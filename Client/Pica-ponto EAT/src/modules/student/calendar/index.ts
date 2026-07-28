@@ -1,0 +1,1 @@
+export { default as StudentCalendarPage } from "./pages/StudentCalendarPage.vue";

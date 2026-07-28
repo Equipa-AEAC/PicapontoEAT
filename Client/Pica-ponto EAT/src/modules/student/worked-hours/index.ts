@@ -1,0 +1,1 @@
+export { default as StudentWorkedHoursPage } from "./pages/StudentWorkedHoursPage.vue";

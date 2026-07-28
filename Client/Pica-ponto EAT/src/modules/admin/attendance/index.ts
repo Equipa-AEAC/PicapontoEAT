@@ -1,0 +1,1 @@
+export { default as AdminAttendancePage } from "./pages/AdminAttendancePage.vue";

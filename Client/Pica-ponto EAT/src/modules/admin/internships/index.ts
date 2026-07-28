@@ -1,0 +1,1 @@
+export { default as AdminInternshipsPage } from "./pages/AdminInternshipsPage.vue";

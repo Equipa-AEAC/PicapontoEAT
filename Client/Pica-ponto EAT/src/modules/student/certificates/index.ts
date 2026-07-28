@@ -1,0 +1,1 @@
+export { default as StudentCertificatesPage } from "./pages/StudentCertificatesPage.vue";

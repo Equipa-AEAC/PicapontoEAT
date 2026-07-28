@@ -1,0 +1,1 @@
+export { default as AdminDevicesPage } from "./pages/AdminDevicesPage.vue";
