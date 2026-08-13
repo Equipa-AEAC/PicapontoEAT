@@ -1,4 +1,4 @@
-import type { AuthSession, LoginPayload, RefreshSessionPayload, UserRole } from "../types/auth";
+import type { AuthSession, LoginPayload, RefreshSessionPayload, StaffRole, UserRole } from "../types/auth";
 
 import { mockRequest } from "../../../services/mockTransport";
 
@@ -8,6 +8,7 @@ interface MockAccount {
   email: string;
   password: string;
   role: UserRole;
+  staffRole: StaffRole | null;
 }
 
 const mockAccounts: MockAccount[] = [
@@ -17,6 +18,17 @@ const mockAccounts: MockAccount[] = [
     email: "admin@school.local",
     password: "password",
     role: "administrator",
+    staffRole: "administrator",
+  },
+  {
+    // Same workspace, narrower permissions — sign in as this account to see the
+    // Users page gate the create/deactivate actions.
+    id: "adm-2",
+    fullName: "Paulo Rios",
+    email: "coordinator@school.local",
+    password: "password",
+    role: "administrator",
+    staffRole: "coordinator",
   },
   {
     id: "stu-1",
@@ -24,6 +36,7 @@ const mockAccounts: MockAccount[] = [
     email: "student@school.local",
     password: "password",
     role: "student",
+    staffRole: null,
   },
 ];
 
@@ -49,6 +62,7 @@ export async function loginWithPassword(payload: LoginPayload): Promise<AuthSess
         email: account.email,
       },
       role: account.role,
+      staffRole: account.staffRole,
     };
   });
 }
@@ -71,6 +85,7 @@ export async function refreshAuthSession(payload: RefreshSessionPayload): Promis
         email: account.email,
       },
       role: account.role,
+      staffRole: account.staffRole,
     };
   });
 }

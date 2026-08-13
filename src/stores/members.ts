@@ -6,10 +6,16 @@ import { assignMemberCard, deleteMember, getMemberById, getMemberInternship, lis
 
 export const useMembersStore = defineStore("members", () => {
   const items = ref<MemberSummary[]>([]);
+  /**
+   * The whole roster, ignoring `filters`. Filter dropdowns must be built from this —
+   * building them from `items` makes every other option vanish as soon as one filter
+   * is applied, leaving no way back.
+   */
+  const allMembers = ref<MemberSummary[]>([]);
   const selectedMember = ref<MemberDetails | null>(null);
   const attendanceHistory = ref<MemberAttendanceHistoryItem[]>([]);
   const internship = ref<MemberInternshipSummary | null>(null);
-  const filters = ref<MemberFilters>({ query: "", status: "all", course: "all", academicYear: "all" });
+  const filters = ref<MemberFilters>({ query: "", status: "all", course: "all", academicYear: "all", origin: "all" });
   const loading = ref(false);
   const loadingDetails = ref(false);
   const saving = ref(false);
@@ -31,6 +37,20 @@ export const useMembersStore = defineStore("members", () => {
     }
   }
 
+  /** Refreshes the unfiltered roster that backs the filter dropdowns. */
+  async function loadAllMembers() {
+    try {
+      const response = await listMembers({});
+      allMembers.value = response.items;
+    } catch (loadError) {
+      error.value = loadError instanceof Error ? loadError.message : "Unable to load members.";
+    }
+  }
+
+  function resetFilters() {
+    filters.value = { query: "", status: "all", course: "all", academicYear: "all", origin: "all" };
+  }
+
   async function loadMember(memberId: string) {
     loadingDetails.value = true;
 
@@ -43,12 +63,14 @@ export const useMembersStore = defineStore("members", () => {
     }
   }
 
+  /** Returns the saved member so callers can chain onto the newly created record. */
   async function persistMember(values: MemberFormValues, memberId?: string) {
     saving.value = true;
 
     try {
-      await saveMember(values, memberId);
-      await loadMembers();
+      const saved = await saveMember(values, memberId);
+      await Promise.all([loadMembers(), loadAllMembers()]);
+      return saved;
     } finally {
       saving.value = false;
     }
@@ -56,7 +78,7 @@ export const useMembersStore = defineStore("members", () => {
 
   async function removeMember(memberId: string) {
     await deleteMember(memberId);
-    await loadMembers();
+    await Promise.all([loadMembers(), loadAllMembers()]);
   }
 
   async function assignCardToMember(memberId: string, cardUid: string) {
@@ -69,6 +91,7 @@ export const useMembersStore = defineStore("members", () => {
 
   return {
     items,
+    allMembers,
     selectedMember,
     attendanceHistory,
     internship,
@@ -79,6 +102,8 @@ export const useMembersStore = defineStore("members", () => {
     error,
     memberCount,
     loadMembers,
+    loadAllMembers,
+    resetFilters,
     loadMember,
     persistMember,
     removeMember,

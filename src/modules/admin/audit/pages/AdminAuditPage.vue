@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import Button from "primevue/button";
-import Column from "primevue/column";
-import Select from "primevue/select";
 
-import { BaseCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseSearchBar, BaseStatusPill, BaseStatsCard, BaseTable, BaseToolbar } from "../../../../shared/components/base";
+import { BaseButton, BaseCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseSearchBar, BaseSelect, BaseStatusPill, BaseStatsCard, BaseTable, BaseTableColumn, BaseToolbar } from "../../../../shared/components/base";
 import { useAuditStore } from "../../../../shared/stores";
 import type { AuditLogEntry } from "../../../../types/audit";
 
@@ -64,12 +61,11 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      eyebrow="Admin workspace"
       title="Audit"
       description="Review audit-friendly log entries with filters and record drill-down."
     >
       <template #actions>
-        <Button label="Refresh" severity="secondary" outlined :loading="auditStore.loading" @click="auditStore.loadAuditLogs()" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="auditStore.loading" @click="auditStore.loadAuditLogs()" />
       </template>
     </BasePageHeader>
 
@@ -84,13 +80,13 @@ onMounted(async () => {
       <template #left>
         <div class="filter-strip">
           <BaseSearchBar v-model="searchQuery" placeholder="Search audit logs" />
-          <Select v-model="entityFilter" :options="entityOptions" optionLabel="label" optionValue="value" />
-          <Select v-model="actionFilter" :options="actionOptions" optionLabel="label" optionValue="value" />
-          <Select v-model="userFilter" :options="userOptions" optionLabel="label" optionValue="value" />
+          <BaseSelect v-model="entityFilter" :options="entityOptions" />
+          <BaseSelect v-model="actionFilter" :options="actionOptions" />
+          <BaseSelect v-model="userFilter" :options="userOptions" />
         </div>
       </template>
       <template #right>
-        <Button label="Reset" severity="secondary" outlined @click="resetFilters" />
+        <BaseButton label="Reset" severity="secondary" outlined @click="resetFilters" />
       </template>
     </BaseToolbar>
 
@@ -103,13 +99,13 @@ onMounted(async () => {
             <BaseEmptyState title="No audit logs" description="No audit records match the current filters." />
           </template>
 
-          <Column field="timestamp" header="Timestamp" sortable />
-          <Column field="userName" header="User" sortable />
-          <Column field="action" header="Action" sortable />
-          <Column field="entity" header="Entity" sortable />
-          <Column field="description" header="Description" />
-          <Column field="ipAddress" header="IP" />
-          <Column field="deviceName" header="Device" sortable />
+          <BaseTableColumn field="timestamp" header="Timestamp" sortable />
+          <BaseTableColumn field="userName" header="User" sortable />
+          <BaseTableColumn field="action" header="Action" sortable />
+          <BaseTableColumn field="entity" header="Entity" sortable />
+          <BaseTableColumn field="description" header="Description" />
+          <BaseTableColumn field="ipAddress" header="IP" />
+          <BaseTableColumn field="deviceName" header="Device" sortable />
         </BaseTable>
       </BaseCard>
 

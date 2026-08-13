@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import Button from "primevue/button";
 
+import BaseButton from "../../../components/base/BaseButton.vue";
 import BaseEmptyState from "../../../components/base/BaseEmptyState.vue";
 import BaseLoading from "../../../components/base/BaseLoading.vue";
 import BaseBadge from "../../../components/base/BaseBadge.vue";
@@ -59,21 +59,14 @@ onMounted(async () => {
   <main class="student-portal">
     <section class="student-portal__hero">
       <BasePageHeader
-        eyebrow="Student portal"
         :title="portal?.profile.fullName ?? 'Loading portal'"
         :description="portal ? `${portal.profile.course} • ${portal.profile.className}` : 'Fetching your academic and attendance summary.'"
       >
         <template #actions>
-            <Button label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="loadPortal()" />
-          <Button label="Download summary" />
+            <BaseButton label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="loadPortal()" />
+          <BaseButton label="Download summary" />
         </template>
       </BasePageHeader>
-
-        <div class="page-breadcrumbs">
-          <span>Student Workspace</span>
-          <span>/</span>
-          <span>Dashboard</span>
-        </div>
 
         <BaseLoading v-if="portalStore.loading" />
 
@@ -87,7 +80,7 @@ onMounted(async () => {
 
         <template v-else-if="portal">
           <div class="student-portal__hero-grid">
-            <BaseCard class="student-portal__profile-card" title="Profile" description="Your identity and internship supervisor.">
+            <BaseCard class="student-portal__profile-card" title="Profile" description="Your identity and internship oversight.">
               <div class="student-profile">
                 <div class="student-profile__avatar" :style="portal.profile.photoUrl ? { backgroundImage: `url(${portal.profile.photoUrl})` } : undefined">
                   <span v-if="!portal.profile.photoUrl">{{ portal.profile.fullName.split(' ').map((part) => part[0]).join('').slice(0, 2) }}</span>
@@ -183,9 +176,10 @@ onMounted(async () => {
             <BaseEmptyState v-else title="No achievements yet" description="There are no milestones available in the mock portal summary." />
           </BaseCard>
 
-          <BaseCard title="Supervisor and placement" description="Current internship oversight information.">
+          <BaseCard title="Internship oversight" description="Who follows your FCT internship, and where it stands.">
             <div class="student-portal__summary">
-              <p><strong>Supervisor:</strong> {{ portal.profile.assignedSupervisor }}</p>
+              <p><strong>Orientador de Estágio:</strong> {{ portal.profile.assignedOrientador }}</p>
+              <p><strong>Monitor de Estágio:</strong> {{ portal.profile.assignedMonitor }}</p>
               <p><strong>Internship status:</strong> {{ portal.currentInternshipStatus }}</p>
               <p><strong>Completed hours:</strong> {{ portal.completedHours }}</p>
               <p><strong>Remaining hours:</strong> {{ portal.remainingHours }}</p>

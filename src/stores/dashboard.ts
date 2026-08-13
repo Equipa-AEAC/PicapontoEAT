@@ -1,11 +1,16 @@
-import { computed, ref } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
 import { getDashboardActivity, getDashboardMetrics } from "../services/dashboard.service";
 
 export const useDashboardStore = defineStore("dashboard", () => {
-  const metrics = ref<Awaited<ReturnType<typeof getDashboardMetrics>>>([]);
-  const activity = ref<Awaited<ReturnType<typeof getDashboardActivity>>>([]);
+  /**
+   * shallowRef: metrics carry an icon *component*, and a deep ref would proxy it —
+   * which Vue warns about. The array is always replaced wholesale, never mutated,
+   * so shallow reactivity is all this needs.
+   */
+  const metrics = shallowRef<Awaited<ReturnType<typeof getDashboardMetrics>>>([]);
+  const activity = shallowRef<Awaited<ReturnType<typeof getDashboardActivity>>>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
 

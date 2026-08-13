@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Dialog from "primevue/dialog";
-import Button from "primevue/button";
+import BaseDialog from "./BaseDialog.vue";
+import BaseButton from "./BaseButton.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -28,11 +28,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Dialog
+  <BaseDialog
     class="base-form-dialog"
     :visible="props.visible"
-    modal
-    :dismissableMask="props.dismissableMask"
+    :dismissable-mask="props.dismissableMask"
     :closable="!props.loading"
     :header="props.title"
     @update:visible="emit('update:visible', $event)"
@@ -45,9 +44,29 @@ const emit = defineEmits<{
 
     <template #footer>
       <div class="base-form-dialog__footer">
-        <Button :label="props.cancelLabel" severity="secondary" text :disabled="props.loading" @click="emit('cancel')" />
-        <Button :label="props.confirmLabel" :loading="props.loading" @click="emit('confirm')" />
+        <BaseButton :label="props.cancelLabel" severity="secondary" text :disabled="props.loading" @click="emit('cancel')" />
+        <BaseButton :label="props.confirmLabel" :loading="props.loading" @click="emit('confirm')" />
       </div>
     </template>
-  </Dialog>
+  </BaseDialog>
 </template>
+
+<style>
+.base-form-dialog__subtitle {
+  margin: 0 0 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.base-form-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.base-form-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+</style>
