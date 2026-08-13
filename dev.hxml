@@ -1,0 +1,5 @@
+global.hxml
+
+-lib hxwell
+-D no-compilation
+-cpp Export/cpp

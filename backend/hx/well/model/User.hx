@@ -1,0 +1,36 @@
+package hx.well.model;
+
+import hx.well.auth.IAuthenticatable;
+import hx.well.model.BaseModel;
+import hx.well.model.BaseModelQuery;
+
+@:connection("default")
+@:table("users")
+class User extends BaseModel<User> implements IAuthenticatable {
+    public static var query:BaseModelQuery<User>;
+
+    @:primary
+    //@:visible
+    @:field
+    public var id:Int;
+
+    @:visible
+    @:field
+    public var username:String;
+
+    //@:visible
+    @:field
+    public var password:String;
+
+    public function new() {
+        super();
+    }
+
+    public function getId():Dynamic {
+        return id;
+    }
+
+    public function getPassword():String {
+        return password;
+    }
+}

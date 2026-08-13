@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 
 import AdminLayout from "../layouts/AdminLayout.vue";
 import LoginLayout from "../layouts/LoginLayout.vue";
@@ -48,7 +48,7 @@ const adminChildRoutes = adminNavigationItems.map((item) => ({
 }));
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: [
     {
       path: "/",
