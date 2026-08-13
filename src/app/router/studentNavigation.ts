@@ -1,4 +1,4 @@
-import { PhCalendar, PhCertificate, PhClockCounterClockwise, PhGearSix, PhHouse, PhIdentificationCard, PhMegaphone, PhSuitcaseSimple, PhTimer } from "@phosphor-icons/vue";
+import { PhCalendar, PhCertificate, PhClockCounterClockwise, PhFileText, PhGearSix, PhHouse, PhIdentificationCard, PhMegaphone, PhNotePencil, PhSuitcaseSimple, PhTimer } from "@phosphor-icons/vue";
 
 import type { NavigationItem } from "../../shared/types";
 
@@ -37,6 +37,20 @@ export const studentNavigationItems: NavigationItem[] = [
     label: "Internship",
     description: "Progress and milestones",
     icon: PhSuitcaseSimple,
+  },
+  {
+    name: "student-daily-log",
+    path: "/student/daily-log",
+    label: "Daily Report",
+    description: "Register what you did today",
+    icon: PhNotePencil,
+  },
+  {
+    name: "student-reports",
+    path: "/student/reports",
+    label: "Internship Reports",
+    description: "Monthly and final reports",
+    icon: PhFileText,
   },
   {
     name: "student-certificates",

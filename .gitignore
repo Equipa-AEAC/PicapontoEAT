@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code scratch worktrees — these are full repo checkouts and must never be committed
+.claude/worktrees/
+
+# Official FCT form templates kept locally for reference, not distributed with the repo
+docs/Documentos de estagio AGRUPAMENTO DE ESCOLAS AUGUSTO CABRITA/

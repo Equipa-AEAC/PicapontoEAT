@@ -1,108 +1,313 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import Button from "primevue/button";
-import Column from "primevue/column";
-import Select from "primevue/select";
+import { PhCertificate, PhSealCheck, PhSignature, PhTimer } from "@phosphor-icons/vue";
 
-import { BaseCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseStatusPill, BaseStatsCard, BaseTable, BaseToolbar, BaseSearchBar } from "../../../../shared/components/base";
-import { useInternshipsStore } from "../../../../shared/stores";
+import {
+  BaseButton,
+  BaseCard,
+  BaseDialog,
+  BaseEmptyState,
+  BaseFileUpload,
+  BaseLoading,
+  BasePageHeader,
+  BaseSearchBar,
+  BaseSection,
+  BaseSelect,
+  BaseStatusPill,
+  BaseStatsCard,
+  BaseTable,
+  BaseTableColumn,
+  BaseToolbar,
+} from "../../../../shared/components/base";
+import { useCertificatesStore, useInternshipsStore, useMembersStore } from "../../../../shared/stores";
+import type { UploadedFile } from "../../../../services/uploads.service";
+import type { CertificateKind } from "../../../../types/certificates";
 import type { InternshipSummary } from "../../../../types/internships";
 
+const certificatesStore = useCertificatesStore();
 const internshipsStore = useInternshipsStore();
-const searchQuery = ref("");
-const statusFilter = ref<"all" | InternshipSummary["status"]>("all");
+const membersStore = useMembersStore();
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Complete", value: "complete" },
-  { label: "Active", value: "active" },
-  { label: "Planned", value: "planned" },
-  { label: "Paused", value: "paused" },
+const searchQuery = ref("");
+const trackFilter = ref<"all" | "surplus-ready" | "fct-ready" | "awaiting-signature">("all");
+const previewVisible = ref(false);
+
+const trackOptions = [
+  { label: "All members", value: "all" },
+  { label: "Surplus eligible", value: "surplus-ready" },
+  { label: "FCT eligible", value: "fct-ready" },
+  { label: "Awaiting signature", value: "awaiting-signature" },
 ];
 
-const visibleCertificates = computed(() => {
+function internshipFor(memberId: string): InternshipSummary | undefined {
+  return internshipsStore.items.find((internship) => internship.studentId === memberId);
+}
+
+const rows = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  return internshipsStore.items.filter((internship) => {
-    const matchesQuery = query.length === 0 || [internship.studentName, internship.supervisor, internship.notes].join(" ").toLowerCase().includes(query);
-    const matchesStatus = statusFilter.value === "all" || internship.status === statusFilter.value;
-    return matchesQuery && matchesStatus;
-  });
+
+  return membersStore.allMembers
+    .map((member) => {
+      const internship = internshipFor(member.id);
+      const surplus = certificatesStore.certificateFor(member.id, "surplus");
+      const fct = certificatesStore.certificateFor(member.id, "fct");
+
+      return {
+        id: member.id,
+        fullName: member.fullName,
+        originSchool: member.originSchool,
+        teamHours: member.teamHours,
+        isIntern: Boolean(internship),
+        internshipStatus: internship?.status ?? null,
+        internshipHours: internship?.completedHours ?? 0,
+        surplusEligible: member.teamHours > 0,
+        fctEligible: internship?.status === "complete",
+        surplus,
+        fct,
+        awaitingSignature: Boolean((surplus && !surplus.signedFile) || (fct && !fct.signedFile)),
+      };
+    })
+    .filter((row) => {
+      const matchesQuery = query.length === 0 || `${row.fullName} ${row.originSchool}`.toLowerCase().includes(query);
+
+      if (!matchesQuery) {
+        return false;
+      }
+
+      if (trackFilter.value === "surplus-ready") return row.surplusEligible;
+      if (trackFilter.value === "fct-ready") return row.fctEligible;
+      if (trackFilter.value === "awaiting-signature") return row.awaitingSignature;
+      return true;
+    });
 });
 
-const completeCount = computed(() => internshipsStore.items.filter((item) => item.status === "complete").length);
-const issuedCount = computed(() => internshipsStore.items.filter((item) => item.certificateIssuedAt).length);
+const surplusEligible = computed(() => rows.value.filter((row) => row.surplusEligible).length);
+const fctEligible = computed(() => rows.value.filter((row) => row.fctEligible).length);
+const totalTeamHours = computed(() => rows.value.reduce((total, row) => total + row.teamHours, 0));
 
-async function previewCertificate(studentId: string) {
-  await internshipsStore.previewCertificate(studentId);
+const busy = computed(() => certificatesStore.loading || internshipsStore.loading || membersStore.loading);
+
+function templateDate(kind: CertificateKind) {
+  const template = certificatesStore.templateFor(kind);
+  return template ? `uploaded ${template.uploadedAt.slice(0, 10)}` : "";
+}
+
+async function onTemplateChange(kind: CertificateKind, file: UploadedFile | null) {
+  if (file) {
+    await certificatesStore.uploadTemplate(kind, file);
+  } else {
+    await certificatesStore.clearTemplate(kind);
+  }
+}
+
+async function generate(kind: CertificateKind, memberId: string) {
+  const result = await certificatesStore.generate(kind, memberId);
+
+  if (result) {
+    previewVisible.value = true;
+  }
+}
+
+async function onSignedChange(certificateId: string, file: UploadedFile | null) {
+  if (file) {
+    await certificatesStore.attachSigned(certificateId, file);
+  } else {
+    await certificatesStore.clearSigned(certificateId);
+  }
+}
+
+function openDownload(url: string) {
+  window.open(url, "_blank", "noopener");
 }
 
 onMounted(async () => {
-  if (!internshipsStore.items.length) {
-    await internshipsStore.loadInternships();
-  }
+  await Promise.all([membersStore.loadAllMembers(), internshipsStore.loadInternships(), certificatesStore.load()]);
 });
 </script>
 
 <template>
   <section class="page-stack">
     <BasePageHeader
-      eyebrow="Admin workspace"
       title="Certificates"
-      description="Review internship completion and preview issued certificate output."
+      description="Two independent certificates: the surplus-hours certificate for volunteer team work, and the official FCT certificate for members who completed an internship."
     >
       <template #actions>
-        <Button label="Refresh" severity="secondary" outlined :loading="internshipsStore.loading" @click="internshipsStore.loadInternships()" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="busy" @click="certificatesStore.load()" />
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
-      <BaseStatsCard label="Complete" :value="String(completeCount)" caption="Internships ready for certificates" />
-      <BaseStatsCard label="Issued" :value="String(issuedCount)" caption="Certificates already issued" />
-      <BaseStatsCard label="Preview state" :value="internshipsStore.certificatePreview ? 'Ready' : 'Idle'" caption="Last generated certificate preview" />
-      <BaseStatsCard label="Rows" :value="String(visibleCertificates.length)" caption="Filtered certificate entries" />
+      <BaseStatsCard label="Surplus eligible" :value="String(surplusEligible)" caption="Members with registered team hours" :icon="PhCertificate" />
+      <BaseStatsCard label="FCT eligible" :value="String(fctEligible)" caption="Internships marked complete" :icon="PhSealCheck" />
+      <BaseStatsCard label="Team hours" :value="String(totalTeamHours)" caption="Volunteer hours across the roster" :icon="PhTimer" />
+      <BaseStatsCard label="Signed copies" :value="String(certificatesStore.signedCount)" caption="Countersigned PDFs stored" :icon="PhSignature" />
     </section>
+
+    <p v-if="certificatesStore.errorMessage" class="form-error-banner">{{ certificatesStore.errorMessage }}</p>
+
+    <BaseSection
+      title="Certificate templates"
+      description="The blank letterhead PDF each certificate is generated from. Uploaded once and reused for every member."
+    >
+      <div class="dashboard-grid">
+        <BaseCard title="Surplus-hours template" description="Used for volunteer team-hours certificates.">
+          <BaseFileUpload
+            :model-value="certificatesStore.surplusTemplate?.file ?? null"
+            upload-label="Upload surplus template"
+            :meta="templateDate('surplus')"
+            :disabled="certificatesStore.saving"
+            @update:model-value="onTemplateChange('surplus', $event)"
+          />
+        </BaseCard>
+
+        <BaseCard title="FCT template" description="Used for the regulated internship completion certificate.">
+          <BaseFileUpload
+            :model-value="certificatesStore.fctTemplate?.file ?? null"
+            upload-label="Upload FCT template"
+            :meta="templateDate('fct')"
+            :disabled="certificatesStore.saving"
+            @update:model-value="onTemplateChange('fct', $event)"
+          />
+        </BaseCard>
+      </div>
+    </BaseSection>
 
     <BaseToolbar>
       <template #left>
         <div class="filter-strip">
-          <BaseSearchBar v-model="searchQuery" placeholder="Search certificates" />
-          <Select v-model="statusFilter" :options="statusOptions" optionLabel="label" optionValue="value" />
+          <BaseSearchBar v-model="searchQuery" placeholder="Search members" />
+          <BaseSelect v-model="trackFilter" :options="trackOptions" />
         </div>
       </template>
     </BaseToolbar>
 
-    <BaseLoading v-if="internshipsStore.loading" />
+    <BaseLoading v-if="busy" />
 
-    <BaseSection v-else title="Certificate table" description="Searchable certificate rows with preview actions.">
+    <BaseSection v-else title="Certificate registry" description="Every member can earn a surplus-hours certificate; only interns can earn the FCT certificate.">
       <BaseCard>
-        <BaseTable :value="visibleCertificates" dataKey="id" paginator :rows="8">
+        <BaseEmptyState
+          v-if="!certificatesStore.surplusTemplate && !certificatesStore.fctTemplate"
+          title="No template uploaded yet"
+          description="Upload a surplus-hours or FCT template above before generating certificates — without one there is no letterhead to generate onto."
+        />
+
+        <BaseTable v-else :value="rows" dataKey="id" paginator :rows="8">
           <template #empty>
-            <BaseEmptyState title="No certificates found" description="No internship certificate rows match the current filters." />
+            <BaseEmptyState title="No members found" description="No member matches the current search." />
           </template>
 
-          <Column field="studentName" header="Member" sortable />
-          <Column field="supervisor" header="Supervisor" sortable />
-          <Column field="completedHours" header="Completed" sortable />
-          <Column field="remainingHours" header="Remaining" sortable />
-          <Column field="status" header="Status">
+          <BaseTableColumn header="Member" field="fullName" sortable>
             <template #body="slotProps">
-              <BaseStatusPill :label="slotProps.data.status" :tone="slotProps.data.status === 'complete' ? 'success' : 'warning'" />
+              <div class="cell-stack">
+                <strong>{{ slotProps.data.fullName }}</strong>
+                <small>{{ slotProps.data.originSchool }}</small>
+              </div>
             </template>
-          </Column>
-          <Column field="certificateIssuedAt" header="Issued" />
-          <Column header="Actions">
+          </BaseTableColumn>
+
+          <BaseTableColumn header="Surplus (team hours)">
             <template #body="slotProps">
-              <Button label="Preview" text size="small" :disabled="slotProps.data.status !== 'complete'" @click="previewCertificate(slotProps.data.studentId)" />
+              <div class="certificate-cell">
+                <BaseStatusPill
+                  :label="slotProps.data.surplus ? (slotProps.data.surplus.signedFile ? 'Signed' : 'Generated') : slotProps.data.surplusEligible ? `${slotProps.data.teamHours}h available` : 'No hours yet'"
+                  :tone="slotProps.data.surplus?.signedFile ? 'success' : slotProps.data.surplus ? 'info' : slotProps.data.surplusEligible ? 'warning' : 'danger'"
+                />
+                <div class="inline-actions">
+                  <BaseButton
+                    :label="slotProps.data.surplus ? 'Regenerate' : 'Generate'"
+                    text
+                    size="small"
+                    :disabled="!slotProps.data.surplusEligible || !certificatesStore.surplusTemplate || certificatesStore.saving"
+                    @click="generate('surplus', slotProps.data.id)"
+                  />
+                  <BaseButton v-if="slotProps.data.surplus" label="Open" text size="small" @click="openDownload(slotProps.data.surplus.downloadUrl)" />
+                </div>
+                <BaseFileUpload
+                  v-if="slotProps.data.surplus"
+                  :model-value="slotProps.data.surplus.signedFile"
+                  upload-label="Upload signed copy"
+                  hint="Countersigned PDF · max 5 MB"
+                  :meta="slotProps.data.surplus.signedAt ? `signed ${slotProps.data.surplus.signedAt.slice(0, 10)}` : ''"
+                  :disabled="certificatesStore.saving"
+                  @update:model-value="onSignedChange(slotProps.data.surplus.id, $event)"
+                />
+              </div>
             </template>
-          </Column>
+          </BaseTableColumn>
+
+          <BaseTableColumn header="FCT internship">
+            <template #body="slotProps">
+              <div v-if="slotProps.data.isIntern" class="certificate-cell">
+                <BaseStatusPill
+                  :label="slotProps.data.fct ? (slotProps.data.fct.signedFile ? 'Signed' : 'Generated') : `${slotProps.data.internshipStatus} · ${slotProps.data.internshipHours}h`"
+                  :tone="slotProps.data.fct?.signedFile ? 'success' : slotProps.data.fct ? 'info' : slotProps.data.fctEligible ? 'warning' : 'info'"
+                />
+                <div class="inline-actions">
+                  <BaseButton
+                    :label="slotProps.data.fct ? 'Regenerate' : 'Generate'"
+                    text
+                    size="small"
+                    :disabled="!slotProps.data.fctEligible || !certificatesStore.fctTemplate || certificatesStore.saving"
+                    @click="generate('fct', slotProps.data.id)"
+                  />
+                  <BaseButton v-if="slotProps.data.fct" label="Open" text size="small" @click="openDownload(slotProps.data.fct.downloadUrl)" />
+                </div>
+                <BaseFileUpload
+                  v-if="slotProps.data.fct"
+                  :model-value="slotProps.data.fct.signedFile"
+                  upload-label="Upload signed copy"
+                  hint="Countersigned PDF · max 5 MB"
+                  :meta="slotProps.data.fct.signedAt ? `signed ${slotProps.data.fct.signedAt.slice(0, 10)}` : ''"
+                  :disabled="certificatesStore.saving"
+                  @update:model-value="onSignedChange(slotProps.data.fct.id, $event)"
+                />
+              </div>
+              <span v-else class="certificate-cell__muted">Team member only</span>
+            </template>
+          </BaseTableColumn>
         </BaseTable>
       </BaseCard>
-
-      <BaseCard v-if="internshipsStore.certificatePreview" title="Certificate preview" description="Mock output returned by the preview generator.">
-        <p>{{ internshipsStore.certificatePreview.fileName }}</p>
-        <p>{{ internshipsStore.certificatePreview.issuedAt }}</p>
-        <p>{{ internshipsStore.certificatePreview.summary }}</p>
-      </BaseCard>
     </BaseSection>
+
+    <BaseDialog
+      :visible="previewVisible && Boolean(certificatesStore.lastGenerated)"
+      header="Certificate generated"
+      @update:visible="previewVisible = $event"
+    >
+      <div v-if="certificatesStore.lastGenerated" class="module-summary">
+        <BaseStatusPill :label="certificatesStore.lastGenerated.kind === 'surplus' ? 'Surplus hours' : 'FCT internship'" tone="success" />
+        <p><strong>Member:</strong> {{ certificatesStore.lastGenerated.memberName }}</p>
+        <p><strong>Hours:</strong> {{ certificatesStore.lastGenerated.hours }}h</p>
+        <p><strong>Generated from:</strong> {{ certificatesStore.lastGenerated.templateFileName }}</p>
+        <p><strong>Generated at:</strong> {{ certificatesStore.lastGenerated.generatedAt }}</p>
+        <p>{{ certificatesStore.lastGenerated.summary }}</p>
+      </div>
+
+      <template #footer>
+        <div class="inline-actions inline-actions--end">
+          <BaseButton label="Close" severity="secondary" text @click="previewVisible = false" />
+          <BaseButton
+            v-if="certificatesStore.lastGenerated"
+            label="Open file"
+            @click="openDownload(certificatesStore.lastGenerated.downloadUrl)"
+          />
+        </div>
+      </template>
+    </BaseDialog>
   </section>
 </template>
+
+<style scoped>
+.certificate-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.certificate-cell__muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+</style>

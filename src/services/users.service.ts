@@ -20,6 +20,10 @@ export async function saveUser(values: UserFormValues, userId?: string): Promise
       return cloneRecord(currentUser);
     }
 
+    if (mockDatabase.users.some((item) => item.email.toLowerCase() === values.email.trim().toLowerCase())) {
+      throw new Error("An account already exists for that email address.");
+    }
+
     const createdUser: UserSummary = {
       id: `user-${mockDatabase.users.length + 1}`,
       fullName: values.fullName,
@@ -27,6 +31,7 @@ export async function saveUser(values: UserFormValues, userId?: string): Promise
       role: values.role,
       status: values.status,
       lastLoginAt: new Date().toISOString(),
+      memberId: values.memberId,
     };
 
     mockDatabase.users.unshift(createdUser);
@@ -59,9 +64,22 @@ export async function resetUserPassword(userId: string): Promise<{ temporaryPass
   });
 }
 
+export async function reactivateUser(userId: string): Promise<UserSummary> {
+  return mockRequest(() => {
+    const user = mockDatabase.users.find((item) => item.id === userId);
+
+    if (!user) {
+      throw new Error("User not found.");
+    }
+
+    user.status = "active";
+    return cloneRecord(user);
+  });
+}
+
 export async function getPermissionsMatrix(): Promise<PermissionMatrixRow[]> {
   return mockRequest(() => [
-    { module: "Students", create: true, read: true, update: true, delete: true, export: true },
+    { module: "Members", create: true, read: true, update: true, delete: true, export: true },
     { module: "Attendance", create: true, read: true, update: true, delete: false, export: true },
     { module: "Devices", create: true, read: true, update: true, delete: true, export: false },
     { module: "Reports", create: false, read: true, update: false, delete: false, export: true },

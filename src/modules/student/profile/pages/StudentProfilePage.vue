@@ -26,7 +26,8 @@ onMounted(async () => {
         <p><strong>Class:</strong> {{ profile.className }}</p>
         <p><strong>Email:</strong> {{ profile.email }}</p>
         <p><strong>Phone:</strong> {{ profile.phone }}</p>
-        <p><strong>Supervisor:</strong> {{ profile.assignedSupervisor }}</p>
+        <p><strong>Orientador de Estágio:</strong> {{ profile.assignedOrientador }}</p>
+        <p><strong>Monitor de Estágio:</strong> {{ profile.assignedMonitor }}</p>
       </div>
       <BaseEmptyState v-else title="Profile unavailable" description="No student profile is available in the current mock dataset." />
     </BaseCard>

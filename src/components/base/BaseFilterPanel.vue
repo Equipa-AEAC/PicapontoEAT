@@ -14,3 +14,12 @@ defineProps<{
     </div>
   </BaseCard>
 </template>
+
+<style scoped>
+.base-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+</style>

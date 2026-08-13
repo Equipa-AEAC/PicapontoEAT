@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import Button from "primevue/button";
 
-import { BaseCard, BaseDataCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseStatusPill } from "../../../../shared/components/base";
+import { BaseButton, BaseCard, BaseDataCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseStatusPill } from "../../../../shared/components/base";
 import { usePortalStore } from "../../../../shared/stores";
 
 const portalStore = usePortalStore();
@@ -30,21 +29,14 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      eyebrow="Member workspace"
       title="Calendar"
       description="Review the weekly attendance calendar and status distribution for the current period."
     >
       <template #actions>
-        <Button label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="portalStore.loadPortalSummary()" />
-        <Button label="Attendance" severity="secondary" outlined @click="router.push({ name: 'student-attendance' })" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="portalStore.loadPortalSummary()" />
+        <BaseButton label="Attendance" severity="secondary" outlined @click="router.push({ name: 'student-attendance' })" />
       </template>
     </BasePageHeader>
-
-    <div class="page-breadcrumbs">
-      <span>Student Workspace</span>
-      <span>/</span>
-      <span>Calendar</span>
-    </div>
 
     <section class="metric-grid">
       <BaseDataCard title="Present" :value="String(statusTotals.present)" description="Days marked present" trend-label="Stable" />

@@ -6,7 +6,10 @@ export interface StudentPortalProfile {
   photoUrl: string | null;
   email: string;
   phone: string;
-  assignedSupervisor: string;
+  /** Orientador de estágio at the school the member is enrolled at. */
+  assignedOrientador: string;
+  /** Monitor de estágio at Equipa Técnica. */
+  assignedMonitor: string;
 }
 
 export interface PortalAchievement {

@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from "vue";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
-import DatePicker from "primevue/datepicker";
-import Textarea from "primevue/textarea";
+import { computed, reactive, ref, watch } from "vue";
 
-import BaseAvatar from "../base/BaseAvatar.vue";
+import BaseDatePicker from "../base/BaseDatePicker.vue";
 import BaseFormDialog from "../base/BaseFormDialog.vue";
+import BaseImageUpload from "../base/BaseImageUpload.vue";
+import BaseSelect from "../base/BaseSelect.vue";
+import BaseTextarea from "../base/BaseTextarea.vue";
+import BaseTextInput from "../base/BaseTextInput.vue";
+import { isExternalSchool, OTHER_SCHOOL_VALUE, SCHOOL_NAME, SCHOOL_OPTIONS } from "../../shared/constants";
 import type { MemberFormValues } from "../../types/members";
 
 interface MemberFormOption {
@@ -20,6 +21,7 @@ const defaultMember: MemberFormValues = {
   fullName: "",
   email: "",
   phone: "",
+  originSchool: SCHOOL_NAME,
   course: "",
   className: "",
   academicYear: "2026",
@@ -74,13 +76,20 @@ const cardDropdownOptions = computed(() => [
   ...props.cardOptions.map((uid) => ({ label: uid, value: uid })),
 ]);
 
-const birthDateModel = computed<Date | null>({
-  get() {
-    return form.birthDate ? new Date(form.birthDate) : null;
-  },
-  set(value) {
-    form.birthDate = value ? value.toISOString().slice(0, 10) : "";
-  },
+/**
+ * The select holds a known school or the "Other" sentinel; `form.originSchool` always
+ * holds the real name. Picking "Other" reveals a free-text input for schools we have
+ * not partnered with before.
+ */
+const schoolSelection = ref<string>(SCHOOL_NAME);
+const customSchool = ref("");
+const usesCustomSchool = computed(() => schoolSelection.value === OTHER_SCHOOL_VALUE);
+
+/** Members enrolled elsewhere get their course, class and year from their own school. */
+const isExternal = computed(() => isExternalSchool(form.originSchool));
+
+watch([schoolSelection, customSchool], () => {
+  form.originSchool = usesCustomSchool.value ? customSchool.value.trim() : schoolSelection.value;
 });
 
 function resetForm() {
@@ -88,6 +97,10 @@ function resetForm() {
   Object.keys(errors).forEach((key) => {
     delete errors[key as keyof MemberFormValues];
   });
+
+  const known = SCHOOL_OPTIONS.some((option) => option.value === form.originSchool);
+  schoolSelection.value = known ? form.originSchool : OTHER_SCHOOL_VALUE;
+  customSchool.value = known ? "" : form.originSchool;
 }
 
 function validate() {
@@ -99,16 +112,16 @@ function validate() {
     "fullName",
     "email",
     "phone",
-    "course",
-    "className",
-    "academicYear",
+    "originSchool",
     "birthDate",
     "emergencyContact",
+    // Academic fields are only ours to require for our own students.
+    ...(isExternal.value ? [] : (["course", "className", "academicYear"] as Array<keyof MemberFormValues>)),
   ];
 
   for (const field of requiredFields) {
     if (!String(form[field]).trim()) {
-      errors[field] = "This field is required.";
+      errors[field] = field === "originSchool" ? "Select or type the school this member is enrolled at." : "This field is required.";
       isValid = false;
     } else {
       delete errors[field];
@@ -156,7 +169,7 @@ watch(
   <BaseFormDialog
     :visible="visible"
     :title="title ?? 'Member form'"
-    subtitle="Capture member identity, contact details, academic class and RFID assignment."
+    subtitle="Capture member identity, the school they are enrolled at, contact details and RFID assignment."
     confirm-label="Save"
     :loading="busy"
     @update:visible="emit('update:visible', $event)"
@@ -164,79 +177,91 @@ watch(
     @cancel="emit('cancel')"
   >
     <div class="student-form">
-      <div class="student-form__photo">
-        <BaseAvatar :image="form.photoUrl || null" :label="form.fullName || 'ME'" size="xlarge" />
-        <InputText v-model="form.photoUrl" placeholder="Photo URL" />
-      </div>
+      <BaseImageUpload v-model="form.photoUrl" :label="form.fullName || 'ME'" />
 
       <div class="student-form__grid">
         <div>
           <label class="student-form__label">Member Number</label>
-          <InputText v-model="form.memberNumber" />
+          <BaseTextInput v-model="form.memberNumber" />
           <small v-if="errors.memberNumber" class="student-form__error">{{ errors.memberNumber }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Full Name</label>
-          <InputText v-model="form.fullName" />
+          <BaseTextInput v-model="form.fullName" />
           <small v-if="errors.fullName" class="student-form__error">{{ errors.fullName }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Email</label>
-          <InputText v-model="form.email" type="email" />
+          <BaseTextInput v-model="form.email" type="email" />
           <small v-if="errors.email" class="student-form__error">{{ errors.email }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Phone</label>
-          <InputText v-model="form.phone" />
+          <BaseTextInput v-model="form.phone" />
           <small v-if="errors.phone" class="student-form__error">{{ errors.phone }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Course</label>
-          <InputText v-model="form.course" />
+          <label class="student-form__label">School</label>
+          <BaseSelect v-model="schoolSelection" :options="SCHOOL_OPTIONS" />
+          <small v-if="isExternal" class="student-form__hint">
+            Enrolled elsewhere — an FCT intern hosted by Equipa Técnica. Their orientador belongs to that school.
+          </small>
+          <small v-if="errors.originSchool && !usesCustomSchool" class="student-form__error">{{ errors.originSchool }}</small>
+        </div>
+
+        <div v-if="usesCustomSchool">
+          <label class="student-form__label">School name</label>
+          <BaseTextInput v-model="customSchool" placeholder="Escola Secundária de…" />
+          <small v-if="errors.originSchool" class="student-form__error">{{ errors.originSchool }}</small>
+        </div>
+
+        <div>
+          <label class="student-form__label">Course{{ isExternal ? " (optional)" : "" }}</label>
+          <BaseTextInput v-model="form.course" />
           <small v-if="errors.course" class="student-form__error">{{ errors.course }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Class</label>
-          <InputText v-model="form.className" />
+          <label class="student-form__label">Class{{ isExternal ? " (optional)" : "" }}</label>
+          <BaseTextInput v-model="form.className" />
           <small v-if="errors.className" class="student-form__error">{{ errors.className }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Academic Year</label>
-          <Select v-model="form.academicYear" :options="yearOptions" optionLabel="label" optionValue="value" />
+          <label class="student-form__label">Academic Year{{ isExternal ? " (optional)" : "" }}</label>
+          <BaseSelect v-model="form.academicYear" :options="yearOptions" />
           <small v-if="errors.academicYear" class="student-form__error">{{ errors.academicYear }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Birth Date</label>
-          <DatePicker v-model="birthDateModel" dateFormat="yy-mm-dd" showIcon />
+          <BaseDatePicker v-model="form.birthDate" />
           <small v-if="errors.birthDate" class="student-form__error">{{ errors.birthDate }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Emergency Contact</label>
-          <InputText v-model="form.emergencyContact" />
+          <BaseTextInput v-model="form.emergencyContact" />
           <small v-if="errors.emergencyContact" class="student-form__error">{{ errors.emergencyContact }}</small>
         </div>
 
         <div>
           <label class="student-form__label">Assigned Card</label>
-          <Select v-model="form.assignedCardUid" :options="cardDropdownOptions" optionLabel="label" optionValue="value" />
+          <BaseSelect v-model="form.assignedCardUid" :options="cardDropdownOptions" />
         </div>
 
         <div>
           <label class="student-form__label">Status</label>
-          <Select v-model="form.status" :options="statusOptions" optionLabel="label" optionValue="value" />
+          <BaseSelect v-model="form.status" :options="statusOptions" />
         </div>
 
         <div class="student-form__full-width">
           <label class="student-form__label">Notes</label>
-          <Textarea v-model="form.notes" rows="4" autoResize />
+          <BaseTextarea v-model="form.notes" rows="4" auto-resize />
         </div>
       </div>
     </div>
