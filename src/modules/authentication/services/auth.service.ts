@@ -10,6 +10,18 @@ interface MockAccount {
   role: UserRole;
 }
 
+type MockTokenType = "access" | "refresh";
+
+interface MockTokenPayload {
+  type: MockTokenType;
+  role: UserRole;
+  accountId: string;
+  issuedAt: number;
+}
+
+const TOKEN_PREFIX = "mock";
+const TOKEN_SEPARATOR = ".";
+
 const mockAccounts: MockAccount[] = [
   {
     id: "adm-1",
@@ -27,8 +39,56 @@ const mockAccounts: MockAccount[] = [
   },
 ];
 
-function buildToken(prefix: string, account: MockAccount) {
-  return `${prefix}-${account.role}-${account.id}-${Date.now()}`;
+function encodePayload(payload: MockTokenPayload) {
+  return btoa(encodeURIComponent(JSON.stringify(payload)));
+}
+
+function decodePayload(encoded: string): MockTokenPayload | null {
+  try {
+    return JSON.parse(decodeURIComponent(atob(encoded))) as MockTokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+function buildToken(type: MockTokenType, account: MockAccount) {
+  const payload: MockTokenPayload = {
+    type,
+    role: account.role,
+    accountId: account.id,
+    issuedAt: Date.now(),
+  };
+
+  return [TOKEN_PREFIX, encodePayload(payload)].join(TOKEN_SEPARATOR);
+}
+
+function parseToken(token: string, expectedType: MockTokenType): MockTokenPayload | null {
+  const [prefix, encoded, ...rest] = token.split(TOKEN_SEPARATOR);
+
+  if (prefix !== TOKEN_PREFIX || !encoded || rest.length > 0) {
+    return null;
+  }
+
+  const payload = decodePayload(encoded);
+
+  if (!payload || payload.type !== expectedType || !payload.accountId || !payload.role) {
+    return null;
+  }
+
+  return payload;
+}
+
+function buildSession(account: MockAccount): AuthSession {
+  return {
+    accessToken: buildToken("access", account),
+    refreshToken: buildToken("refresh", account),
+    user: {
+      id: account.id,
+      fullName: account.fullName,
+      email: account.email,
+    },
+    role: account.role,
+  };
 }
 
 export async function loginWithPassword(payload: LoginPayload): Promise<AuthSession> {
@@ -40,37 +100,21 @@ export async function loginWithPassword(payload: LoginPayload): Promise<AuthSess
       throw new Error("Invalid email or password.");
     }
 
-    return {
-      accessToken: buildToken("access", account),
-      refreshToken: buildToken("refresh", account),
-      user: {
-        id: account.id,
-        fullName: account.fullName,
-        email: account.email,
-      },
-      role: account.role,
-    };
+    return buildSession(account);
   });
 }
 
 export async function refreshAuthSession(payload: RefreshSessionPayload): Promise<AuthSession> {
   return mockRequest(() => {
-    const [, , role, id] = payload.refreshToken.split("-");
-    const account = mockAccounts.find((item) => item.id === id && item.role === role);
+    const token = parseToken(payload.refreshToken, "refresh");
+    const account = token
+      ? mockAccounts.find((item) => item.id === token.accountId && item.role === token.role)
+      : undefined;
 
     if (!account) {
       throw new Error("Invalid refresh token.");
     }
 
-    return {
-      accessToken: buildToken("access", account),
-      refreshToken: buildToken("refresh", account),
-      user: {
-        id: account.id,
-        fullName: account.fullName,
-        email: account.email,
-      },
-      role: account.role,
-    };
+    return buildSession(account);
   });
 }
