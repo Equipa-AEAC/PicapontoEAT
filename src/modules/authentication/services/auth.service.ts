@@ -1,4 +1,4 @@
-import type { AuthSession, LoginPayload, RefreshSessionPayload, UserRole } from "../types/auth";
+import type { AuthSession, LoginPayload, RefreshSessionPayload, StaffRole, UserRole } from "../types/auth";
 
 import { mockRequest } from "../../../services/mockTransport";
 
@@ -8,6 +8,7 @@ interface MockAccount {
   email: string;
   password: string;
   role: UserRole;
+  staffRole: StaffRole | null;
 }
 
 type MockTokenType = "access" | "refresh";
@@ -29,6 +30,17 @@ const mockAccounts: MockAccount[] = [
     email: "admin@school.local",
     password: "password",
     role: "administrator",
+    staffRole: "administrator",
+  },
+  {
+    // Same workspace, narrower permissions — sign in as this account to see the
+    // Users page gate the create/deactivate actions.
+    id: "adm-2",
+    fullName: "Paulo Rios",
+    email: "coordinator@school.local",
+    password: "password",
+    role: "administrator",
+    staffRole: "coordinator",
   },
   {
     id: "stu-1",
@@ -36,6 +48,7 @@ const mockAccounts: MockAccount[] = [
     email: "student@school.local",
     password: "password",
     role: "student",
+    staffRole: null,
   },
 ];
 
@@ -88,6 +101,7 @@ function buildSession(account: MockAccount): AuthSession {
       email: account.email,
     },
     role: account.role,
+    staffRole: account.staffRole,
   };
 }
 

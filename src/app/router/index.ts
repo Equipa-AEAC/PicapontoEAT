@@ -10,8 +10,10 @@ import { adminNavigationItems } from "./adminNavigation";
 const adminPageComponents = {
   dashboard: () => import("../../modules/admin/dashboard/pages/AdminDashboardPage.vue"),
   members: () => import("../../modules/admin/members/pages/AdminMembersPage.vue"),
+  cards: () => import("../../modules/admin/cards/pages/AdminCardsPage.vue"),
   attendance: () => import("../../modules/admin/attendance/pages/AdminAttendancePage.vue"),
   internships: () => import("../../modules/admin/internships/pages/AdminInternshipsPage.vue"),
+  announcements: () => import("../../modules/admin/announcements/pages/AdminAnnouncementsPage.vue"),
   certificates: () => import("../../modules/admin/certificates/pages/AdminCertificatesPage.vue"),
   devices: () => import("../../modules/admin/devices/pages/AdminDevicesPage.vue"),
   audit: () => import("../../modules/admin/audit/pages/AdminAuditPage.vue"),
@@ -26,6 +28,8 @@ const studentPageComponents = {
   workedHours: () => import("../../modules/student/worked-hours/pages/StudentWorkedHoursPage.vue"),
   calendar: () => import("../../modules/student/calendar/pages/StudentCalendarPage.vue"),
   internship: () => import("../../modules/student/internship/pages/StudentInternshipPage.vue"),
+  dailyLog: () => import("../../modules/student/daily-log/pages/StudentDailyLogPage.vue"),
+  reports: () => import("../../modules/student/reports/pages/StudentReportsPage.vue"),
   certificates: () => import("../../modules/student/certificates/pages/StudentCertificatesPage.vue"),
   profile: () => import("../../modules/student/profile/pages/StudentProfilePage.vue"),
   announcements: () => import("../../modules/student/announcements/pages/StudentAnnouncementsPage.vue"),
@@ -66,7 +70,7 @@ const router = createRouter({
         {
           path: "members/:memberId",
           name: "member-details",
-          component: () => import("../../pages/StudentDetailsPage.vue"),
+          component: () => import("../../modules/admin/members/pages/MemberDetailsPage.vue"),
           meta: {
             title: "Member details",
             subtitle: "Profile and internship drill-down",
@@ -76,7 +80,7 @@ const router = createRouter({
         {
           path: "members/:memberId/attendance",
           name: "member-attendance-history",
-          component: () => import("../../pages/StudentAttendanceHistoryPage.vue"),
+          component: () => import("../../modules/admin/members/pages/MemberAttendanceHistoryPage.vue"),
           meta: {
             title: "Attendance history",
             subtitle: "Detailed attendance records by member",
@@ -137,6 +141,24 @@ const router = createRouter({
           meta: {
             title: "Internship Progress",
             subtitle: "Track required and completed hours",
+          },
+        },
+        {
+          path: "daily-log",
+          name: "student-daily-log",
+          component: studentPageComponents.dailyLog,
+          meta: {
+            title: "Daily Report",
+            subtitle: "Register your daily internship activity",
+          },
+        },
+        {
+          path: "reports",
+          name: "student-reports",
+          component: studentPageComponents.reports,
+          meta: {
+            title: "Internship Reports",
+            subtitle: "Monthly balance and final report",
           },
         },
         {

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import Button from "primevue/button";
-import Chart from "primevue/chart";
-import Column from "primevue/column";
 import type { ChartData, ChartOptions } from "chart.js";
 
-import { BaseCard, BaseDataCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseStatusPill, BaseTable } from "../../../../shared/components/base";
+import { BaseButton, BaseCard, BaseChart, BaseDataCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseStatusPill, BaseTable, BaseTableColumn } from "../../../../shared/components/base";
 import { usePortalStore } from "../../../../shared/stores";
 
 const portalStore = usePortalStore();
@@ -68,20 +65,13 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      eyebrow="Member workspace"
       title="Worked Hours"
       description="Track completed and remaining hours with a mock trend chart and recent attendance records."
     >
       <template #actions>
-        <Button label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="portalStore.loadPortalSummary()" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="portalStore.loadPortalSummary()" />
       </template>
     </BasePageHeader>
-
-    <div class="page-breadcrumbs">
-      <span>Student Workspace</span>
-      <span>/</span>
-      <span>Worked Hours</span>
-    </div>
 
     <section class="metric-grid">
       <BaseDataCard title="Completed" :value="String(portalStore.summary?.completedHours ?? 0)" description="Hours already completed" trend-label="On track" />
@@ -96,13 +86,13 @@ onMounted(async () => {
       <section class="dashboard-grid">
         <BaseCard title="Weekly hours" description="Mock trend chart generated from the portal service.">
           <div style="height: 260px;">
-            <Chart type="bar" :data="weeklyChart" :options="barOptions" />
+            <BaseChart type="bar" :data="weeklyChart" :options="barOptions" />
           </div>
         </BaseCard>
 
         <BaseCard title="Progress split" description="Completed versus remaining hours.">
           <div style="height: 260px;">
-            <Chart type="doughnut" :data="progressChart" :options="doughnutOptions" />
+            <BaseChart type="doughnut" :data="progressChart" :options="doughnutOptions" />
           </div>
         </BaseCard>
       </section>
@@ -114,15 +104,15 @@ onMounted(async () => {
               <BaseEmptyState title="No attendance rows" description="There are no recent attendance rows available in the mock dataset." />
             </template>
 
-            <Column field="date" header="Date" sortable />
-            <Column field="entry" header="Entry" />
-            <Column field="exit" header="Exit" />
-            <Column field="hours" header="Hours" sortable />
-            <Column field="status" header="Status">
+            <BaseTableColumn field="date" header="Date" sortable />
+            <BaseTableColumn field="entry" header="Entry" />
+            <BaseTableColumn field="exit" header="Exit" />
+            <BaseTableColumn field="hours" header="Hours" sortable />
+            <BaseTableColumn field="status" header="Status">
               <template #body="slotProps">
                 <BaseStatusPill :label="slotProps.data.status" :tone="slotProps.data.status === 'Present' ? 'success' : slotProps.data.status === 'Holiday' ? 'info' : 'warning'" />
               </template>
-            </Column>
+            </BaseTableColumn>
           </BaseTable>
         </BaseCard>
       </BaseSection>

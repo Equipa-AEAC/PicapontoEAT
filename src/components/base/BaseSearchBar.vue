@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import InputText from "primevue/inputtext";
 import { PhMagnifyingGlass } from "@phosphor-icons/vue";
+import BaseTextInput from "./BaseTextInput.vue";
 
 defineProps<{
   modelValue: string;
@@ -15,11 +15,34 @@ const emit = defineEmits<{
 <template>
   <label class="base-search-bar">
     <PhMagnifyingGlass weight="bold" class="base-search-bar__icon" />
-    <InputText
+    <BaseTextInput
       :modelValue="modelValue"
       :placeholder="placeholder ?? 'Search'"
       class="base-search-bar__input"
-      @update:modelValue="emit('update:modelValue', String($event ?? ''))"
+      @update:modelValue="emit('update:modelValue', $event)"
     />
   </label>
 </template>
+
+<style scoped>
+.base-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 240px;
+  flex: 1 1 240px;
+}
+
+.base-search-bar__icon {
+  position: absolute;
+  left: 14px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.base-search-bar__input {
+  padding-left: 40px;
+}
+</style>

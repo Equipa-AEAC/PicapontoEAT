@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { reactive } from "vue";
-import Button from "primevue/button";
-import Checkbox from "primevue/checkbox";
-import InputText from "primevue/inputtext";
 
+import BaseButton from "../../../components/base/BaseButton.vue";
+import BaseCheckbox from "../../../components/base/BaseCheckbox.vue";
+import BaseTextInput from "../../../components/base/BaseTextInput.vue";
 import type { LoginPayload } from "../types/auth";
 
 const props = defineProps<{
@@ -42,17 +42,17 @@ function submit() {
     <form class="login-card__form" @submit.prevent="submit">
       <label>
         <span>Email</span>
-        <InputText v-model="form.email" type="email" autocomplete="username" placeholder="admin@school.local" />
+        <BaseTextInput v-model="form.email" type="email" autocomplete="username" placeholder="admin@school.local" />
       </label>
 
       <label>
         <span>Password</span>
-        <InputText v-model="form.password" type="password" autocomplete="current-password" placeholder="password" />
+        <BaseTextInput v-model="form.password" type="password" autocomplete="current-password" placeholder="password" />
       </label>
 
       <div class="login-card__row">
         <label class="login-card__remember">
-          <Checkbox v-model="form.rememberMe" binary inputId="rememberMe" />
+          <BaseCheckbox v-model="form.rememberMe" />
           <span>Remember me</span>
         </label>
         <button type="button" class="login-card__link">Forgot password</button>
@@ -60,7 +60,7 @@ function submit() {
 
       <p v-if="props.errorMessage" class="login-card__error">{{ props.errorMessage }}</p>
 
-      <Button type="submit" label="Sign In" :loading="props.loading" />
+      <BaseButton type="submit" label="Sign In" :loading="props.loading" />
     </form>
 
     <footer class="login-card__footer">Version {{ props.appVersion }}</footer>

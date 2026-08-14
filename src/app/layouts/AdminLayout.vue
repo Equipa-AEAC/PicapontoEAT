@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
-import Button from "primevue/button";
-import Menu from "primevue/menu";
-import Dialog from "primevue/dialog";
-import { PhList, PhSparkle } from "@phosphor-icons/vue";
+import { RouterLink, RouterView, useRouter } from "vue-router";
+import { PhGearSix, PhInfo, PhList, PhSignOut, PhSparkle, PhUserCircle } from "@phosphor-icons/vue";
 
-import { BaseAvatar, BaseCard, BaseConfirmDialog, BaseStatusPill } from "../../shared/components/base";
+import { BaseAvatar, BaseButton, BaseConfirmDialog, BaseDialog, BaseMenu } from "../../shared/components/base";
+import type { BaseMenuItem } from "../../shared/components/base";
 import { adminNavigationItems } from "../router/adminNavigation";
 import { useNavigationStore } from "../../shared/stores";
 import { useAuthStore } from "../../modules/authentication";
@@ -14,24 +12,19 @@ import { useAuthStore } from "../../modules/authentication";
 const navigationStore = useNavigationStore();
 const authStore = useAuthStore();
 const router = useRouter();
-const route = useRoute();
 const profileMenu = ref();
 const showProfileDialog = ref(false);
 const showLogoutConfirm = ref(false);
 const showAboutDialog = ref(false);
 
-const pageTitle = computed(() => (typeof route.meta.title === "string" ? route.meta.title : "Pica Ponto"));
-const pageSubtitle = computed(() =>
-  typeof route.meta.subtitle === "string" ? route.meta.subtitle : "Desktop attendance operations workspace",
-);
 const userRoleLabel = computed(() => (authStore.role === "administrator" ? "Administrator" : authStore.role === "student" ? "Student" : "User"));
 
-const profileMenuItems = [
-  { label: "My Profile", icon: "pi pi-user", command: () => { showProfileDialog.value = true; } },
-  { label: "Settings", icon: "pi pi-cog", command: () => router.push({ name: "settings" }) },
-  { label: "About", icon: "pi pi-info-circle", command: () => { showAboutDialog.value = true; } },
+const profileMenuItems: BaseMenuItem[] = [
+  { label: "My Profile", icon: PhUserCircle, command: () => { showProfileDialog.value = true; } },
+  { label: "Settings", icon: PhGearSix, command: () => router.push({ name: "settings" }) },
+  { label: "About", icon: PhInfo, command: () => { showAboutDialog.value = true; } },
   { separator: true },
-  { label: "Logout", icon: "pi pi-sign-out", command: () => { showLogoutConfirm.value = true; } },
+  { label: "Logout", icon: PhSignOut, command: () => { showLogoutConfirm.value = true; } },
 ];
 
 async function confirmLogout() {
@@ -65,49 +58,21 @@ async function confirmLogout() {
           <span class="sidebar-nav__icon" aria-hidden="true">
             <component :is="item.icon" weight="bold" />
           </span>
-          <span class="sidebar-nav__text">
-            <span class="sidebar-nav__label">{{ item.label }}</span>
-            <span class="sidebar-nav__description">{{ item.description }}</span>
-          </span>
+          <span class="sidebar-nav__label">{{ item.label }}</span>
         </RouterLink>
       </nav>
-
-      <BaseCard class="sidebar-card" title="Workspace status" description="Desktop shell is ready for API integration.">
-        <template #header>
-          <BaseStatusPill label="Ready" tone="success" />
-        </template>
-
-        <div class="sidebar-card__grid">
-          <div>
-            <p class="sidebar-card__label">Frontend</p>
-            <p class="sidebar-card__value">Vue 3 + TypeScript</p>
-          </div>
-          <div>
-            <p class="sidebar-card__label">Transport</p>
-            <p class="sidebar-card__value">REST services</p>
-          </div>
-        </div>
-      </BaseCard>
     </aside>
 
     <div class="app-shell__content">
       <header class="topbar">
         <div class="topbar__leading">
-          <button class="topbar__toggle" type="button" @click="navigationStore.toggleSidebar">
+          <button class="topbar__toggle" type="button" aria-label="Toggle navigation" @click="navigationStore.toggleSidebar">
             <PhList weight="bold" />
           </button>
-
-          <div>
-            <p class="topbar__eyebrow">Pica Ponto</p>
-            <h2 class="topbar__title">{{ pageTitle }}</h2>
-            <p class="topbar__subtitle">{{ pageSubtitle }}</p>
-          </div>
         </div>
 
         <div class="topbar__actions">
-          <Button label="New scan" severity="secondary" outlined />
-          <Button label="Generate report" />
-          <Button class="topbar__profile-trigger" severity="secondary" outlined @click="profileMenu.toggle($event)">
+          <BaseButton class="topbar__profile-trigger" severity="secondary" outlined @click="profileMenu.toggle($event)">
             <span class="topbar__profile-trigger-inner">
               <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="normal" />
               <span class="topbar__profile-copy">
@@ -115,8 +80,8 @@ async function confirmLogout() {
                 <span class="topbar__profile-role">{{ userRoleLabel }}</span>
               </span>
             </span>
-          </Button>
-          <Menu ref="profileMenu" :model="profileMenuItems" popup />
+          </BaseButton>
+          <BaseMenu ref="profileMenu" :model="profileMenuItems" />
         </div>
       </header>
 
@@ -135,12 +100,12 @@ async function confirmLogout() {
       @cancel="showLogoutConfirm = false"
     />
 
-    <Dialog v-model:visible="showAboutDialog" modal header="About Pica Ponto" class="app-about-dialog">
+    <BaseDialog :visible="showAboutDialog" header="About Pica Ponto" class="app-about-dialog" @update:visible="showAboutDialog = $event">
       <p>This workspace is the desktop attendance and member management application.</p>
       <p>Version: development build</p>
-    </Dialog>
+    </BaseDialog>
 
-    <Dialog v-model:visible="showProfileDialog" modal header="My Profile" class="app-profile-dialog">
+    <BaseDialog :visible="showProfileDialog" header="My Profile" class="app-profile-dialog" @update:visible="showProfileDialog = $event">
       <div class="app-profile-dialog__body">
         <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="xlarge" />
         <div>
@@ -149,6 +114,6 @@ async function confirmLogout() {
           <p>{{ userRoleLabel }}</p>
         </div>
       </div>
-    </Dialog>
+    </BaseDialog>
   </div>
 </template>

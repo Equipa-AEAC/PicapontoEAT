@@ -2,7 +2,8 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import { loginWithPassword, refreshAuthSession } from "../services/auth.service";
-import type { AuthSession, AuthUser, LoginPayload, UserRole } from "../types/auth";
+import type { AuthSession, AuthUser, LoginPayload, StaffRole, UserRole } from "../types/auth";
+import { roleCan, type AdminPermission } from "../../../types/users";
 
 const AUTH_STORAGE_KEY = "picaponto.auth.session";
 
@@ -11,6 +12,7 @@ interface PersistedAuthState {
   refreshToken: string;
   user: AuthUser;
   role: UserRole;
+  staffRole: StaffRole | null;
 }
 
 export const useAuthStore = defineStore("auth", () => {
@@ -18,6 +20,7 @@ export const useAuthStore = defineStore("auth", () => {
   const refreshToken = ref<string | null>(null);
   const currentUser = ref<AuthUser | null>(null);
   const role = ref<UserRole | null>(null);
+  const staffRole = ref<StaffRole | null>(null);
   const loading = ref(false);
   const rememberMe = ref(false);
 
@@ -28,6 +31,7 @@ export const useAuthStore = defineStore("auth", () => {
     refreshToken.value = session.refreshToken;
     currentUser.value = session.user;
     role.value = session.role;
+    staffRole.value = session.staffRole;
     rememberMe.value = shouldPersist;
 
     if (shouldPersist) {
@@ -36,6 +40,7 @@ export const useAuthStore = defineStore("auth", () => {
         refreshToken: session.refreshToken,
         user: session.user,
         role: session.role,
+        staffRole: session.staffRole,
       };
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
       return;
@@ -49,6 +54,7 @@ export const useAuthStore = defineStore("auth", () => {
     refreshToken.value = null;
     currentUser.value = null;
     role.value = null;
+    staffRole.value = null;
     rememberMe.value = false;
     localStorage.removeItem(AUTH_STORAGE_KEY);
   }
@@ -65,6 +71,7 @@ export const useAuthStore = defineStore("auth", () => {
       refreshToken.value = parsed.refreshToken;
       currentUser.value = parsed.user;
       role.value = parsed.role;
+      staffRole.value = parsed.staffRole ?? null;
       rememberMe.value = true;
     } catch {
       clearSession();
@@ -109,11 +116,28 @@ export const useAuthStore = defineStore("auth", () => {
     return role.value === expectedRole;
   }
 
+  /** Whether the signed-in staff tier is allowed to perform `permission`. */
+  function can(permission: AdminPermission) {
+    return roleCan(staffRole.value, permission);
+  }
+
+  /** Why an action is unavailable, for a disabled control's tooltip. */
+  function denialReason(permission: AdminPermission) {
+    if (can(permission)) {
+      return "";
+    }
+
+    return staffRole.value
+      ? `Your ${staffRole.value} role does not allow this action.`
+      : "Sign in with a staff account to perform this action.";
+  }
+
   return {
     accessToken,
     refreshToken,
     currentUser,
     role,
+    staffRole,
     loading,
     rememberMe,
     isAuthenticated,
@@ -121,6 +145,8 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     refreshSession,
     hasRole,
+    can,
+    denialReason,
     rehydrateSession,
   };
 });

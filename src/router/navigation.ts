@@ -1,1 +1,0 @@
-export { adminNavigationItems as navigationItems } from "../app/router/adminNavigation";

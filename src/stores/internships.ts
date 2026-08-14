@@ -2,7 +2,15 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import type { InternshipDetails, InternshipFormValues, InternshipProgressUpdateValues, InternshipSummary } from "../types/internships";
-import { assignInternship, generateCertificatePreview, getInternshipByStudentId, listInternships, updateInternshipProgress } from "../services/internships.service";
+import type { CertificatePreview } from "../services/internships.service";
+import {
+  assignInternship,
+  generateCertificatePreview,
+  generateSurplusCertificatePreview,
+  getInternshipByStudentId,
+  listInternships,
+  updateInternshipProgress,
+} from "../services/internships.service";
 
 export const useInternshipsStore = defineStore("internships", () => {
   const items = ref<InternshipSummary[]>([]);
@@ -10,7 +18,8 @@ export const useInternshipsStore = defineStore("internships", () => {
   const loading = ref(false);
   const loadingDetails = ref(false);
   const saving = ref(false);
-  const certificatePreview = ref<{ fileName: string; issuedAt: string; summary: string } | null>(null);
+  const errorMessage = ref<string | null>(null);
+  const certificatePreview = ref<CertificatePreview | null>(null);
 
   const totalCompletedHours = computed(() => items.value.reduce((total, internship) => total + internship.completedHours, 0));
 
@@ -34,9 +43,14 @@ export const useInternshipsStore = defineStore("internships", () => {
 
   async function assignStudentInternship(values: InternshipFormValues) {
     saving.value = true;
+    errorMessage.value = null;
     try {
       await assignInternship(values);
       await loadInternships();
+      return true;
+    } catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : "Unable to assign the internship.";
+      return false;
     } finally {
       saving.value = false;
     }
@@ -53,8 +67,14 @@ export const useInternshipsStore = defineStore("internships", () => {
     }
   }
 
+  /** FCT internship completion certificate. */
   async function previewCertificate(studentId: string) {
     certificatePreview.value = await generateCertificatePreview(studentId);
+  }
+
+  /** Volunteer surplus-hours certificate, available to any team member. */
+  async function previewSurplusCertificate(memberId: string) {
+    certificatePreview.value = await generateSurplusCertificatePreview(memberId);
   }
 
   return {
@@ -63,6 +83,7 @@ export const useInternshipsStore = defineStore("internships", () => {
     loading,
     loadingDetails,
     saving,
+    errorMessage,
     certificatePreview,
     totalCompletedHours,
     loadInternships,
@@ -70,5 +91,6 @@ export const useInternshipsStore = defineStore("internships", () => {
     assignStudentInternship,
     updateProgress,
     previewCertificate,
+    previewSurplusCertificate,
   };
 });

@@ -3,6 +3,7 @@ import type { MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberF
 
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
+import { isExternalSchool, SCHOOL_NAME } from "../shared/constants";
 
 export async function listMembers(filters: Partial<MemberFilters> = {}): Promise<PaginatedResponse<MemberSummary>> {
   return mockRequest(() => {
@@ -10,12 +11,17 @@ export async function listMembers(filters: Partial<MemberFilters> = {}): Promise
     const filteredItems = mockDatabase.members.filter((member) => {
       const matchesQuery =
         query.length === 0 ||
-        [member.fullName, member.memberNumber, member.course, member.className, member.email].join(" ").toLowerCase().includes(query);
+        [member.fullName, member.memberNumber, member.course, member.className, member.email, member.originSchool]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
       const matchesStatus = !filters.status || filters.status === "all" || member.status === filters.status;
       const matchesCourse = !filters.course || filters.course === "all" || member.course === filters.course;
       const matchesYear = !filters.academicYear || filters.academicYear === "all" || member.academicYear === filters.academicYear;
+      const matchesOrigin =
+        !filters.origin || filters.origin === "all" || (filters.origin === "external" ? member.isExternal : !member.isExternal);
 
-      return matchesQuery && matchesStatus && matchesCourse && matchesYear;
+      return matchesQuery && matchesStatus && matchesCourse && matchesYear && matchesOrigin;
     });
 
     return {
@@ -40,12 +46,16 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
         throw new Error("Member not found.");
       }
 
+      const originSchool = values.originSchool || SCHOOL_NAME;
+
       Object.assign(currentMember, {
         photoUrl: values.photoUrl || null,
         memberNumber: values.memberNumber,
         fullName: values.fullName,
         email: values.email,
         phone: values.phone,
+        originSchool,
+        isExternal: isExternalSchool(originSchool),
         course: values.course,
         className: values.className,
         academicYear: values.academicYear,
@@ -59,6 +69,8 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
       return cloneRecord(currentMember);
     }
 
+    const originSchool = values.originSchool || SCHOOL_NAME;
+
     const createdMember: MemberDetails = {
       id: `mem-${mockDatabase.members.length + 1001}`,
       photoUrl: values.photoUrl || null,
@@ -66,17 +78,19 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
       fullName: values.fullName,
       email: values.email,
       phone: values.phone,
+      originSchool,
+      isExternal: isExternalSchool(originSchool),
       course: values.course,
       className: values.className,
       academicYear: values.academicYear,
       status: values.status,
       assignedCardUid: values.assignedCardUid || null,
       internshipStatus: "not-assigned",
-      accumulatedHours: 0,
+      teamHours: 0,
       birthDate: values.birthDate,
       emergencyContact: values.emergencyContact,
       notes: values.notes,
-      supervisorName: null,
+      orientadorName: null,
       internshipRequiredHours: 0,
       internshipCompletedHours: 0,
       internshipStartDate: null,

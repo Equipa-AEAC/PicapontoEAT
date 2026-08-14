@@ -1,4 +1,4 @@
-import { PhBriefcase, PhCertificate, PhChartBar, PhClockCounterClockwise, PhDeviceMobile, PhGearSix, PhHouse, PhUsersThree, PhUserGear } from "@phosphor-icons/vue";
+import { PhBriefcase, PhCertificate, PhChartBar, PhClockCounterClockwise, PhCreditCard, PhDeviceMobile, PhGearSix, PhHouse, PhMegaphone, PhUsersThree, PhUserGear } from "@phosphor-icons/vue";
 
 import type { NavigationItem } from "../../shared/types";
 
@@ -14,8 +14,15 @@ export const adminNavigationItems: NavigationItem[] = [
     name: "members",
     path: "/admin/members",
     label: "Members",
-    description: "Unified member registry and card assignment",
+    description: "Student & Equipa Técnica roster",
     icon: PhUsersThree,
+  },
+  {
+    name: "cards",
+    path: "/admin/cards",
+    label: "Cards",
+    description: "RFID card inventory and assignment",
+    icon: PhCreditCard,
   },
   {
     name: "attendance",
@@ -28,8 +35,15 @@ export const adminNavigationItems: NavigationItem[] = [
     name: "internships",
     path: "/admin/internships",
     label: "Internships",
-    description: "Placements and hour tracking",
+    description: "FCT placements and surplus hours",
     icon: PhBriefcase,
+  },
+  {
+    name: "announcements",
+    path: "/admin/announcements",
+    label: "Announcements",
+    description: "Targeted notices for members",
+    icon: PhMegaphone,
   },
   {
     name: "certificates",
@@ -63,7 +77,7 @@ export const adminNavigationItems: NavigationItem[] = [
     name: "users",
     path: "/admin/users",
     label: "Users",
-    description: "Access and role management",
+    description: "Staff accounts with system access",
     icon: PhUserGear,
   },
   {
