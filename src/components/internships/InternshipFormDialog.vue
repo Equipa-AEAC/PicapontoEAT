@@ -203,13 +203,13 @@ watch(
   flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--surface-border);
-  background: var(--surface-soft);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
 }
 
 .internship-form__origin strong {
-  color: var(--text-primary);
+  color: var(--foreground);
 }
 </style>

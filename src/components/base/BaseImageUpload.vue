@@ -105,7 +105,7 @@ function clearImage() {
 }
 
 .base-image-upload__hint {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.78rem;
 }
 

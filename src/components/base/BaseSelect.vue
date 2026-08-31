@@ -53,16 +53,17 @@ function onChange(event: Event) {
 .base-select__control {
   width: 100%;
   appearance: none;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 36px 10px 14px;
-  background: rgba(9, 15, 26, 0.72);
-  color: var(--text-primary);
+  background: var(--input);
+  color: var(--foreground);
 }
 
 .base-select__control:focus {
   outline: none;
-  border-color: rgba(122, 167, 255, 0.55);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .base-select__control:disabled {
@@ -77,7 +78,7 @@ function onChange(event: Event) {
   transform: translateY(-50%);
   width: 14px;
   height: 14px;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   pointer-events: none;
 }
 </style>

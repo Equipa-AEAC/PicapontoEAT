@@ -233,21 +233,21 @@ export default defineComponent({
 .base-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .base-table thead th {
   position: sticky;
   top: 0;
   text-align: left;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-  background: rgba(15, 23, 42, 0.7);
-  border-bottom: 1px solid var(--surface-border);
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-normal);
+  color: var(--foreground-secondary);
+  background: var(--table-header);
+  border-bottom: var(--border-width) solid var(--border);
   white-space: nowrap;
 }
 
@@ -257,62 +257,67 @@ export default defineComponent({
 }
 
 .base-table__sort-icon {
-  margin-left: 6px;
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  margin-left: var(--space-1);
+  color: var(--foreground-subtle);
+  font-size: var(--text-2xs);
 }
 
 .base-table tbody td {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  color: var(--text-primary);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  color: var(--foreground);
   vertical-align: middle;
 }
 
+.base-table tbody tr {
+  transition: background-color var(--transition-fast);
+}
+
+/* No zebra striping: with a visible row rule it is redundant and adds noise. */
 .base-table tbody tr:hover {
-  background: rgba(122, 167, 255, 0.06);
+  background: var(--table-row-hover);
 }
 
-.base-table tbody tr:nth-child(even) {
-  background: rgba(15, 23, 42, 0.32);
-}
-
-.base-table tbody tr:nth-child(even):hover {
-  background: rgba(122, 167, 255, 0.08);
-}
-
-.base-table__row--selected {
-  background: rgba(122, 167, 255, 0.14) !important;
+.base-table__row--selected,
+.base-table__row--selected:hover {
+  background: var(--selected) !important;
 }
 
 .base-table__select-col {
-  width: 40px;
-  padding: 12px 16px;
+  width: 36px;
+  padding: var(--space-2) var(--space-4);
 }
 
 .base-table__loading,
 .base-table__empty {
-  padding: 40px 16px;
+  padding: var(--space-8) var(--space-4);
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
 }
 
 .base-table__paginator {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding-top: 4px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .base-table__paginator button {
-  border: 1px solid var(--surface-border);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 6px 14px;
-  background: rgba(17, 26, 42, 0.78);
-  color: var(--text-primary);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.base-table__paginator button:hover:not(:disabled) {
+  background: var(--hover);
 }
 
 .base-table__paginator button:disabled {

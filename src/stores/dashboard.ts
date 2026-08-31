@@ -36,6 +36,8 @@ export const useDashboardStore = defineStore("dashboard", () => {
     activity,
     loading,
     error,
+    /** Alias so every page reads the same property name. */
+    errorMessage: error,
     hasData,
     loadDashboard,
   };

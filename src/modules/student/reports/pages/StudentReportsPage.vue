@@ -17,11 +17,23 @@ import {
   BaseTextarea,
   BaseToolbar,
 } from "../../../../shared/components/base";
-import { CURRENT_MEMBER_ID } from "../../../../shared/constants";
 import { useInternshipReportsStore } from "../../../../shared/stores";
 import type { FinalReportFormValues, MonthlyReport, ReportStatus } from "../../../../types/internshipReports";
+import { formatTimestamp } from "../../../../shared/utils/date";
+import { useAuthStore } from "../../../../modules/authentication";
 
+const authStore = useAuthStore();
 const reportsStore = useInternshipReportsStore();
+
+/**
+ * The member whose data this page shows, resolved from the session.
+ *
+ * Falls back to an empty id rather than a hardcoded member: an empty id matches
+ * nobody, so a session without a member sees nothing instead of somebody else's
+ * records. This is a safe *default*, not authorization — see the note on
+ * `authStore.currentMemberId`.
+ */
+const memberId = computed(() => authStore.currentMemberId ?? "");
 
 const selectedMonth = ref<string | null>(null);
 const plannedActivitiesText = ref("");
@@ -66,7 +78,7 @@ async function generateDraft() {
     return;
   }
 
-  await reportsStore.prepareMonthlyDraft(CURRENT_MEMBER_ID, selectedMonth.value);
+  await reportsStore.prepareMonthlyDraft(memberId.value, selectedMonth.value);
   plannedActivitiesText.value = (draft.value?.activitiesPlanned ?? []).join("\n");
   difficultiesText.value = draft.value?.mainDifficulties ?? "";
 }
@@ -76,7 +88,7 @@ async function saveMonthlyDraft() {
     return;
   }
 
-  await reportsStore.persistMonthlyReport(CURRENT_MEMBER_ID, {
+  await reportsStore.persistMonthlyReport(memberId.value, {
     ...draft.value,
     activitiesPlanned: toLines(plannedActivitiesText.value),
     mainDifficulties: difficultiesText.value,
@@ -90,7 +102,7 @@ function requestSubmitMonthly(reportId: string) {
 
 async function confirmSubmitMonthly() {
   if (pendingMonthlyReportId.value) {
-    await reportsStore.submitMonthly(CURRENT_MEMBER_ID, pendingMonthlyReportId.value);
+    await reportsStore.submitMonthly(memberId.value, pendingMonthlyReportId.value);
   }
 
   pendingMonthlyReportId.value = null;
@@ -111,16 +123,16 @@ function applyFinalReport() {
 }
 
 async function prefillFromJournal() {
-  const suggestion = await reportsStore.suggestFinalReport(CURRENT_MEMBER_ID, "Escola Secundária Augusto Cabrita");
+  const suggestion = await reportsStore.suggestFinalReport(memberId.value, "Escola Secundária Augusto Cabrita");
   Object.assign(finalForm, suggestion);
 }
 
 async function saveFinal() {
-  await reportsStore.persistFinalReport(CURRENT_MEMBER_ID, { ...finalForm });
+  await reportsStore.persistFinalReport(memberId.value, { ...finalForm });
 }
 
 async function confirmSubmitFinal() {
-  await reportsStore.submitFinal(CURRENT_MEMBER_ID);
+  await reportsStore.submitFinal(memberId.value);
   submitFinalConfirmVisible.value = false;
 }
 
@@ -128,9 +140,9 @@ watch(finalReport, applyFinalReport);
 
 onMounted(async () => {
   await Promise.all([
-    reportsStore.loadJournal(CURRENT_MEMBER_ID),
-    reportsStore.loadMonthlyReports(CURRENT_MEMBER_ID),
-    reportsStore.loadFinalReport(CURRENT_MEMBER_ID),
+    reportsStore.loadJournal(memberId.value),
+    reportsStore.loadMonthlyReports(memberId.value),
+    reportsStore.loadFinalReport(memberId.value),
   ]);
 
   selectedMonth.value = reportsStore.availableMonths[0] ?? null;
@@ -145,7 +157,7 @@ onMounted(async () => {
       description="Build your monthly balance and your final internship report from the daily entries you already wrote."
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="reportsStore.loading" @click="reportsStore.loadMonthlyReports(CURRENT_MEMBER_ID)" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="reportsStore.loading" @click="reportsStore.loadMonthlyReports(memberId)" />
       </template>
     </BasePageHeader>
 
@@ -220,7 +232,7 @@ onMounted(async () => {
               </template>
             </BaseTableColumn>
             <BaseTableColumn field="submittedAt" header="Submitted">
-              <template #body="slotProps">{{ slotProps.data.submittedAt ?? "—" }}</template>
+              <template #body="slotProps">{{ formatTimestamp(slotProps.data.submittedAt) }}</template>
             </BaseTableColumn>
             <BaseTableColumn header="Actions">
               <template #body="slotProps">

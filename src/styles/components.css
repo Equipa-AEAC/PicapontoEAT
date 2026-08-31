@@ -1,0 +1,878 @@
+/*
+ * Shared page-level composition classes.
+ *
+ * These are the pieces used by more than one page: grids, cards, list rows, filter
+ * strips, table cell treatments. Everything is expressed in tokens, so a page that
+ * uses only these classes is automatically correct in both themes.
+ */
+
+/* ------------------------------------------------------------------- Grids */
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+/* -------------------------------------------------------------------- Card */
+
+/*
+ * A card is a bordered panel on a surface. No gradient, no shadow: the border and
+ * the step between --background and --surface carry the separation, which keeps
+ * long pages of stacked cards calm.
+ */
+.base-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.base-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.base-card__body,
+.base-card__footer {
+  min-width: 0;
+}
+
+.base-card__footer {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--border-subtle);
+}
+
+.base-card__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--foreground);
+}
+
+.base-card__description {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--foreground-secondary);
+}
+
+/* ------------------------------------------------------------- Metric card */
+
+.base-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.base-metric-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.base-metric-card__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--primary-subtle);
+  color: var(--primary-contrast);
+}
+
+.base-metric-card__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.base-metric-card__trend {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--secondary-subtle);
+  color: var(--foreground-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.base-metric-card__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
+}
+
+.base-metric-card__value {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+
+.base-metric-card__caption {
+  font-size: var(--text-xs);
+  color: var(--foreground-muted);
+}
+
+.base-metric-card--positive .base-metric-card__trend {
+  background: var(--success-subtle);
+  color: var(--success-foreground);
+}
+
+.base-metric-card--negative .base-metric-card__trend {
+  background: var(--danger-subtle);
+  color: var(--danger-foreground);
+}
+
+.base-metric-card--neutral .base-metric-card__trend {
+  background: var(--info-subtle);
+  color: var(--info-foreground);
+}
+
+/* ------------------------------------------------------------- Status pill */
+
+/*
+ * A status is a small, square-cornered tag. Pills read as marketing badges; this
+ * reads as a field value, which is what it is.
+ */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  /*
+   * A pill states one fact and must hug it. Most of its parents are flex columns,
+   * whose default `align-items: stretch` was blowing pills out to the full card
+   * width; `width: fit-content` covers the grid and block parents too.
+   */
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--secondary-subtle);
+  color: var(--foreground-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.status-pill--success {
+  background: var(--success-subtle);
+  border-color: var(--success-border);
+  color: var(--success-foreground);
+}
+
+.status-pill--danger {
+  background: var(--danger-subtle);
+  border-color: var(--danger-border);
+  color: var(--danger-foreground);
+}
+
+.status-pill--info {
+  background: var(--info-subtle);
+  border-color: var(--info-border);
+  color: var(--info-foreground);
+}
+
+.status-pill--warning {
+  background: var(--warning-subtle);
+  border-color: var(--warning-border);
+  color: var(--warning-foreground);
+}
+
+/* ------------------------------------------------------------------ Charts */
+
+.chart-shell {
+  height: 300px;
+}
+
+/* -------------------------------------------------------------- List rows */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item {
+  padding: var(--space-3) 0;
+}
+
+.activity-item:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.activity-item__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.activity-item h3 {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--foreground);
+}
+
+.activity-item p {
+  font-size: var(--text-sm);
+  color: var(--foreground-secondary);
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.list-row:not(:last-child) {
+  margin-bottom: var(--space-2);
+}
+
+.empty-panel {
+  padding: var(--space-3) 0;
+}
+
+/* ---------------------------------------------------------------- Shortcuts */
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.shortcut-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-subtle);
+}
+
+.shortcut-card h3 {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--foreground);
+}
+
+.shortcut-card p {
+  font-size: var(--text-sm);
+  color: var(--foreground-secondary);
+}
+
+.shortcut-card svg {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+}
+
+.module-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.module-summary p {
+  font-size: var(--text-sm);
+  color: var(--foreground-secondary);
+}
+
+/*
+ * A slim shortcut strip that sits under the dashboard chart/snapshot row. It is
+ * deliberately not a card: no chrome, no title, and it scrolls sideways rather
+ * than wrapping into a second row at narrow widths.
+ */
+.quick-actions-rail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  overflow-x: auto;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.quick-actions-rail__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.quick-actions-rail__item:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+
+.quick-actions-rail__item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+/* -------------------------------------------------------------- Snapshots */
+
+.snapshot-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.snapshot-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+}
+
+.snapshot-list__row:hover {
+  background: var(--hover);
+}
+
+.snapshot-list__row:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.snapshot-list__label {
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ------------------------------------------------------------ Row actions */
+
+.inline-actions,
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.inline-actions--end {
+  justify-content: flex-end;
+}
+
+/* Compact icon-only row actions, so the Actions column stops dominating a table. */
+.icon-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon-actions__button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-actions__button:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+
+.icon-actions__button--danger:hover {
+  color: var(--danger);
+  background: var(--danger-subtle);
+}
+
+.icon-actions__button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ------------------------------------------------------------ Table cells */
+
+.attendance-span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.attendance-span svg {
+  width: 13px;
+  height: 13px;
+  color: var(--foreground-subtle);
+}
+
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.status-cell__icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.status-cell__icon--success {
+  color: var(--success);
+}
+
+.status-cell__icon--warning {
+  color: var(--warning);
+}
+
+.status-cell__icon--danger {
+  color: var(--danger);
+}
+
+.status-cell__icon--info {
+  color: var(--info);
+}
+
+/* A stacked table cell: a primary line with a muted qualifier under it. */
+.cell-stack {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--leading-snug);
+}
+
+.cell-stack small {
+  color: var(--foreground-muted);
+  font-size: var(--text-xs);
+}
+
+/* ----------------------------------------------------------------- Filters */
+
+.filter-strip,
+.student-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.filter-strip > *,
+.student-filter-bar > * {
+  flex: 0 1 220px;
+}
+
+/* ------------------------------------------------------------------- Forms */
+
+.form-error-banner,
+.form-success-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-subtle);
+  color: var(--danger-foreground);
+  font-size: var(--text-sm);
+}
+
+/*
+ * The counterpart to the error banner. An action that changed something has to
+ * say so — otherwise the only feedback is the list quietly redrawing.
+ */
+.form-success-banner {
+  border-color: var(--success-border);
+  background: var(--success-subtle);
+  color: var(--success-foreground);
+}
+
+.form-error-banner svg,
+.form-success-banner svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-grid label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
+}
+
+.settings-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.student-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.student-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.student-form__grid > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.student-form__full-width {
+  grid-column: 1 / -1;
+}
+
+.student-form__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
+}
+
+.student-form__error {
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
+
+.student-form__hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--foreground-muted);
+  font-size: var(--text-xs);
+}
+
+/* ----------------------------------------------------------------- Reports */
+
+.report-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin-bottom: var(--space-4);
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+}
+
+.report-subtitle {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--foreground-subtle);
+}
+
+.report-list {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+
+.report-field {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.report-field > span {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
+}
+
+.report-field textarea {
+  width: 100%;
+}
+
+.report-preview__list {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.report-preview__list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  font-size: var(--text-sm);
+}
+
+.source-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.source-columns h3 {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.source-columns p {
+  margin-bottom: var(--space-1);
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+}
+
+/* ----------------------------------------------------------------- Devices */
+
+.device-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.device-status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+/* ---------------------------------------------------------------- Students */
+
+.student-profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.student-profile-card > div:first-of-type {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.student-profile-card__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.student-profile-card__grid span {
+  color: var(--foreground-secondary);
+}
+
+/* --------------------------------------------------------------- Progress */
+
+.student-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.student-progress-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.student-progress-card__bar,
+.progress-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--track);
+}
+
+.student-progress-card__fill,
+.progress-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width var(--transition-base);
+}
+
+.progress-bar__fill--success {
+  background: var(--success);
+}
+
+.progress-bar__fill--warning {
+  background: var(--warning);
+}
+
+.progress-bar__fill--danger {
+  background: var(--danger);
+}
+
+/* --------------------------------------------------------------- Calendar */
+
+.attendance-calendar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--space-2);
+}
+
+.attendance-calendar__day {
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.attendance-calendar__day--present {
+  border-left-color: var(--success);
+}
+
+.attendance-calendar__day--late {
+  border-left-color: var(--warning);
+}
+
+.attendance-calendar__day--absent,
+.attendance-calendar__day--missing {
+  border-left-color: var(--danger);
+}
+
+.attendance-calendar__day--holiday {
+  border-left-color: var(--info);
+}
+
+/* A day rewritten after a correction was reviewed. */
+.attendance-calendar__day--corrected {
+  border-left-color: var(--info);
+}
+
+/* -------------------------------------------------------------- Not found */
+
+.not-found-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--background);
+}
+
+.not-found-page .base-card {
+  width: min(480px, 100%);
+}
+
+.not-found-page__link {
+  display: inline-flex;
+}
+
+/* ---------------------------------------------------------------- Dialogs */
+
+.app-profile-dialog__body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-profile-dialog__body p {
+  font-size: var(--text-sm);
+  color: var(--foreground-secondary);
+}
+
+.app-profile-dialog__body p:first-child {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--foreground);
+}
+
+/* ------------------------------------------------------------- Responsive */
+
+@media (max-width: 1280px) {
+  .metric-grid,
+  .shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .metric-grid,
+  .shortcut-grid,
+  .settings-grid,
+  .student-form__grid,
+  .source-columns {
+    grid-template-columns: 1fr;
+  }
+}

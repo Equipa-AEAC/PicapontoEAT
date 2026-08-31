@@ -5,6 +5,7 @@ import BaseButton from "../../../../components/base/BaseButton.vue";
 import BaseCard from "../../../../components/base/BaseCard.vue";
 import BaseConfirmDialog from "../../../../components/base/BaseConfirmDialog.vue";
 import BaseEmptyState from "../../../../components/base/BaseEmptyState.vue";
+import BaseErrorState from "../../../../components/base/BaseErrorState.vue";
 import BaseFormDialog from "../../../../components/base/BaseFormDialog.vue";
 import BaseLoading from "../../../../components/base/BaseLoading.vue";
 import BasePageHeader from "../../../../components/base/BasePageHeader.vue";
@@ -19,6 +20,7 @@ import BaseTextInput from "../../../../components/base/BaseTextInput.vue";
 import { useCardsStore } from "../../../../stores/cards";
 import { useMembersStore } from "../../../../stores/members";
 import type { CardStatus } from "../../../../types/cards";
+import { formatTimestamp } from "../../../../shared/utils/date";
 
 const cardsStore = useCardsStore();
 const membersStore = useMembersStore();
@@ -128,6 +130,12 @@ onMounted(async () => {
       </template>
     </BasePageHeader>
 
+    <BaseErrorState
+      v-if="cardsStore.errorMessage"
+      :message="cardsStore.errorMessage"
+      @retry="cardsStore.loadCards()"
+    />
+
     <section class="metric-grid">
       <BaseStatsCard label="Total cards" :value="String(cardsStore.items.length)" caption="Cards on record" />
       <BaseStatsCard label="Available" :value="String(cardsStore.availableCount)" caption="Ready for assignment" />
@@ -161,10 +169,10 @@ onMounted(async () => {
             </template>
           </TableColumn>
           <TableColumn field="assignedAt" header="Assigned">
-            <template #body="slotProps">{{ slotProps.data.assignedAt ?? "—" }}</template>
+            <template #body="slotProps">{{ formatTimestamp(slotProps.data.assignedAt) }}</template>
           </TableColumn>
           <TableColumn field="lastScanAt" header="Last scan">
-            <template #body="slotProps">{{ slotProps.data.lastScanAt ?? "—" }}</template>
+            <template #body="slotProps">{{ formatTimestamp(slotProps.data.lastScanAt) }}</template>
           </TableColumn>
           <TableColumn header="Actions">
             <template #body="slotProps">

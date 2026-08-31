@@ -18,6 +18,7 @@ import BaseButton from "../../../../components/base/BaseButton.vue";
 import BaseCard from "../../../../components/base/BaseCard.vue";
 import BaseChart from "../../../../components/base/BaseChart.vue";
 import BaseEmptyState from "../../../../components/base/BaseEmptyState.vue";
+import BaseErrorState from "../../../../components/base/BaseErrorState.vue";
 import BaseLoading from "../../../../components/base/BaseLoading.vue";
 import BaseMetricCard from "../../../../components/base/BaseMetricCard.vue";
 import BasePageHeader from "../../../../components/base/BasePageHeader.vue";
@@ -28,6 +29,8 @@ import { useDevicesStore } from "../../../../stores/devices";
 import { useInternshipsStore } from "../../../../stores/internships";
 import { useMembersStore } from "../../../../stores/members";
 import type { StatusTone } from "../../../../types/dashboard";
+import { useChartTheme } from "../../../../composables/useChartTheme";
+import { formatTimestamp } from "../../../../shared/utils/date";
 
 const router = useRouter();
 const dashboardStore = useDashboardStore();
@@ -35,6 +38,7 @@ const attendanceStore = useAttendanceStore();
 const devicesStore = useDevicesStore();
 const internshipsStore = useInternshipsStore();
 const membersStore = useMembersStore();
+const { palette, baseOptions } = useChartTheme();
 
 const weeklyChart = computed<ChartData<"bar">>(() => ({
   labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -42,22 +46,15 @@ const weeklyChart = computed<ChartData<"bar">>(() => ({
     {
       label: "Attendance hours",
       data: [35, 38, 42, 44, 39, 28, 30],
-      backgroundColor: "rgba(110, 168, 254, 0.8)",
-      borderRadius: 12,
+      backgroundColor: palette.value.series[0],
+      borderRadius: 2,
       borderSkipped: false,
+      maxBarThickness: 40,
     },
   ],
 }));
 
-const weeklyOptions = computed<ChartOptions<"bar">>(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
-  scales: {
-    x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
-    y: { grid: { color: "rgba(148, 163, 184, 0.16)" }, ticks: { color: "#94a3b8" } },
-  },
-}));
+const weeklyOptions = computed<ChartOptions<"bar">>(() => baseOptions.value as ChartOptions<"bar">);
 
 const actionItems = [
   { label: "Members", icon: PhStudent, name: "members" },
@@ -186,18 +183,18 @@ onMounted(async () => {
 
     <BaseLoading v-if="busy" />
 
-    <BaseEmptyState
-      v-else-if="dashboardStore.error"
+    <!-- "Could not load" and "nothing to show" are different facts. -->
+    <BaseErrorState
+      v-else-if="dashboardStore.errorMessage"
       title="Dashboard unavailable"
-      :description="dashboardStore.error"
-      action-label="Retry"
-      @action="loadDashboard()"
+      :message="dashboardStore.errorMessage"
+      @retry="loadDashboard()"
     />
 
     <BaseEmptyState
       v-else-if="!dashboardHasContent"
       title="No dashboard data"
-      description="The mock dashboard did not return any metrics or activity yet."
+      description="No attendance, device or internship data has been recorded yet."
       action-label="Reload"
       @action="loadDashboard()"
     />
@@ -263,7 +260,7 @@ onMounted(async () => {
               <BaseStatusPill :label="item.timestamp" :tone="item.tone" />
             </article>
           </div>
-          <BaseEmptyState v-else title="No activity yet" description="The mock dashboard has no recent activity to display." />
+          <BaseEmptyState v-else title="No activity yet" description="Scans, corrections and journal entries will show up here as they happen." />
         </BaseCard>
 
         <BaseCard title="Device status" description="Hardware and terminal health.">
@@ -271,12 +268,12 @@ onMounted(async () => {
             <article v-for="device in devicesStore.items" :key="device.id" class="device-status-item">
               <div>
                 <h3>{{ device.name }}</h3>
-                <p>{{ device.location }} • Queue {{ device.queueSize }} • last seen {{ device.lastHeartbeatAt }}</p>
+                <p>{{ device.location }} • Queue {{ device.queueSize }} • last seen {{ formatTimestamp(device.lastHeartbeatAt) }}</p>
               </div>
               <BaseStatusPill :label="device.status" :tone="device.status === 'online' ? 'success' : device.status === 'offline' ? 'danger' : 'warning'" />
             </article>
           </div>
-          <BaseEmptyState v-else title="No devices loaded" description="There are no devices in the mock dataset yet." />
+          <BaseEmptyState v-else title="No devices loaded" description="Register a terminal to start seeing heartbeat and queue status." />
         </BaseCard>
       </section>
 
@@ -296,7 +293,7 @@ onMounted(async () => {
 
         <BaseCard title="Internship progress" description="Active placements and completed hour totals.">
           <article v-if="activeInternships.length === 0" class="empty-panel">
-            <BaseEmptyState title="No active internships" description="There are no active placements in the mock dataset." />
+            <BaseEmptyState title="No active internships" description="Assign an internship to a member and their progress will appear here." />
           </article>
           <article v-for="internship in activeInternships" :key="internship.id" class="list-row">
             <div>

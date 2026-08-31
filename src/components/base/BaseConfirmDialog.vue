@@ -55,7 +55,7 @@ const emit = defineEmits<{
 <style>
 .base-confirm-dialog__message {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
 }
 
 .base-confirm-dialog__footer {

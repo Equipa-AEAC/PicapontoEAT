@@ -5,6 +5,8 @@ export * from "./devices";
 export * from "./internships";
 export * from "./certificates";
 export * from "./members";
+export * from "./moments";
+export * from "./projects";
 export * from "./reports";
 export * from "./settings";
 export * from "./users";

@@ -86,43 +86,44 @@ defineExpose({ toggle, close });
 .base-menu {
   position: fixed;
   z-index: 1000;
-  min-width: 220px;
-  padding: 8px;
+  min-width: 208px;
+  padding: var(--space-1);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--surface-border);
-  background: linear-gradient(180deg, rgba(20, 30, 48, 0.98), rgba(13, 20, 33, 0.98));
+  border: var(--border-width) solid var(--border);
+  background: var(--surface-elevated);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(18px);
 }
 
 .base-menu__item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--foreground);
   text-align: left;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
+  transition: background-color var(--transition-fast);
 }
 
 .base-menu__item:hover {
-  background: rgba(122, 167, 255, 0.12);
+  background: var(--hover);
 }
 
 .base-menu__icon {
   width: 16px;
   height: 16px;
-  color: var(--text-secondary);
+  flex: none;
+  color: var(--foreground-muted);
 }
 
 .base-menu__separator {
   height: 1px;
-  margin: 6px 4px;
-  background: var(--surface-border);
+  margin: var(--space-1) 0;
+  background: var(--border);
 }
 </style>

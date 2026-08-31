@@ -1,0 +1,318 @@
+/*
+ * Semantic design tokens.
+ *
+ * Every colour, radius, spacing step and type step the application uses is declared
+ * here once, in semantic terms ("surface", "border", "danger") rather than literal
+ * ones ("slate-900", "#f46f6f"). Components reference the semantic name only, which
+ * is what lets a single `data-theme` attribute on <html> repaint the whole product
+ * without any component knowing that more than one theme exists.
+ *
+ * Light is the default and lives on `:root`. Dark is the application's original
+ * palette, moved here wholesale, and overrides only the colour tokens — every
+ * geometry, spacing and type token is shared by both themes on purpose, so the two
+ * are the same interface in two skins rather than two interfaces.
+ */
+
+:root {
+  /* ------------------------------------------------------------------ Type */
+
+  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", "SF Mono", monospace;
+
+  /*
+   * A restrained type scale. Steps are close together on purpose: hierarchy in this
+   * product comes from weight, colour and spacing far more than from size, so the
+   * largest page title is only ~1.5x body text rather than the usual dashboard
+   * hero heading.
+   */
+  --text-2xs: 0.6875rem; /* 11px — dense table metadata */
+  --text-xs: 0.75rem; /* 12px — labels, eyebrows, status text */
+  --text-sm: 0.8125rem; /* 13px — table cells, secondary copy */
+  --text-base: 0.875rem; /* 14px — body, form controls */
+  --text-md: 0.9375rem; /* 15px — card titles */
+  --text-lg: 1.0625rem; /* 17px — section titles */
+  --text-xl: 1.25rem; /* 20px — page titles */
+  --text-2xl: 1.5rem; /* 24px — dialog and detail titles */
+  --text-3xl: 2rem; /* 32px — metric values */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+
+  /* Wide tracking is reserved for uppercase micro-labels; body text stays neutral. */
+  --tracking-tight: -0.011em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.06em;
+  --tracking-wider: 0.09em;
+
+  /* --------------------------------------------------------------- Spacing */
+
+  /* 4px base grid. Components must step through these rather than inventing values. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* -------------------------------------------------------------- Geometry */
+
+  /*
+   * Deliberately tight radii. The previous scale peaked at 24px, which is what made
+   * the interface read as a consumer SaaS dashboard; an institutional tool wants
+   * corners you barely notice.
+   */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-pill: 999px;
+
+  --border-width: 1px;
+
+  /* ----------------------------------------------------------------- Depth */
+
+  /*
+   * Shadows are for things that genuinely float (dialogs, menus, popovers). Cards
+   * and tables get their separation from borders and background steps instead.
+   */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
+
+  /* --------------------------------------------------------------- Motion */
+
+  --transition-fast: 120ms ease;
+  --transition-base: 160ms ease;
+
+  /* ------------------------------------------------------------- Structure */
+
+  --sidebar-width: 264px;
+  --sidebar-width-collapsed: 68px;
+  --topbar-height: 56px;
+  --content-max-width: 1600px;
+
+  /* ---------------------------------------------------------------- Colour */
+
+  color-scheme: light;
+
+  /* Canvas and surfaces. Four steps: page, sunken, raised, floating. */
+  --background: #f6f7f9;
+  --background-sunken: #eceef2;
+  --surface: #ffffff;
+  --surface-subtle: #fafbfc;
+  --surface-elevated: #ffffff;
+  --surface-inverted: #0f172a;
+
+  /* Text. `foreground` is the only colour body copy should ever use. */
+  --foreground: #10161f;
+  --foreground-secondary: #48546a;
+  --foreground-muted: #6b7688;
+  --foreground-subtle: #8b95a6;
+  --foreground-inverted: #f8fafc;
+  --foreground-on-accent: #ffffff;
+
+  /* Borders. `border` is the workhorse; `border-strong` marks a real division. */
+  --border: #e2e5ea;
+  --border-strong: #cbd1da;
+  --border-subtle: #eef0f4;
+
+  /*
+   * Deep institutional blue rather than the bright dashboard blue. It reads as a
+   * school/administration colour and survives being placed next to dense text.
+   */
+  --primary: #1d4ed8;
+  --primary-hover: #1a45c0;
+  --primary-active: #17399f;
+  --primary-subtle: #eaf0fe;
+  --primary-border: #c3d4fb;
+  --primary-foreground: #ffffff;
+  --primary-contrast: #1e40af;
+
+  --secondary: #475569;
+  --secondary-hover: #3c4759;
+  --secondary-subtle: #f1f3f6;
+  --secondary-border: #dde1e8;
+  --secondary-foreground: #ffffff;
+
+  --success: #0f7a4f;
+  --success-subtle: #e6f5ee;
+  --success-border: #b9e0cd;
+  --success-foreground: #0b5c3b;
+
+  --warning: #a35c07;
+  --warning-subtle: #fdf1e0;
+  --warning-border: #f2d6ab;
+  --warning-foreground: #7d4605;
+
+  --danger: #b3261e;
+  --danger-subtle: #fdeceb;
+  --danger-border: #f5c7c4;
+  --danger-foreground: #8c1d17;
+
+  --info: #0e6c9e;
+  --info-subtle: #e6f3fa;
+  --info-border: #b6ddef;
+  --info-foreground: #0a5378;
+
+  /* Sidebar is its own surface family so it can sit darker or lighter than content. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #48546a;
+  --sidebar-foreground-active: #10161f;
+  --sidebar-border: #e2e5ea;
+  --sidebar-item-hover: #f1f3f6;
+  --sidebar-item-active: #eaf0fe;
+  --sidebar-item-active-border: #1d4ed8;
+  --sidebar-section-label: #8b95a6;
+
+  /* Form controls. */
+  --input: #ffffff;
+  --input-border: #cbd1da;
+  --input-border-hover: #aab3c0;
+  --input-foreground: #10161f;
+  --input-placeholder: #8b95a6;
+  --input-disabled: #f1f3f6;
+
+  /* Interaction states, used as overlays on top of any surface. */
+  --hover: rgba(15, 23, 42, 0.04);
+  --active: rgba(15, 23, 42, 0.07);
+  --selected: #eaf0fe;
+  --focus-ring: rgba(29, 78, 216, 0.35);
+  --focus-ring-width: 2px;
+
+  /* Data display. */
+  --overlay: rgba(15, 23, 42, 0.4);
+  --table-header: #f6f7f9;
+  --table-row-hover: #f6f7f9;
+  --table-row-stripe: #fafbfc;
+  --track: #e6e9ee;
+  --skeleton: #eceef2;
+
+  /*
+   * Categorical series for charts. Ordered so the first four stay distinguishable
+   * for the most common colour-vision deficiencies.
+   */
+  --chart-1: #1d4ed8;
+  --chart-2: #0f7a4f;
+  --chart-3: #a35c07;
+  --chart-4: #7c3aed;
+  --chart-5: #0e6c9e;
+  --chart-6: #b3261e;
+  --chart-grid: #e2e5ea;
+  --chart-axis: #6b7688;
+}
+
+/*
+ * Dark theme — the application's original palette, promoted to tokens.
+ *
+ * Hues, surface tints and accent colours are the ones the product already shipped
+ * with; what changed is that they are now reachable by name. A few text and border
+ * values were nudged to clear WCAG AA against their own backgrounds, which the
+ * original hardcoded values did not always do.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #07111d;
+  --background-sunken: #050c16;
+  --surface: #101a2a;
+  --surface-subtle: #0d1626;
+  --surface-elevated: #16223a;
+  --surface-inverted: #f8fafc;
+
+  --foreground: #eef2ff;
+  --foreground-secondary: #a8b6cc;
+  --foreground-muted: #8593a9;
+  --foreground-subtle: #64748b;
+  --foreground-inverted: #07111d;
+  --foreground-on-accent: #04101f;
+
+  --border: rgba(148, 163, 184, 0.18);
+  --border-strong: rgba(148, 163, 184, 0.32);
+  --border-subtle: rgba(148, 163, 184, 0.1);
+
+  --primary: #7aa7ff;
+  --primary-hover: #93b8ff;
+  --primary-active: #4f8cff;
+  --primary-subtle: rgba(122, 167, 255, 0.14);
+  --primary-border: rgba(122, 167, 255, 0.36);
+  --primary-foreground: #04101f;
+  --primary-contrast: #b6d0ff;
+
+  --secondary: #94a3b8;
+  --secondary-hover: #aab8cc;
+  --secondary-subtle: rgba(148, 163, 184, 0.12);
+  --secondary-border: rgba(148, 163, 184, 0.26);
+  --secondary-foreground: #07111d;
+
+  --success: #44d39d;
+  --success-subtle: rgba(68, 211, 157, 0.14);
+  --success-border: rgba(68, 211, 157, 0.34);
+  --success-foreground: #abf3d3;
+
+  --warning: #f0b35a;
+  --warning-subtle: rgba(240, 179, 90, 0.14);
+  --warning-border: rgba(240, 179, 90, 0.34);
+  --warning-foreground: #fde68a;
+
+  --danger: #f46f6f;
+  --danger-subtle: rgba(244, 111, 111, 0.14);
+  --danger-border: rgba(244, 111, 111, 0.34);
+  --danger-foreground: #fecaca;
+
+  --info: #63b3ff;
+  --info-subtle: rgba(99, 179, 255, 0.14);
+  --info-border: rgba(99, 179, 255, 0.34);
+  --info-foreground: #bfdbfe;
+
+  --sidebar: #060c17;
+  --sidebar-foreground: #a8b6cc;
+  --sidebar-foreground-active: #eef2ff;
+  --sidebar-border: rgba(148, 163, 184, 0.16);
+  --sidebar-item-hover: rgba(22, 34, 56, 0.7);
+  --sidebar-item-active: rgba(22, 34, 56, 0.95);
+  --sidebar-item-active-border: #7aa7ff;
+  --sidebar-section-label: #64748b;
+
+  --input: rgba(9, 15, 26, 0.72);
+  --input-border: rgba(148, 163, 184, 0.2);
+  --input-border-hover: rgba(148, 163, 184, 0.34);
+  --input-foreground: #eef2ff;
+  --input-placeholder: #64748b;
+  --input-disabled: rgba(15, 23, 42, 0.5);
+
+  --hover: rgba(148, 163, 184, 0.08);
+  --active: rgba(148, 163, 184, 0.14);
+  --selected: rgba(122, 167, 255, 0.14);
+  --focus-ring: rgba(122, 167, 255, 0.55);
+
+  --overlay: rgba(4, 8, 16, 0.66);
+  --table-header: rgba(15, 23, 42, 0.7);
+  --table-row-hover: rgba(122, 167, 255, 0.07);
+  --table-row-stripe: rgba(15, 23, 42, 0.34);
+  --track: rgba(148, 163, 184, 0.16);
+  --skeleton: rgba(148, 163, 184, 0.12);
+
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.4);
+  --shadow-md: 0 8px 20px rgba(2, 6, 23, 0.34);
+  --shadow-lg: 0 24px 56px rgba(2, 6, 23, 0.48);
+
+  --chart-1: #7aa7ff;
+  --chart-2: #44d39d;
+  --chart-3: #f0b35a;
+  --chart-4: #b79bff;
+  --chart-5: #63b3ff;
+  --chart-6: #f46f6f;
+  --chart-grid: rgba(148, 163, 184, 0.14);
+  --chart-axis: #8593a9;
+}

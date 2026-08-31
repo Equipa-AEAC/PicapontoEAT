@@ -3,27 +3,110 @@ import { REPORT_TYPE_LABELS } from "../types/reports";
 
 import { mockDatabase } from "./mockDatabase";
 import { mockRequest } from "./mockTransport";
+import { computeParticipationHours } from "./participation.service";
+import { todayIsoDate } from "../utils/date";
 
-function totalTeamHours(): number {
-  return mockDatabase.members.reduce((total, member) => total + member.teamHours, 0);
+/** Inclusive `YYYY-MM-DD` bounds; either end may be null. */
+type DateRange = [string | null, string | null];
+
+/*
+ * Both totals are summed from participation periods, so a member who moved from
+ * volunteering to a placement contributes to each bucket for the days that
+ * actually belonged to it. Neither reads a member's current status.
+ */
+function totalTeamHours(dateRange: DateRange): number {
+  return round(
+    mockDatabase.members.reduce((total, m) => total + computeParticipationHours(m.id, dateRange).teamHours, 0),
+  );
 }
 
-function totalInternshipHours(): number {
-  return mockDatabase.internships.reduce((total, internship) => total + internship.completedHours, 0);
+function totalInternshipHours(dateRange: DateRange): number {
+  return round(
+    mockDatabase.internships.reduce(
+      (total, i) => total + computeParticipationHours(i.studentId, dateRange).internshipHours,
+      0,
+    ),
+  );
 }
 
-export async function getReportSummary(): Promise<ReportSummary> {
+function round(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Whether an ISO day falls inside the report's range.
+ *
+ * Every report prints its range in the subtitle, so every report has to honour
+ * it. Three of them used to print it and then chart an all-time figure, which is
+ * the most misleading thing a report can do: it looks specific and is not.
+ */
+function withinRange(date: string | null, [from, to]: [string | null, string | null]): boolean {
+  if (!date) {
+    return from === null && to === null;
+  }
+
+  return (!from || date >= from) && (!to || date <= to);
+}
+
+/**
+ * Tasks that are past their due date and not finished.
+ *
+ * Duplicated logic is avoided by reading the same `projectTasks` collection the
+ * project service does; what a report calls "overdue" and what the board calls
+ * "overdue" must be the same thing or the two pages disagree in front of the user.
+ */
+function overdueTaskCount(): number {
+  const today = todayIsoDate();
+
+  return mockDatabase.projectTasks.filter(
+    (task) => !task.archivedAt && task.status !== "done" && task.dueDate !== null && task.dueDate < today,
+  ).length;
+}
+
+/**
+ * The figures the reports page shows beside the preview.
+ *
+ * Takes the same range as the preview. It used to take none while being
+ * presented as a "Period snapshot" of "what the export will cover", so a report
+ * narrowed to one month sat next to all-time totals — a displayed period that
+ * changed nothing, which is the defect this codebase treats as unacceptable.
+ *
+ * `attendanceTotal`, the two hour buckets and `completedTasks` are dated and are
+ * scoped. `activeStudents`, `activeProjects` and `overdueTasks` describe the
+ * roster *now*: a member is not "active during June", and overdue is measured
+ * against today. `rangeApplied` lets the page say which is which rather than
+ * implying everything is period-scoped.
+ */
+export async function getReportSummary(
+  dateRange: DateRange = [null, null],
+): Promise<ReportSummary> {
   return mockRequest(() => ({
     generatedAt: new Date().toISOString(),
-    attendanceTotal: mockDatabase.attendance.length,
+    rangeApplied: dateRange[0] !== null || dateRange[1] !== null,
+    attendanceTotal: mockDatabase.attendance.filter((row) => withinRange(row.date, dateRange)).length,
     activeStudents: mockDatabase.members.filter((member) => member.status === "active").length,
-    teamHours: totalTeamHours(),
-    internshipHours: totalInternshipHours(),
+    teamHours: totalTeamHours(dateRange),
+    internshipHours: totalInternshipHours(dateRange),
+    activeProjects: mockDatabase.projects.filter((project) => project.status !== "archived").length,
+    completedTasks: mockDatabase.projectTasks.filter(
+      (task) =>
+        !task.archivedAt &&
+        task.status === "done" &&
+        (dateRange[0] === null && dateRange[1] === null
+          ? true
+          : withinRange(task.completedAt?.slice(0, 10) ?? null, dateRange)),
+    ).length,
+    overdueTasks: overdueTaskCount(),
   }));
 }
 
 export async function previewReport(filters: ReportFilterValues): Promise<ReportPreview> {
   return mockRequest(() => {
+    const noRange = filters.dateRange[0] === null && filters.dateRange[1] === null;
+    const rangeSubtitle = noRange
+      ? "All recorded data"
+      : `${filters.dateRange[0] ?? "start"} to ${filters.dateRange[1] ?? "end"}`;
+
     const scopedMembers =
       filters.studentId === "all"
         ? mockDatabase.members
@@ -32,9 +115,46 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
     if (filters.type === "team-hours") {
       return {
         title: "Team hours (surplus) report",
-        subtitle: `${filters.dateRange[0] ?? "start"} to ${filters.dateRange[1] ?? "end"}`,
-        summary: `Volunteer hours registered as Equipa Técnica team members, creditable to the surplus-hours certificate. FCT internship hours are excluded.`,
-        chartData: scopedMembers.map((member) => ({ label: member.fullName, value: member.teamHours })),
+        subtitle: rangeSubtitle,
+        summary:
+          "Hours that fell inside a Technical Team participation period, creditable to the surplus-hours certificate. " +
+          "Hours a member accrued while on an FCT placement are excluded, even for members who are interns now.",
+        chartData: scopedMembers.map((member) => ({
+          label: member.fullName,
+          value: computeParticipationHours(member.id, filters.dateRange).teamHours,
+        })),
+      };
+    }
+
+    /*
+     * Project delivery reads from the project tasks rather than from the journal:
+     * hours answer "how much time went in", completed tasks answer "what got done".
+     * Reporting needs both, and they are deliberately different numbers.
+     */
+    if (filters.type === "project") {
+      /*
+       * A task counts for the range it was *completed* in, taken from
+       * `completedAt`. With no range the report covers everything, which is what
+       * an empty range means everywhere else in the application.
+       */
+      const live = mockDatabase.projectTasks.filter(
+        (task) =>
+          !task.archivedAt &&
+          task.status === "done" &&
+          (noRange ? true : withinRange(task.completedAt?.slice(0, 10) ?? null, filters.dateRange)),
+      );
+
+      return {
+        title: "Project delivery report",
+        subtitle: rangeSubtitle,
+        summary:
+          "Tasks completed per project, taken from the project boards. Journal hours are reported separately under team hours.",
+        chartData: mockDatabase.projects
+          .filter((project) => project.status !== "archived")
+          .map((project) => ({
+            label: project.name,
+            value: live.filter((task) => task.projectId === project.id).length,
+          })),
       };
     }
 
@@ -46,19 +166,38 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
 
       return {
         title: "Internship (FCT) report",
-        subtitle: `${filters.dateRange[0] ?? "start"} to ${filters.dateRange[1] ?? "end"}`,
-        summary: `FCT internship hours only. Volunteer team hours are reported separately.`,
-        chartData: scopedInternships.map((internship) => ({ label: internship.studentName, value: internship.completedHours })),
+        subtitle: rangeSubtitle,
+        summary:
+          "Hours that fell inside an FCT internship participation period. Volunteer hours the same member accrued " +
+          "before the placement began are reported separately and never counted here.",
+        chartData: scopedInternships.map((internship) => ({
+          label: internship.studentName,
+          value: computeParticipationHours(internship.studentId, filters.dateRange).internshipHours,
+        })),
       };
     }
 
+    /*
+     * Attendance / student / device. Attendance is dated, so it is scoped to the
+     * range; members and devices are not dated records, and counting them "in a
+     * period" would be inventing a meaning the data does not have — so the
+     * summary says plainly that they are current totals.
+     */
+    const scopedAttendance = mockDatabase.attendance.filter(
+      (row) =>
+        withinRange(row.date, filters.dateRange) &&
+        (filters.studentId === "all" || row.studentId === filters.studentId),
+    );
+
     return {
       title: `${REPORT_TYPE_LABELS[filters.type]} report`,
-      subtitle: `${filters.dateRange[0] ?? "start"} to ${filters.dateRange[1] ?? "end"}`,
-      summary: `Prepared for ${filters.scope} with ${filters.format.toUpperCase()} export availability.`,
+      subtitle: rangeSubtitle,
+      summary:
+        `Attendance is counted inside ${noRange ? "the full record" : "the selected period"}. ` +
+        "Members and devices are current totals and are not period-scoped.",
       chartData: [
-        { label: "Attendance", value: mockDatabase.attendance.length },
-        { label: "Members", value: mockDatabase.members.length },
+        { label: "Attendance", value: scopedAttendance.length },
+        { label: "Members", value: scopedMembers.length },
         { label: "Devices", value: mockDatabase.devices.length },
       ],
     };

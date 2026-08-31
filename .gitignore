@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Vite build output (vite.config.ts build.outDir): served by the Haxe backend, generated
+Export/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

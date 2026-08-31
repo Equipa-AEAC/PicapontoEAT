@@ -8,12 +8,14 @@ const props = withDefaults(
     label: string;
     value: string;
     caption: string;
-    trendLabel: string;
+    /** Optional: render a badge only when there is a real, computed signal to show. */
+    trendLabel?: string;
     trendTone?: TrendTone;
     /** Phosphor icon component. The `icon` slot still wins when both are given. */
     icon?: Component | null;
   }>(),
   {
+    trendLabel: undefined,
     trendTone: "neutral",
     icon: null,
   },
@@ -30,7 +32,7 @@ const toneClass = computed(() => `base-metric-card--${props.trendTone}`);
           <component :is="icon" v-if="icon" weight="bold" />
         </slot>
       </div>
-      <span class="base-metric-card__trend">{{ trendLabel }}</span>
+      <span v-if="trendLabel" class="base-metric-card__trend">{{ trendLabel }}</span>
     </div>
 
     <p class="base-metric-card__label">{{ label }}</p>

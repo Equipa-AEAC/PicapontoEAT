@@ -96,40 +96,40 @@ function onKeydown(event: KeyboardEvent) {
 .base-tabs__list {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px;
+  gap: var(--space-5);
+  padding: 0;
   overflow-x: auto;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--surface-border);
-  background: var(--surface-soft);
+  border-bottom: var(--border-width) solid var(--border);
 }
 
 .base-tabs__tab {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex: none;
-  padding: 9px 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  padding: var(--space-3) 0;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-  font-weight: 500;
+  color: var(--foreground-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
   white-space: nowrap;
-  transition: background 140ms ease, color 140ms ease;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .base-tabs__tab:hover {
-  color: var(--text-primary);
-  background: rgba(148, 163, 184, 0.1);
+  color: var(--foreground);
 }
 
+/* An underline rather than a filled segment: it reads as a section switch, not a button. */
 .base-tabs__tab--active,
 .base-tabs__tab--active:hover {
-  color: var(--text-primary);
-  border-color: var(--surface-border);
-  background: var(--surface-strong);
+  color: var(--foreground);
+  border-bottom-color: var(--primary);
+  font-weight: var(--weight-semibold);
 }
 
 .base-tabs__tab svg {
@@ -138,12 +138,18 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 .base-tabs__badge {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: rgba(122, 167, 255, 0.16);
-  color: var(--primary);
-  font-size: 0.74rem;
-  font-weight: 600;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--secondary-subtle);
+  color: var(--foreground-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.base-tabs__tab--active .base-tabs__badge {
+  background: var(--primary-subtle);
+  color: var(--primary-contrast);
 }
 
 .base-tabs__panel {

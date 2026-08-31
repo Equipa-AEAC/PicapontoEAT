@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import type { Project, TeamJournalEntry, TeamJournalFilters, TeamJournalSummary } from "../types/internshipReports";
 import { getTeamJournalSummary, listAllDailyLogs, listProjects } from "../services/internshipReports.service";
+import { journalCoverageState } from "../types/internshipReports";
 
 /**
  * The admin-side view of the daily work journal. `useInternshipReportsStore` is
@@ -21,9 +22,26 @@ export const useAdminJournalStore = defineStore("adminJournal", () => {
     [...new Set(entries.value.map((entry) => entry.date.slice(0, 7)))].sort((first, second) => second.localeCompare(first)),
   );
 
-  /** Members who have not written anything for more than two weeks. */
+  /**
+   * Interns who are behind on a journal they are required to keep.
+   *
+   * Volunteers are deliberately excluded: the journal is only recommended for
+   * them, so counting their silence as a fault was the contradiction between
+   * this number and the "optional but recommended" copy beside it.
+   */
   const staleContributors = computed(
-    () => summary.value?.coverage.filter((row) => row.daysSinceLastEntry === null || row.daysSinceLastEntry > 14) ?? [],
+    () =>
+      summary.value?.coverage.filter(
+        (row) => journalCoverageState(row.isIntern, row.daysSinceLastEntry).isBehind,
+      ) ?? [],
+  );
+
+  /** Volunteers who simply are not writing. Worth seeing, never a fault. */
+  const quietVolunteers = computed(
+    () =>
+      summary.value?.coverage.filter(
+        (row) => !row.isIntern && (row.daysSinceLastEntry === null || row.daysSinceLastEntry > 14),
+      ) ?? [],
   );
 
   const draftEntries = computed(() => entries.value.filter((entry) => entry.status === "draft"));
@@ -61,6 +79,7 @@ export const useAdminJournalStore = defineStore("adminJournal", () => {
     errorMessage,
     availableMonths,
     staleContributors,
+    quietVolunteers,
     draftEntries,
     loadJournal,
     resetFilters,

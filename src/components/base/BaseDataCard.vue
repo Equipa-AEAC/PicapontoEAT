@@ -26,12 +26,11 @@ defineProps<{
 .base-data-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 18px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--surface-border);
-  background: linear-gradient(180deg, rgba(17, 26, 42, 0.92), rgba(12, 20, 34, 0.92));
-  box-shadow: var(--shadow-lg);
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface);
 }
 
 .base-data-card__header {
@@ -43,30 +42,35 @@ defineProps<{
 
 .base-data-card__title {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--foreground-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
 }
 
 .base-data-card__description {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 0.78rem;
+  margin: var(--space-1) 0 0;
+  color: var(--foreground-muted);
+  font-size: var(--text-xs);
 }
 
 .base-data-card__trend {
   flex: 0 0 auto;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(71, 85, 105, 0.22);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--secondary-subtle);
+  color: var(--foreground-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .base-data-card__value {
   margin: 0;
-  color: var(--text-primary);
-  font-size: 1.9rem;
-  font-weight: 600;
-  line-height: 1.1;
+  color: var(--foreground);
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-variant-numeric: tabular-nums;
 }
 </style>

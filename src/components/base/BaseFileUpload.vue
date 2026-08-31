@@ -121,7 +121,7 @@ function clearFile() {
 
 .base-file-upload__label {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
 }
 
@@ -136,8 +136,8 @@ function clearFile() {
   flex-wrap: wrap;
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--surface-border);
-  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
 }
 
 .base-file-upload__file-icon {
@@ -156,13 +156,13 @@ function clearFile() {
 }
 
 .base-file-upload__file-copy strong {
-  color: var(--text-primary);
+  color: var(--foreground);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
 .base-file-upload__file-copy small {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.78rem;
 }
 
@@ -174,7 +174,7 @@ function clearFile() {
 }
 
 .base-file-upload__hint {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.78rem;
 }
 

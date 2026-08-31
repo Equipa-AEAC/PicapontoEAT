@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import type { DeviceDetails, DeviceFilters } from "../types/devices";
 import { deleteDevice, getDeviceById, listDevices, restartDevice, saveDevice, updateDeviceFirmware } from "../services/devices.service";
+import { describeError } from "../utils/errors";
 
 export const useDevicesStore = defineStore("devices", () => {
   const items = ref<DeviceDetails[]>([]);
@@ -10,16 +11,26 @@ export const useDevicesStore = defineStore("devices", () => {
   const filters = ref<DeviceFilters>({ query: "", status: "all", firmwareChannel: "all" });
   const loading = ref(false);
   const saving = ref(false);
+  /** A failed request must never be shown as an empty result. */
+  const errorMessage = ref<string | null>(null);
 
   const offlineDevicesCount = computed(() => items.value.filter((device) => device.status === "offline").length);
 
   async function loadDevices() {
     loading.value = true;
+    errorMessage.value = null;
     try {
       items.value = await listDevices(filters.value);
+    } catch (error) {
+      errorMessage.value = describeError(error, "Devices could not be loaded.");
     } finally {
       loading.value = false;
     }
+  }
+
+  /** Mirrors `useMembersStore.resetFilters` so every list page clears the same way. */
+  function resetFilters() {
+    filters.value = { query: "", status: "all", firmwareChannel: "all" };
   }
 
   async function loadDevice(deviceId: string) {
@@ -57,7 +68,9 @@ export const useDevicesStore = defineStore("devices", () => {
     filters,
     loading,
     saving,
+    errorMessage,
     offlineDevicesCount,
+    resetFilters,
     loadDevices,
     loadDevice,
     persistDevice,

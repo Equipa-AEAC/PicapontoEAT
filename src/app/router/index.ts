@@ -20,6 +20,12 @@ const adminPageComponents = {
   reports: () => import("../../modules/admin/reports/pages/AdminReportsPage.vue"),
   users: () => import("../../modules/admin/users/pages/AdminUsersPage.vue"),
   settings: () => import("../../modules/admin/settings/pages/AdminSettingsPage.vue"),
+  "projects-overview": () => import("../../modules/admin/projects/pages/ProjectsOverviewPage.vue"),
+  projects: () => import("../../modules/admin/projects/pages/ProjectsListPage.vue"),
+  "project-tasks": () => import("../../modules/admin/projects/pages/ProjectTasksPage.vue"),
+  "project-team": () => import("../../modules/admin/projects/pages/ProjectTeamPage.vue"),
+  "project-activity": () => import("../../modules/admin/projects/pages/ProjectActivityPage.vue"),
+  "team-moments": () => import("../../modules/admin/moments/pages/AdminTeamMomentsPage.vue"),
 } as const;
 
 const studentPageComponents = {
@@ -27,13 +33,14 @@ const studentPageComponents = {
   attendance: () => import("../../modules/student/attendance/pages/StudentAttendancePage.vue"),
   workedHours: () => import("../../modules/student/worked-hours/pages/StudentWorkedHoursPage.vue"),
   calendar: () => import("../../modules/student/calendar/pages/StudentCalendarPage.vue"),
-  internship: () => import("../../modules/student/internship/pages/StudentInternshipPage.vue"),
   dailyLog: () => import("../../modules/student/daily-log/pages/StudentDailyLogPage.vue"),
   reports: () => import("../../modules/student/reports/pages/StudentReportsPage.vue"),
   certificates: () => import("../../modules/student/certificates/pages/StudentCertificatesPage.vue"),
   profile: () => import("../../modules/student/profile/pages/StudentProfilePage.vue"),
   announcements: () => import("../../modules/student/announcements/pages/StudentAnnouncementsPage.vue"),
   settings: () => import("../../modules/student/settings/pages/StudentSettingsPage.vue"),
+  moments: () => import("../../modules/student/moments/pages/StudentTeamMomentsPage.vue"),
+  work: () => import("../../modules/student/work/pages/StudentWorkPage.vue"),
 } as const;
 
 const adminChildRoutes = adminNavigationItems.map((item) => ({
@@ -66,6 +73,29 @@ const router = createRouter({
         {
           path: "students",
           redirect: { name: "members" },
+        },
+        {
+          path: "projects",
+          redirect: { name: "projects-overview" },
+        },
+        {
+          // Team moments moved out of the project group; keep old links alive.
+          path: "projects/moments",
+          redirect: { name: "team-moments" },
+        },
+        {
+          /*
+           * Kept under an explicit `detail` segment so a project id can never be
+           * mistaken for one of the workspace pages above it.
+           */
+          path: "projects/detail/:projectId",
+          name: "project-details",
+          component: () => import("../../modules/admin/projects/pages/ProjectDetailsPage.vue"),
+          meta: {
+            title: "Project",
+            subtitle: "Tasks, team and activity for one project",
+            workspace: "admin",
+          },
         },
         {
           path: "members/:memberId",
@@ -135,15 +165,6 @@ const router = createRouter({
           },
         },
         {
-          path: "internship",
-          name: "student-internship",
-          component: studentPageComponents.internship,
-          meta: {
-            title: "Internship Progress",
-            subtitle: "Track required and completed hours",
-          },
-        },
-        {
           path: "daily-log",
           name: "student-daily-log",
           component: studentPageComponents.dailyLog,
@@ -186,6 +207,29 @@ const router = createRouter({
           meta: {
             title: "Announcements",
             subtitle: "Latest student updates",
+          },
+        },
+        {
+          // Internship was merged into Worked Hours; keep old links alive.
+          path: "internship",
+          redirect: { name: "student-worked-hours" },
+        },
+        {
+          path: "my-work",
+          name: "student-work",
+          component: studentPageComponents.work,
+          meta: {
+            title: "My Work",
+            subtitle: "Tasks assigned to you across the team's projects",
+          },
+        },
+        {
+          path: "moments",
+          name: "student-moments",
+          component: studentPageComponents.moments,
+          meta: {
+            title: "Team Moments",
+            subtitle: "What the team is working on today",
           },
         },
         {

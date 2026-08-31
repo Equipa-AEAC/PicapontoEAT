@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 
 import BaseButton from "../../../components/base/BaseButton.vue";
 import BaseCheckbox from "../../../components/base/BaseCheckbox.vue";
@@ -21,6 +21,13 @@ const form = reactive<LoginPayload>({
   password: "",
   rememberMe: true,
 });
+
+/**
+ * There is no self-service reset: accounts are issued by the coordination team,
+ * so the honest thing for this control to do is say who to ask rather than open
+ * a flow that cannot complete.
+ */
+const showRecoveryHint = ref(false);
 
 function submit() {
   emit("submit", {
@@ -55,8 +62,21 @@ function submit() {
           <BaseCheckbox v-model="form.rememberMe" />
           <span>Remember me</span>
         </label>
-        <button type="button" class="login-card__link">Forgot password</button>
+        <button
+          type="button"
+          class="login-card__link"
+          :aria-expanded="showRecoveryHint"
+          aria-controls="login-recovery-hint"
+          @click="showRecoveryHint = !showRecoveryHint"
+        >
+          Forgot password
+        </button>
       </div>
+
+      <p v-if="showRecoveryHint" id="login-recovery-hint" class="login-card__hint">
+        Passwords are reset by the coordination team. Ask them in person or email
+        <a href="mailto:coordenacao@picaponto.edu">coordenacao@picaponto.edu</a> from your school address.
+      </p>
 
       <p v-if="props.errorMessage" class="login-card__error">{{ props.errorMessage }}</p>
 
@@ -69,13 +89,14 @@ function submit() {
 
 <style scoped>
 .login-card {
-  width: min(420px, 92vw);
-  padding: 1.5rem;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  width: min(400px, 92vw);
+  padding: var(--space-7);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  box-shadow: var(--shadow-md);
   display: grid;
-  gap: 1rem;
+  gap: var(--space-5);
 }
 
 .login-card__brand {
@@ -83,27 +104,34 @@ function submit() {
 }
 
 .login-card__logo {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
 }
 
 .login-card__brand h1 {
-  margin: 0.5rem 0 0.25rem;
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
 }
 
 .login-card__brand p {
   margin: 0;
-  color: #94a3b8;
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
 }
 
 .login-card__form {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-4);
 }
 
 .login-card__form label {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
 }
 
 .login-card__row {
@@ -121,17 +149,44 @@ function submit() {
 .login-card__link {
   background: none;
   border: none;
-  color: #60a5fa;
+  padding: 0;
+  color: var(--primary);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
-.login-card__error {
-  color: #f87171;
+.login-card__link:hover {
+  text-decoration: underline;
+}
+
+.login-card__hint {
   margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  color: var(--foreground-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.login-card__hint a {
+  color: var(--primary);
+}
+
+.login-card__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-subtle);
+  color: var(--danger-foreground);
+  font-size: var(--text-sm);
 }
 
 .login-card__footer {
   text-align: center;
-  color: #64748b;
+  color: var(--foreground-muted);
+  font-size: var(--text-xs);
 }
 </style>

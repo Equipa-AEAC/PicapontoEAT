@@ -9,6 +9,7 @@ export { default as BaseDataCard } from "../../../components/base/BaseDataCard.v
 export { default as BaseDatePicker } from "../../../components/base/BaseDatePicker.vue";
 export { default as BaseDialog } from "../../../components/base/BaseDialog.vue";
 export { default as BaseDivider } from "../../../components/base/BaseDivider.vue";
+export { default as BaseErrorState } from "../../../components/base/BaseErrorState.vue";
 export { default as BaseEmptyState } from "../../../components/base/BaseEmptyState.vue";
 export { default as BaseFileUpload } from "../../../components/base/BaseFileUpload.vue";
 export { default as BaseFilterPanel } from "../../../components/base/BaseFilterPanel.vue";

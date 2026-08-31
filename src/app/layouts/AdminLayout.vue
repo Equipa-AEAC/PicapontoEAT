@@ -1,23 +1,57 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { RouterLink, RouterView, useRouter } from "vue-router";
-import { PhGearSix, PhInfo, PhList, PhSignOut, PhSparkle, PhUserCircle } from "@phosphor-icons/vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterView, useRoute, useRouter } from "vue-router";
+import { PhGearSix, PhGraduationCap, PhInfo, PhList, PhSignOut, PhUserCircle } from "@phosphor-icons/vue";
 
 import { BaseAvatar, BaseButton, BaseConfirmDialog, BaseDialog, BaseMenu } from "../../shared/components/base";
 import type { BaseMenuItem } from "../../shared/components/base";
-import { adminNavigationItems } from "../router/adminNavigation";
-import { useNavigationStore } from "../../shared/stores";
+import AppSidebarNav from "../../components/navigation/AppSidebarNav.vue";
+import AppThemeToggle from "../../components/navigation/AppThemeToggle.vue";
+import { adminNavigationEntries } from "../router/adminNavigation";
+import { useAttendanceCorrectionsStore, useMomentsStore, useNavigationStore } from "../../shared/stores";
 import { useAuthStore } from "../../modules/authentication";
 
 const navigationStore = useNavigationStore();
+const correctionsStore = useAttendanceCorrectionsStore();
+const momentsStore = useMomentsStore();
 const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 const profileMenu = ref();
 const showProfileDialog = ref(false);
 const showLogoutConfirm = ref(false);
 const showAboutDialog = ref(false);
 
-const userRoleLabel = computed(() => (authStore.role === "administrator" ? "Administrator" : authStore.role === "student" ? "Student" : "User"));
+/**
+ * Live counts on the sidebar.
+ *
+ * This is the entire notification surface, on purpose. There is no delivery
+ * mechanism to fake and nothing to configure: a number appears when there is
+ * genuinely something waiting, next to the page that resolves it, and vanishes
+ * when there is not. Both counts come from the same collections the pages read.
+ */
+const navBadges = computed<Record<string, number>>(() => ({
+  attendance: correctionsStore.pendingCount,
+  "team-moments": momentsStore.summary?.activeMoments ?? 0,
+}));
+
+/** Refresh on every navigation: a request may have been raised elsewhere. */
+async function refreshBadges() {
+  await Promise.all([correctionsStore.refreshPendingCount(), momentsStore.loadGallery()]);
+}
+
+onMounted(refreshBadges);
+watch(() => route.path, refreshBadges);
+
+const userRoleLabel = computed(() =>
+  authStore.role === "administrator" ? "Administrator" : authStore.role === "student" ? "Student" : "User",
+);
+
+/**
+ * The topbar states where you are, never what the page is called — the page header
+ * owns the title, so repeating it here would be a second title on every screen.
+ */
+const locationLabel = computed(() => (route.meta.title as string | undefined) ?? "Administration");
 
 const profileMenuItems: BaseMenuItem[] = [
   { label: "My Profile", icon: PhUserCircle, command: () => { showProfileDialog.value = true; } },
@@ -39,40 +73,42 @@ async function confirmLogout() {
     <aside class="app-shell__sidebar">
       <div class="brand-panel">
         <div class="brand-panel__mark" aria-hidden="true">
-          <PhSparkle weight="bold" />
+          <PhGraduationCap weight="fill" />
         </div>
         <div class="brand-panel__copy">
           <p class="brand-panel__name">Pica Ponto</p>
-          <p class="brand-panel__tagline">Attendance management</p>
+          <p class="brand-panel__tagline">Administration</p>
         </div>
       </div>
 
-      <nav class="sidebar-nav" aria-label="Admin workspace">
-        <RouterLink
-          v-for="item in adminNavigationItems"
-          :key="item.name"
-          :to="item.path"
-          class="sidebar-nav__item"
-          active-class="sidebar-nav__item--active"
-        >
-          <span class="sidebar-nav__icon" aria-hidden="true">
-            <component :is="item.icon" weight="bold" />
-          </span>
-          <span class="sidebar-nav__label">{{ item.label }}</span>
-        </RouterLink>
-      </nav>
+      <AppSidebarNav
+        :entries="adminNavigationEntries"
+        nav-label="Admin workspace"
+        :collapsed="navigationStore.isSidebarCollapsed"
+        :badges="navBadges"
+      />
     </aside>
 
     <div class="app-shell__content">
       <header class="topbar">
         <div class="topbar__leading">
-          <button class="topbar__toggle" type="button" aria-label="Toggle navigation" @click="navigationStore.toggleSidebar">
-            <PhList weight="bold" />
+          <button
+            class="topbar__toggle"
+            type="button"
+            aria-label="Toggle navigation"
+            @click="navigationStore.toggleSidebar"
+          >
+            <PhList weight="regular" />
           </button>
+          <span class="topbar__workspace">
+            <span class="topbar__workspace-name">{{ locationLabel }}</span>
+            <span class="topbar__workspace-context">Administration workspace</span>
+          </span>
         </div>
 
         <div class="topbar__actions">
-          <BaseButton class="topbar__profile-trigger" severity="secondary" outlined @click="profileMenu.toggle($event)">
+          <AppThemeToggle />
+          <BaseButton class="topbar__profile-trigger" severity="secondary" @click="profileMenu.toggle($event)">
             <span class="topbar__profile-trigger-inner">
               <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="normal" />
               <span class="topbar__profile-copy">

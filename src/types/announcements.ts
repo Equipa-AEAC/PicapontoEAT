@@ -23,6 +23,30 @@ export interface AnnouncementSummary {
   updatedAt: string | null;
 }
 
+/**
+ * Which announcements a member has opened.
+ *
+ * Read state belongs to the (member, announcement) pair rather than to the
+ * announcement, because the same notice is unread for one person and read for
+ * another. Stored as its own collection for the same reason a join table exists.
+ *
+ * BACKEND CONTRACT: this needs a real table with a unique key on
+ * (memberId, announcementId) and a server-set `readAt`. Marking read must be
+ * idempotent — re-opening a notice must not move the timestamp. See
+ * docs/ai/BACKEND_CONTRACTS.md.
+ */
+export interface AnnouncementRead {
+  memberId: string;
+  announcementId: string;
+  readAt: string;
+}
+
+/** An announcement as one member sees it. */
+export interface MemberAnnouncement extends AnnouncementSummary {
+  /** Null while the member has not opened it. */
+  readAt: string | null;
+}
+
 export interface AnnouncementFormValues {
   title: string;
   body: string;

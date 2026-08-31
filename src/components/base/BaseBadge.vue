@@ -1,48 +1,60 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from "vue";
+
+import { toDisplayLabel } from "../../utils/label";
+
+const props = defineProps<{
   label: string;
   tone?: "neutral" | "success" | "warning" | "danger" | "info";
 }>();
+
+const displayLabel = computed(() => toDisplayLabel(props.label));
 </script>
 
 <template>
-  <span class="base-badge" :class="`base-badge--${tone ?? 'neutral'}`">{{ label }}</span>
+  <span class="base-badge" :class="`base-badge--${tone ?? 'neutral'}`">{{ displayLabel }}</span>
 </template>
 
 <style scoped>
 .base-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 600;
+  padding: 2px var(--space-2);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
   white-space: nowrap;
-  text-transform: capitalize;
 }
 
 .base-badge--neutral {
-  background: rgba(71, 85, 105, 0.24);
-  color: var(--text-secondary);
+  background: var(--secondary-subtle);
+  border-color: var(--border);
+  color: var(--foreground-secondary);
 }
 
 .base-badge--success {
-  background: rgba(68, 211, 157, 0.14);
-  color: #abf3d3;
+  background: var(--success-subtle);
+  border-color: var(--success-border);
+  color: var(--success-foreground);
 }
 
 .base-badge--warning {
-  background: rgba(240, 179, 90, 0.14);
-  color: #fde68a;
+  background: var(--warning-subtle);
+  border-color: var(--warning-border);
+  color: var(--warning-foreground);
 }
 
 .base-badge--danger {
-  background: rgba(244, 111, 111, 0.14);
-  color: #fecaca;
+  background: var(--danger-subtle);
+  border-color: var(--danger-border);
+  color: var(--danger-foreground);
 }
 
 .base-badge--info {
-  background: rgba(99, 179, 255, 0.14);
-  color: #bfdbfe;
+  background: var(--info-subtle);
+  border-color: var(--info-border);
+  color: var(--info-foreground);
 }
 </style>
