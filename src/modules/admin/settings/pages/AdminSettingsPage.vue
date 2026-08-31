@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { PhBellRinging, PhCalendarBlank, PhGearSix, PhShieldCheck, PhTrash } from "@phosphor-icons/vue";
+import { PhCalendarBlank, PhGearSix, PhShieldCheck, PhTrash } from "@phosphor-icons/vue";
 
 import {
   BaseButton,
   BaseCard,
-  BaseCheckbox,
   BaseEmptyState,
+  BaseErrorState,
   BaseInputNumber,
   BaseLoading,
   BasePageHeader,
@@ -18,11 +18,12 @@ import {
   BaseToggleSwitch,
 } from "../../../../shared/components/base";
 import type { BaseTabItem } from "../../../../shared/components/base";
-import { useSettingsStore } from "../../../../shared/stores";
-import { NOTIFICATION_EVENT_LABELS, WEEKDAY_LABELS } from "../../../../types/settings";
-import type { ApplicationSettings, NotificationEvent } from "../../../../types/settings";
+import { useSettingsStore, useThemeStore } from "../../../../shared/stores";
+import { WEEKDAY_LABELS } from "../../../../types/settings";
+import type { ApplicationSettings } from "../../../../types/settings";
 
 const settingsStore = useSettingsStore();
+const themeStore = useThemeStore();
 const loadError = ref<string | null>(null);
 const activeTab = ref("account");
 
@@ -34,7 +35,6 @@ const passwordChanged = ref(false);
 
 const tabs: BaseTabItem[] = [
   { value: "account", label: "Account & security", icon: PhShieldCheck },
-  { value: "notifications", label: "Notifications", icon: PhBellRinging },
   { value: "work-hours", label: "Work hours", icon: PhCalendarBlank },
   { value: "system", label: "System", icon: PhGearSix },
 ];
@@ -69,7 +69,7 @@ function createDefaultSettings(): ApplicationSettings {
   return {
     schoolName: "Pica Ponto EAT",
     logoUrl: "",
-    theme: "dark",
+    theme: "light",
     language: "pt-PT",
     timezone: "Europe/Lisbon",
     attendance: {
@@ -84,15 +84,6 @@ function createDefaultSettings(): ApplicationSettings {
       apiUrl: "https://api.local/pica-ponto",
       backupEnabled: true,
       backupPath: "C:/backups/pica-ponto",
-    },
-    notifications: {
-      emailEnabled: true,
-      desktopEnabled: true,
-      recipients: "admin@school.local",
-      events: ["pending-corrections", "device-offline"],
-      quietHoursEnabled: true,
-      quietHoursStart: "19:00",
-      quietHoursEnd: "08:00",
     },
     security: {
       confirmNewDevices: true,
@@ -133,7 +124,6 @@ function syncForm(nextValue: ApplicationSettings | null) {
     ...source,
     attendance: { ...defaults.attendance, ...source.attendance },
     devices: { ...defaults.devices, ...source.devices },
-    notifications: { ...defaults.notifications, ...source.notifications },
     security: { ...defaults.security, ...source.security },
     workHours: { ...defaults.workHours, ...source.workHours },
   });
@@ -157,15 +147,6 @@ const scheduledWeeklyHours = computed(() =>
 
 const newClosedDate = ref("");
 
-function toggleEvent(event: NotificationEvent, enabled: boolean) {
-  const events = new Set(form.notifications.events);
-  if (enabled) {
-    events.add(event);
-  } else {
-    events.delete(event);
-  }
-  form.notifications.events = [...events];
-}
 
 function addClosedDate() {
   const value = newClosedDate.value.trim();
@@ -243,6 +224,9 @@ function changePassword() {
 
 async function saveSettings() {
   await settingsStore.persistSettings(JSON.parse(JSON.stringify(form)) as ApplicationSettings);
+  // Saving the institutional default also applies it here, so the choice is visible
+  // immediately rather than only to the next person who signs in.
+  themeStore.setMode(form.theme);
 }
 
 function resetSettings() {
@@ -277,6 +261,12 @@ onMounted(async () => {
         <BaseButton label="Save changes" :loading="settingsStore.saving" :disabled="settingsStore.loading" @click="saveSettings" />
       </template>
     </BasePageHeader>
+
+    <BaseErrorState
+      v-if="settingsStore.errorMessage"
+      :message="settingsStore.errorMessage"
+      @retry="settingsStore.loadSettings()"
+    />
 
     <BaseLoading v-if="settingsStore.loading" />
 
@@ -356,55 +346,6 @@ onMounted(async () => {
               </div>
             </article>
           </BaseCard>
-        </BaseSection>
-      </template>
-
-      <!-- -------------------------------------------------- Notifications -->
-      <template #notifications>
-        <BaseSection title="Notifications" description="What reaches you, through which channel, and when it is allowed to.">
-          <div class="dashboard-grid">
-            <BaseCard title="Notify me about" description="An event not selected here never produces a notification.">
-              <div class="settings-checklist">
-                <label v-for="(label, event) in NOTIFICATION_EVENT_LABELS" :key="event" class="settings-checklist__row">
-                  <BaseCheckbox
-                    :model-value="form.notifications.events.includes(event as NotificationEvent)"
-                    @update:model-value="toggleEvent(event as NotificationEvent, $event)"
-                  />
-                  <span>{{ label }}</span>
-                </label>
-              </div>
-            </BaseCard>
-
-            <BaseCard title="Channels and quiet hours" description="Where notifications go, and when they are held back.">
-              <div class="settings-grid">
-                <label>
-                  <span>Desktop notifications</span>
-                  <BaseToggleSwitch v-model="form.notifications.desktopEnabled" />
-                </label>
-                <label>
-                  <span>Email notifications</span>
-                  <BaseToggleSwitch v-model="form.notifications.emailEnabled" />
-                </label>
-                <label class="settings-grid__wide">
-                  <span>Email recipients</span>
-                  <BaseTextInput v-model="form.notifications.recipients" placeholder="admin@school.local" />
-                </label>
-                <label class="settings-grid__wide">
-                  <span>Quiet hours</span>
-                  <BaseToggleSwitch v-model="form.notifications.quietHoursEnabled" />
-                  <small class="student-form__hint">Hold notifications outside the club's work hours instead of delivering them.</small>
-                </label>
-                <label>
-                  <span>Quiet from</span>
-                  <BaseTextInput v-model="form.notifications.quietHoursStart" placeholder="19:00" :disabled="!form.notifications.quietHoursEnabled" />
-                </label>
-                <label>
-                  <span>Quiet until</span>
-                  <BaseTextInput v-model="form.notifications.quietHoursEnd" placeholder="08:00" :disabled="!form.notifications.quietHoursEnabled" />
-                </label>
-              </div>
-            </BaseCard>
-          </div>
         </BaseSection>
       </template>
 
@@ -577,12 +518,12 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 10px 4px;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.9rem;
 }
 
 .settings-checklist__row:not(:last-child) {
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  border-bottom: var(--border-width) solid var(--border-subtle);
 }
 
 .week-schedule {
@@ -600,7 +541,7 @@ onMounted(async () => {
 }
 
 .week-schedule__row:not(:last-child) {
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  border-bottom: var(--border-width) solid var(--border-subtle);
 }
 
 .week-schedule__day {
@@ -608,7 +549,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   min-width: 160px;
-  color: var(--text-primary);
+  color: var(--foreground);
   font-size: 0.9rem;
 }
 
@@ -620,7 +561,7 @@ onMounted(async () => {
 }
 
 .week-schedule__separator {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.82rem;
 }
 
@@ -637,9 +578,9 @@ onMounted(async () => {
   gap: 8px;
   padding: 5px 8px 5px 12px;
   border-radius: 999px;
-  border: 1px solid var(--surface-border);
-  background: var(--surface-soft);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--foreground-secondary);
   font-size: 0.82rem;
 }
 
@@ -651,12 +592,12 @@ onMounted(async () => {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--foreground-muted);
 }
 
 .closed-dates__chip button:hover {
   color: var(--danger);
-  background: rgba(244, 111, 111, 0.16);
+  background: var(--danger-subtle);
 }
 
 .closed-dates__chip svg {

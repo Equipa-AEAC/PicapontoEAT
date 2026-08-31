@@ -49,24 +49,25 @@ const emit = defineEmits<{
 }
 
 .base-checkbox__box {
-  width: 20px;
-  height: 20px;
+  width: 17px;
+  height: 17px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 6px;
-  border: 1px solid var(--surface-border);
-  background: rgba(9, 15, 26, 0.72);
-  color: var(--primary);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--input-border);
+  background: var(--input);
+  color: var(--primary-foreground);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .base-checkbox__input:checked + .base-checkbox__box {
-  border-color: rgba(122, 167, 255, 0.55);
-  background: rgba(122, 167, 255, 0.16);
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 .base-checkbox__input:focus-visible + .base-checkbox__box {
-  outline: 2px solid rgba(122, 167, 255, 0.55);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: 2px;
 }
 

@@ -32,13 +32,13 @@ defineProps<{
   margin: 0;
   font-size: 1.02rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--foreground);
 }
 
 .base-section__header p {
   margin: 0;
   max-width: 78ch;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
 }
 </style>

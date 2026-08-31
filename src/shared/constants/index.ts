@@ -4,11 +4,18 @@ export const WORKSPACE_KEYS = {
 } as const;
 
 /**
- * The mock backend seeds a single member for the student workspace. Replace this
- * with the member id carried by the authenticated session once the backend
- * issues it, so the journal and report pages resolve the signed-in member.
+ * The roster member the seeded student account signs in as.
+ *
+ * This is now *only* a mock fixture value, consumed by the mock auth service to
+ * populate `AuthUser.memberId`. No page, store or service reads it directly —
+ * they resolve the subject through `authStore.currentMemberId`, which is the
+ * single seam a real session will fill instead.
+ *
+ * BACKEND CONTRACT: when the API issues sessions, the account→member mapping
+ * moves server-side and this constant is deleted. Nothing above the auth service
+ * changes. See docs/ai/BACKEND_CONTRACTS.md.
  */
-export const CURRENT_MEMBER_ID = "stu-1001";
+export const SEEDED_STUDENT_MEMBER_ID = "stu-1001";
 
 /**
  * Equipa Técnica is a club founded inside the school, so every internship it runs is

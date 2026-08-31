@@ -1,61 +1,108 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { PhDownloadSimple } from "@phosphor-icons/vue";
 
-import { BaseButton, BaseCard, BaseEmptyState, BaseLoading, BasePageHeader, BaseSection, BaseSearchBar, BaseSelect, BaseStatusPill, BaseStatsCard, BaseTable, BaseTableColumn, BaseToolbar } from "../../../../shared/components/base";
+import { BaseButton, BaseCard, BaseEmptyState,
+  BaseErrorState, BaseFilterPanel, BaseLoading, BasePageHeader, BaseSection, BaseSearchBar, BaseSelect, BaseStatusPill, BaseStatsCard, BaseTable, BaseTableColumn } from "../../../../shared/components/base";
 import { useAuditStore } from "../../../../shared/stores";
 import type { AuditLogEntry } from "../../../../types/audit";
+import { csvFilename, downloadCsv, toCsv } from "../../../../shared/utils/csv";
+import { formatTimestamp } from "../../../../shared/utils/date";
 
+/**
+ * The audit trail.
+ *
+ * The page used to hold its own four filter refs and re-filter the rows in the
+ * browser, while `auditStore.filters` sat at its defaults and was never written
+ * to — so the loaded set and the displayed set were different collections. That
+ * split is why there could be no honest export: exporting what was loaded would
+ * have handed over rows the table was hiding. Filtering now goes through the
+ * store and the service, and the export is the loaded set.
+ */
 const auditStore = useAuditStore();
-const searchQuery = ref("");
-const entityFilter = ref<string>("all");
-const actionFilter = ref<string>("all");
-const userFilter = ref<string>("all");
 const selectedLog = ref<AuditLogEntry | null>(null);
 
-const entityOptions = computed(() => [
-  { label: "All entities", value: "all" },
-  ...Array.from(new Set(auditStore.items.map((entry) => entry.entity))).map((value) => ({ label: value, value })),
-]);
+/** Built from the unfiltered log, so narrowing never removes the way back. */
+function optionsFrom(read: (entry: AuditLogEntry) => string, allLabel: string) {
+  return [
+    { label: allLabel, value: "all" },
+    ...Array.from(new Set(auditStore.allEntries.map(read))).sort().map((value) => ({ label: value, value })),
+  ];
+}
 
-const actionOptions = computed(() => [
-  { label: "All actions", value: "all" },
-  ...Array.from(new Set(auditStore.items.map((entry) => entry.action))).map((value) => ({ label: value, value })),
-]);
+const entityOptions = computed(() => optionsFrom((entry) => entry.entity, "All entities"));
+const actionOptions = computed(() => optionsFrom((entry) => entry.action, "All actions"));
+const userOptions = computed(() => optionsFrom((entry) => entry.userName, "All users"));
 
-const userOptions = computed(() => [
-  { label: "All users", value: "all" },
-  ...Array.from(new Set(auditStore.items.map((entry) => entry.userName))).map((value) => ({ label: value, value })),
-]);
+const hasActiveFilters = computed(
+  () =>
+    auditStore.filters.query.trim().length > 0 ||
+    auditStore.filters.entity !== "all" ||
+    auditStore.filters.action !== "all" ||
+    auditStore.filters.userName !== "all",
+);
 
-const visibleLogs = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
-  return auditStore.items.filter((entry) => {
-    const matchesQuery = query.length === 0 || [entry.userName, entry.action, entry.entity, entry.description, entry.deviceName].join(" ").toLowerCase().includes(query);
-    const matchesEntity = entityFilter.value === "all" || entry.entity === entityFilter.value;
-    const matchesAction = actionFilter.value === "all" || entry.action === actionFilter.value;
-    const matchesUser = userFilter.value === "all" || entry.userName === userFilter.value;
-    return matchesQuery && matchesEntity && matchesAction && matchesUser;
-  });
-});
-
-const selectedCount = computed(() => (selectedLog.value ? 1 : 0));
+const actorCount = computed(() => new Set(auditStore.items.map((entry) => entry.userName)).size);
 
 function openLog(event: unknown) {
   selectedLog.value = (event as { data?: AuditLogEntry } | undefined)?.data ?? null;
 }
 
-function resetFilters() {
-  searchQuery.value = "";
-  entityFilter.value = "all";
-  actionFilter.value = "all";
-  userFilter.value = "all";
+/**
+ * Export exactly the rows the table is showing.
+ *
+ * The audit trail is the thing somebody is asked to produce when a decision is
+ * questioned, so the file has to be the filtered view and not a silent dump of
+ * everything. A full-history export belongs to the server — see
+ * docs/ai/BACKEND_CONTRACTS.md.
+ */
+function exportCsv() {
+  const csv = toCsv(auditStore.items, [
+    { header: "Timestamp", value: (row) => row.timestamp },
+    { header: "User", value: (row) => row.userName },
+    { header: "Action", value: (row) => row.action },
+    { header: "Entity", value: (row) => row.entity },
+    { header: "Description", value: (row) => row.description },
+    { header: "IP address", value: (row) => row.ipAddress },
+    { header: "Device", value: (row) => row.deviceName },
+  ]);
+
+  const scope = [
+    auditStore.filters.entity !== "all" ? auditStore.filters.entity : null,
+    auditStore.filters.action !== "all" ? auditStore.filters.action : null,
+  ];
+
+  downloadCsv(csvFilename("audit", ...scope), csv);
 }
 
-onMounted(async () => {
-  if (!auditStore.items.length) {
-    await auditStore.loadAuditLogs();
-  }
-});
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Typing filters the list directly — debounced so it is one request, not one per key. */
+watch(
+  () => auditStore.filters.query,
+  () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => void auditStore.loadAuditLogs(), 250);
+  },
+);
+
+watch(
+  () => [auditStore.filters.entity, auditStore.filters.action, auditStore.filters.userName],
+  () => {
+    void auditStore.loadAuditLogs();
+  },
+);
+
+function clearFilters() {
+  auditStore.resetFilters();
+  void auditStore.loadAuditLogs();
+}
+
+async function refresh() {
+  await Promise.all([auditStore.loadAuditLogs(), auditStore.loadAllEntries()]);
+}
+
+onMounted(refresh);
 </script>
 
 <template>
@@ -65,41 +112,66 @@ onMounted(async () => {
       description="Review audit-friendly log entries with filters and record drill-down."
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="auditStore.loading" @click="auditStore.loadAuditLogs()" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="auditStore.loading" @click="refresh" />
+        <BaseButton :disabled="auditStore.items.length === 0" @click="exportCsv">
+          <PhDownloadSimple weight="bold" />
+          Export CSV
+        </BaseButton>
       </template>
     </BasePageHeader>
 
+    <BaseErrorState
+      v-if="auditStore.errorMessage"
+      :message="auditStore.errorMessage"
+      @retry="refresh"
+    />
+
     <section class="metric-grid">
-      <BaseStatsCard label="Entries" :value="String(auditStore.items.length)" caption="Total audit records" />
-      <BaseStatsCard label="Selected" :value="String(selectedCount)" caption="Current drill-down row" />
-      <BaseStatsCard label="Entities" :value="String(auditStore.entityCount)" caption="Unique audited entities" />
-      <BaseStatsCard label="Users" :value="String(userOptions.length - 1)" caption="Distinct actors" />
+      <!--
+        These describe the current view, and "Total records" gives it something
+        to be a fraction of. The fourth card used to count whether a row was
+        selected, which told a reader nothing they could not see.
+      -->
+      <BaseStatsCard label="Entries" :value="String(auditStore.items.length)" caption="Records in the current view" />
+      <BaseStatsCard label="Total records" :value="String(auditStore.allEntries.length)" caption="The whole audit trail" />
+      <BaseStatsCard label="Entities" :value="String(auditStore.entityCount)" caption="Unique entities in the current view" />
+      <BaseStatsCard label="Users" :value="String(actorCount)" caption="Distinct actors in the current view" />
     </section>
 
-    <BaseToolbar>
-      <template #left>
-        <div class="filter-strip">
-          <BaseSearchBar v-model="searchQuery" placeholder="Search audit logs" />
-          <BaseSelect v-model="entityFilter" :options="entityOptions" />
-          <BaseSelect v-model="actionFilter" :options="actionOptions" />
-          <BaseSelect v-model="userFilter" :options="userOptions" />
-        </div>
-      </template>
-      <template #right>
-        <BaseButton label="Reset" severity="secondary" outlined @click="resetFilters" />
-      </template>
-    </BaseToolbar>
+    <BaseFilterPanel
+      title="Search and filters"
+      description="Filters apply as you type — no Apply step. The export follows whatever is shown."
+    >
+      <div class="filter-strip">
+        <BaseSearchBar v-model="auditStore.filters.query" placeholder="Search audit logs" />
+        <BaseSelect v-model="auditStore.filters.entity" :options="entityOptions" />
+        <BaseSelect v-model="auditStore.filters.action" :options="actionOptions" />
+        <BaseSelect v-model="auditStore.filters.userName" :options="userOptions" />
+        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
+      </div>
+    </BaseFilterPanel>
 
     <BaseLoading v-if="auditStore.loading" />
 
     <BaseSection v-else title="Audit table" description="Searchable and filterable security and operations logs.">
       <BaseCard>
-        <BaseTable :value="visibleLogs" dataKey="id" paginator :rows="8" @rowClick="openLog">
+        <BaseTable :value="auditStore.items" dataKey="id" paginator :rows="8" @rowClick="openLog">
           <template #empty>
-            <BaseEmptyState title="No audit logs" description="No audit records match the current filters." />
+            <BaseEmptyState
+              title="No audit logs"
+              :description="
+                hasActiveFilters
+                  ? 'No audit record matches the current filters.'
+                  : 'Nothing has been audited yet. Corrections, device changes and member edits appear here.'
+              "
+              :action-label="hasActiveFilters ? 'Clear filters' : undefined"
+              @action="clearFilters"
+            />
           </template>
 
-          <BaseTableColumn field="timestamp" header="Timestamp" sortable />
+          <BaseTableColumn field="timestamp" header="Timestamp" sortable>
+            <template #body="{ data }">{{ formatTimestamp((data as AuditLogEntry).timestamp) }}</template>
+          </BaseTableColumn>
           <BaseTableColumn field="userName" header="User" sortable />
           <BaseTableColumn field="action" header="Action" sortable />
           <BaseTableColumn field="entity" header="Entity" sortable />

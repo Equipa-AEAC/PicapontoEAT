@@ -307,7 +307,7 @@ onMounted(async () => {
 }
 
 .certificate-cell__muted {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.85rem;
 }
 </style>

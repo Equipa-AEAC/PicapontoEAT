@@ -5,17 +5,30 @@ import {
   BaseButton,
   BaseCard,
   BaseEmptyState,
+  BaseErrorState,
   BaseLoading,
   BasePageHeader,
   BaseSection,
   BaseStatsCard,
   BaseStatusPill,
 } from "../../../../shared/components/base";
-import { CURRENT_MEMBER_ID } from "../../../../shared/constants";
 import { useInternshipsStore, useMembersStore } from "../../../../shared/stores";
+import { formatTimestamp } from "../../../../shared/utils/date";
+import { useAuthStore } from "../../../../modules/authentication";
 
+const authStore = useAuthStore();
 const internshipsStore = useInternshipsStore();
 const membersStore = useMembersStore();
+
+/**
+ * The member whose data this page shows, resolved from the session.
+ *
+ * Falls back to an empty id rather than a hardcoded member: an empty id matches
+ * nobody, so a session without a member sees nothing instead of somebody else's
+ * records. This is a safe *default*, not authorization — see the note on
+ * `authStore.currentMemberId`.
+ */
+const memberId = computed(() => authStore.currentMemberId ?? "");
 
 const member = computed(() => membersStore.selectedMember);
 const internship = computed(() => internshipsStore.selectedInternship);
@@ -24,15 +37,15 @@ const canRequestSurplus = computed(() => teamHours.value > 0);
 const canRequestFct = computed(() => internship.value?.status === "complete");
 
 async function previewSurplus() {
-  await internshipsStore.previewSurplusCertificate(CURRENT_MEMBER_ID);
+  await internshipsStore.previewSurplusCertificate(memberId.value);
 }
 
 async function previewFct() {
-  await internshipsStore.previewCertificate(CURRENT_MEMBER_ID);
+  await internshipsStore.previewCertificate(memberId.value);
 }
 
 async function reload() {
-  await Promise.all([membersStore.loadMember(CURRENT_MEMBER_ID), internshipsStore.loadInternship(CURRENT_MEMBER_ID)]);
+  await Promise.all([membersStore.loadMember(memberId.value), internshipsStore.loadInternship(memberId.value)]);
 }
 
 onMounted(reload);
@@ -48,6 +61,11 @@ onMounted(reload);
         <BaseButton label="Refresh" severity="secondary" outlined :loading="membersStore.loadingDetails" @click="reload()" />
       </template>
     </BasePageHeader>
+
+    <BaseErrorState
+      v-if="internshipsStore.errorMessage"
+      :message="internshipsStore.errorMessage"
+    />
 
     <BaseLoading v-if="membersStore.loadingDetails || internshipsStore.loadingDetails" />
 
@@ -91,7 +109,7 @@ onMounted(reload);
       <BaseCard v-if="internshipsStore.certificatePreview" title="Certificate preview" description="Mock output returned by the certificate generator.">
         <div class="module-summary">
           <p>{{ internshipsStore.certificatePreview.fileName }}</p>
-          <p>{{ internshipsStore.certificatePreview.issuedAt }}</p>
+          <p>{{ formatTimestamp(internshipsStore.certificatePreview.issuedAt) }}</p>
           <p>{{ internshipsStore.certificatePreview.summary }}</p>
         </div>
       </BaseCard>

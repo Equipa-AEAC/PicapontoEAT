@@ -1,7 +1,7 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
-import type { MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberFormValues, MemberInternshipSummary, MemberSummary } from "../types/members";
+import type { MemberAttendanceHistoryFilters, MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberFormValues, MemberInternshipSummary, MemberSummary } from "../types/members";
 import { assignMemberCard, deleteMember, getMemberById, getMemberInternship, listMemberAttendanceHistory, listMembers, saveMember } from "../services/members.service";
 
 export const useMembersStore = defineStore("members", () => {
@@ -22,6 +22,20 @@ export const useMembersStore = defineStore("members", () => {
   const error = ref<string | null>(null);
 
   const memberCount = computed(() => items.value.length);
+
+  /** One member's attendance, optionally narrowed by period and status. */
+  async function loadMemberAttendance(memberId: string, filters: MemberAttendanceHistoryFilters = {}) {
+    loadingDetails.value = true;
+    error.value = null;
+
+    try {
+      attendanceHistory.value = await listMemberAttendanceHistory(memberId, filters);
+    } catch (loadError) {
+      error.value = loadError instanceof Error ? loadError.message : "Unable to load attendance history.";
+    } finally {
+      loadingDetails.value = false;
+    }
+  }
 
   async function loadMembers() {
     loading.value = true;
@@ -100,11 +114,14 @@ export const useMembersStore = defineStore("members", () => {
     loadingDetails,
     saving,
     error,
+    /** Alias so every page reads the same property name. */
+    errorMessage: error,
     memberCount,
     loadMembers,
     loadAllMembers,
     resetFilters,
     loadMember,
+    loadMemberAttendance,
     persistMember,
     removeMember,
     assignCardToMember,

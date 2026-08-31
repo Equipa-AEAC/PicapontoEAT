@@ -38,7 +38,7 @@ const emit = defineEmits<{
   left: 14px;
   width: 16px;
   height: 16px;
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   pointer-events: none;
 }
 

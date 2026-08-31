@@ -3,19 +3,25 @@ import { defineStore } from "pinia";
 
 import type { RfidCardFilters, RfidCardSummary } from "../types/cards";
 import { assignCard, deactivateCard, listCards, registerCard, replaceCard, saveCard } from "../services/cards.service";
+import { describeError } from "../utils/errors";
 
 export const useCardsStore = defineStore("cards", () => {
   const items = ref<RfidCardSummary[]>([]);
   const filters = ref<RfidCardFilters>({ query: "", status: "all" });
   const loading = ref(false);
   const saving = ref(false);
+  /** A failed request must never be shown as an empty result. */
+  const errorMessage = ref<string | null>(null);
 
   const availableCount = computed(() => items.value.filter((card) => card.status === "available").length);
 
   async function loadCards() {
     loading.value = true;
+    errorMessage.value = null;
     try {
       items.value = await listCards(filters.value);
+    } catch (error) {
+      errorMessage.value = describeError(error, "Cards could not be loaded.");
     } finally {
       loading.value = false;
     }
@@ -59,6 +65,7 @@ export const useCardsStore = defineStore("cards", () => {
     filters,
     loading,
     saving,
+    errorMessage,
     availableCount,
     loadCards,
     createCard,

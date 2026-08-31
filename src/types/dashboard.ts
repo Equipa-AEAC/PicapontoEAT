@@ -7,8 +7,9 @@ export interface DashboardMetric {
   label: string;
   value: string;
   caption: string;
-  trendLabel: string;
-  trendTone: TrendTone;
+  /** Optional: only present when the data supports a real, computed signal. */
+  trendLabel?: string;
+  trendTone?: TrendTone;
   icon: Component;
 }
 

@@ -15,11 +15,11 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--surface-border);
-  background: rgba(15, 23, 42, 0.46);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface);
 }
 
 .base-toolbar__left {

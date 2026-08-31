@@ -20,7 +20,7 @@ withDefaults(
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.82rem;
 }
 
@@ -29,7 +29,7 @@ withDefaults(
   content: "";
   flex: 1;
   height: 1px;
-  background: var(--surface-border);
+  background: var(--border);
 }
 
 .base-divider--left::before {

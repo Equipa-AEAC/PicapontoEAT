@@ -1,18 +1,15 @@
+import type { Project, ProjectStatus } from "./projects";
+
 export type DailyLogStatus = "draft" | "submitted";
 export type ReportStatus = "draft" | "submitted" | "approved";
-export type ProjectStatus = "active" | "paused" | "done";
 
-/**
- * A piece of work daily entries can be tagged against. Deliberately minimal — this
- * is the seam a fuller task board would grow from, not the board itself.
+/*
+ * `Project` used to be declared here as the minimal record a daily entry could be
+ * tagged against. It has since grown into the project-management domain and lives
+ * in `./projects`; it is re-exported so journal code keeps importing it from the
+ * module it belongs to conceptually, with only one definition behind it.
  */
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  status: ProjectStatus;
-  owner: string;
-}
+export type { Project, ProjectStatus };
 
 /**
  * A single day of work written by the member. Daily entries are the raw material
@@ -164,4 +161,68 @@ export interface InternshipJournalSummary {
   totalHours: number;
   lastEntryDate: string | null;
   monthsCovered: string[];
+}
+
+/**
+ * Whether keeping the work journal is an obligation for this member.
+ *
+ * The product rule, made explicit because the interface previously said two
+ * contradictory things about it:
+ *
+ *   - **required** for members carrying an FCT internship. The monthly balance
+ *     and the final Relatório de Estágio are assembled from journal entries, so
+ *     an intern who stops writing cannot produce the documents the placement is
+ *     graded on. A gap is a problem to chase.
+ *   - **recommended** for volunteer team members. Their surplus-hours
+ *     certificate is earned from attendance, not from writing, so the journal
+ *     only enriches project reporting. A gap is worth noticing, never a fault.
+ *
+ * It is derived from internship status rather than stored, so it cannot drift
+ * out of step with the roster.
+ */
+export type JournalObligation = "required" | "recommended";
+
+export function journalObligationFor(isIntern: boolean): JournalObligation {
+  return isIntern ? "required" : "recommended";
+}
+
+/** Days without an entry before an intern counts as behind on the requirement. */
+export const JOURNAL_GAP_DAYS = 14;
+
+export interface JournalCoverageState {
+  obligation: JournalObligation;
+  /** Only ever true for a member the journal is required of. */
+  isBehind: boolean;
+  label: string;
+  tone: "success" | "warning" | "danger" | "info";
+}
+
+/** One place that decides how a member's coverage reads, for every view. */
+export function journalCoverageState(
+  isIntern: boolean,
+  daysSinceLastEntry: number | null,
+): JournalCoverageState {
+  const obligation = journalObligationFor(isIntern);
+  const stale = daysSinceLastEntry === null || daysSinceLastEntry > JOURNAL_GAP_DAYS;
+
+  if (!stale) {
+    return { obligation, isBehind: false, label: "Up to date", tone: "success" };
+  }
+
+  if (obligation === "recommended") {
+    // A volunteer who has not written is not doing anything wrong.
+    return {
+      obligation,
+      isBehind: false,
+      label: daysSinceLastEntry === null ? "Not writing" : "Quiet",
+      tone: "info",
+    };
+  }
+
+  return {
+    obligation,
+    isBehind: true,
+    label: daysSinceLastEntry === null ? "No journal" : "Behind",
+    tone: daysSinceLastEntry === null ? "danger" : "warning",
+  };
 }

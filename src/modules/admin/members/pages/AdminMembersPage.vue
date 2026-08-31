@@ -235,7 +235,6 @@ onMounted(async () => {
       description="Everyone on the Equipa Técnica roster. Members accumulate volunteer team hours; those who also carry out an FCT internship track those hours separately."
     >
       <template #actions>
-        <BaseButton label="Import members" severity="secondary" outlined />
         <BaseButton label="Create member" @click="openMemberForm()" />
       </template>
     </BasePageHeader>
@@ -278,7 +277,7 @@ onMounted(async () => {
       </div>
     </BaseFilterPanel>
 
-    <BaseSection title="Member table" description="Every action is ready to map to REST endpoints later.">
+    <BaseSection title="Member table" description="Select a row to open the member, or use the row actions to edit, assign a card or remove.">
       <BaseTable
         :value="membersStore.items"
         dataKey="id"
@@ -388,7 +387,7 @@ onMounted(async () => {
     <BaseConfirmDialog
       :visible="isDeleteVisible"
       title="Delete member"
-      message="This will remove the member record from the local mock dataset. The same action will map to a DELETE endpoint later."
+      message="The member record, along with their card assignment and attendance links, will be removed. This cannot be undone."
       :loading="membersStore.saving"
       @update:visible="isDeleteVisible = $event"
       @confirm="handleDeleteMember"

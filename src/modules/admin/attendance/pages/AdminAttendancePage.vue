@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import {
   PhArrowRight,
   PhCheckCircle,
   PhClockCounterClockwise,
+  PhDownloadSimple,
   PhEye,
   PhFingerprint,
   PhPencilSimple,
@@ -34,8 +36,16 @@ import { useAttendanceStore } from "../../../../stores/attendance";
 import { useDevicesStore } from "../../../../stores/devices";
 import { useMembersStore } from "../../../../stores/members";
 import type { AttendanceCorrectionFormValues, AttendanceCorrectionReason, AttendanceStatus } from "../../../../types/attendance";
+import CorrectionReviewQueue from "../../../../components/attendance/CorrectionReviewQueue.vue";
+import { useAttendanceCorrectionsStore } from "../../../../shared/stores";
+import { csvFilename, downloadCsv, toCsv } from "../../../../shared/utils/csv";
+import { classifyAttendanceDate } from "../../../../services/participation.service";
+import type { ParticipationPeriod } from "../../../../types/participation";
+import { PARTICIPATION_KIND_CREDIT, PARTICIPATION_KIND_LABELS } from "../../../../types/participation";
 
+const router = useRouter();
 const attendanceStore = useAttendanceStore();
+const correctionsStore = useAttendanceCorrectionsStore();
 const membersStore = useMembersStore();
 const devicesStore = useDevicesStore();
 
@@ -59,18 +69,27 @@ const correctionReasonOptions: Array<{ label: string; value: AttendanceCorrectio
   { label: "Manual entry", value: "manual-entry" },
 ];
 
-const filterForm = reactive<{
-  query: string;
-  course: string | "all";
-  status: "all" | AttendanceStatus;
-  studentId: string | "all";
-  deviceId: string | "all";
-}>({
-  query: "",
-  course: "all",
-  status: "all",
-  studentId: "all",
-  deviceId: "all",
+/**
+ * The filter controls bind straight to the store, the way the members and
+ * reports pages do. There is no local copy of the filter state any more: a
+ * second copy only stays right until the two drift.
+ *
+ * `dateRange` is a tuple in the store and two inputs on screen, so each end gets
+ * a computed accessor rather than its own ref. An empty input means "no bound",
+ * which is null, not `""`.
+ */
+const fromDate = computed({
+  get: () => attendanceStore.filters.dateRange[0] ?? "",
+  set: (value: string) => {
+    attendanceStore.filters.dateRange = [value || null, attendanceStore.filters.dateRange[1]];
+  },
+});
+
+const toDate = computed({
+  get: () => attendanceStore.filters.dateRange[1] ?? "",
+  set: (value: string) => {
+    attendanceStore.filters.dateRange = [attendanceStore.filters.dateRange[0], value || null];
+  },
 });
 
 const selectedRecord = computed(() => attendanceStore.selectedAttendance);
@@ -105,12 +124,17 @@ const hoursRecorded = computed(() => attendanceStore.items.reduce((total, item) 
 
 const hasActiveFilters = computed(
   () =>
-    filterForm.query.trim().length > 0 ||
-    filterForm.course !== "all" ||
-    filterForm.status !== "all" ||
-    filterForm.studentId !== "all" ||
-    filterForm.deviceId !== "all",
+    attendanceStore.filters.query.trim().length > 0 ||
+    attendanceStore.filters.course !== "all" ||
+    attendanceStore.filters.status !== "all" ||
+    attendanceStore.filters.studentId !== "all" ||
+    attendanceStore.filters.deviceId !== "all" ||
+    fromDate.value !== "" ||
+    toDate.value !== "",
 );
+
+/** A backwards range matches nothing; say so rather than render an empty table. */
+const rangeIsBackwards = computed(() => Boolean(fromDate.value && toDate.value && toDate.value < fromDate.value));
 
 const statusMeta: Record<AttendanceStatus, { tone: "success" | "warning" | "danger" | "info"; icon: typeof PhCheckCircle }> = {
   present: { tone: "success", icon: PhCheckCircle },
@@ -119,32 +143,104 @@ const statusMeta: Record<AttendanceStatus, { tone: "success" | "warning" | "dang
   corrected: { tone: "warning", icon: PhWarningCircle },
 };
 
-async function applyFilters() {
-  attendanceStore.filters.query = filterForm.query;
-  attendanceStore.filters.course = filterForm.course;
-  attendanceStore.filters.status = filterForm.status;
-  attendanceStore.filters.studentId = filterForm.studentId;
-  attendanceStore.filters.deviceId = filterForm.deviceId;
-  await attendanceStore.loadAttendance();
+/**
+ * Export what the table currently shows.
+ *
+ * Built from the loaded rows rather than a fresh unfiltered query, so the file
+ * always matches the view it was taken from.
+ */
+function exportCsv() {
+  const csv = toCsv(attendanceStore.items, [
+    { header: "Member", value: (row) => row.studentName },
+    { header: "Course", value: (row) => row.course },
+    { header: "Class", value: (row) => row.className },
+    { header: "Date", value: (row) => row.date },
+    { header: "Entry", value: (row) => row.entry ?? "" },
+    { header: "Exit", value: (row) => row.exit ?? "" },
+    { header: "Hours", value: (row) => row.hours ?? 0 },
+    { header: "Device", value: (row) => row.deviceName },
+    { header: "Status", value: (row) => row.status },
+    { header: "Corrections", value: (row) => row.corrections },
+    { header: "Notes", value: (row) => row.notes },
+  ]);
+
+  downloadCsv(csvFilename("attendance", fromDate.value || null, toDate.value || null), csv);
 }
 
-function resetFilters() {
-  filterForm.query = "";
-  filterForm.course = "all";
-  filterForm.status = "all";
-  filterForm.studentId = "all";
-  filterForm.deviceId = "all";
-  void applyFilters();
+/**
+ * A backwards range can only ever return nothing, so the request is skipped and
+ * the table keeps showing the last real result while the banner explains why.
+ * The same guard is on the member history page.
+ */
+function reload() {
+  if (rangeIsBackwards.value) {
+    return;
+  }
+
+  void attendanceStore.loadAttendance();
 }
+
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Typing and date entry are debounced; the selects are not.
+ *
+ * A `type="date"` input emits a value on every keystroke of the year, so an
+ * undebounced watch would fire a request for `0002-01-01` on the way to 2026.
+ */
+watch([() => attendanceStore.filters.query, fromDate, toDate], () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(reload, 250);
+});
+
+watch(
+  () => [
+    attendanceStore.filters.course,
+    attendanceStore.filters.status,
+    attendanceStore.filters.studentId,
+    attendanceStore.filters.deviceId,
+  ],
+  reload,
+);
+
+function clearFilters() {
+  attendanceStore.filters.query = "";
+  attendanceStore.filters.course = "all";
+  attendanceStore.filters.status = "all";
+  attendanceStore.filters.studentId = "all";
+  attendanceStore.filters.deviceId = "all";
+  attendanceStore.filters.dateRange = [null, null];
+  reload();
+}
+
+/**
+ * Which participation the open record counted under.
+ *
+ * Resolved for the one record being looked at rather than added as a column on
+ * every row: the category is the same for long stretches of the table, so a
+ * column would repeat it hundreds of times and still not explain the transition.
+ * The member's own participation timeline is where the history is read.
+ */
+const recordPeriod = ref<ParticipationPeriod | null>(null);
 
 async function openDetails(attendanceId: string) {
   await attendanceStore.loadAttendanceDetails(attendanceId);
+
+  const record = attendanceStore.selectedAttendance;
+  recordPeriod.value = record ? await classifyAttendanceDate(record.studentId, record.date) : null;
+
   detailsVisible.value = true;
+}
+
+/** Attendance → member, the same target the task and project tables use. */
+function openMember(memberId: string) {
+  void router.push({ name: "member-details", params: { memberId } });
 }
 
 function closeDetails() {
   detailsVisible.value = false;
   attendanceStore.selectedAttendance = null;
+  recordPeriod.value = null;
 }
 
 function requestDelete(attendanceId: string) {
@@ -186,7 +282,7 @@ async function submitCorrection() {
 }
 
 onMounted(async () => {
-  await Promise.all([membersStore.loadAllMembers(), devicesStore.loadDevices()]);
+  await Promise.all([membersStore.loadAllMembers(), devicesStore.loadDevices(), correctionsStore.loadQueue()]);
   await attendanceStore.loadAttendance();
 });
 </script>
@@ -199,27 +295,54 @@ onMounted(async () => {
     >
       <template #actions>
         <BaseButton label="Reload" severity="secondary" outlined :loading="attendanceStore.loading" @click="attendanceStore.loadAttendance()" />
+        <BaseButton :disabled="attendanceStore.items.length === 0" @click="exportCsv">
+          <PhDownloadSimple weight="bold" />
+          Export CSV
+        </BaseButton>
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
-      <BaseMetricCard label="Total records" :value="String(totalRecords)" caption="Attendance rows in the current view" :icon="PhFingerprint" trend-label="Live list" trend-tone="positive" />
-      <BaseMetricCard label="Present" :value="String(presentRecords)" caption="Validated present records" :icon="PhUsersThree" trend-label="Operational" trend-tone="positive" />
+      <BaseMetricCard label="Total records" :value="String(totalRecords)" caption="Attendance rows in the current view" :icon="PhFingerprint" />
+      <BaseMetricCard label="Present" :value="String(presentRecords)" caption="Validated present records" :icon="PhUsersThree" />
       <BaseMetricCard label="Corrections" :value="String(correctionRecords)" caption="Records updated by administrators" :icon="PhClockCounterClockwise" :trend-label="correctionRecords > 0 ? 'Needs review' : 'All clear'" :trend-tone="correctionRecords > 0 ? 'negative' : 'positive'" />
-      <BaseMetricCard label="Hours logged" :value="String(Math.round(hoursRecorded))" caption="Approved attendance hours" :icon="PhTimer" trend-label="Tracked" trend-tone="positive" />
+      <BaseMetricCard label="Hours logged" :value="String(Math.round(hoursRecorded))" caption="Approved attendance hours" :icon="PhTimer" />
     </section>
 
-    <BaseFilterPanel title="Filters" description="Narrow attendance by query, course, status and asset.">
+    <BaseFilterPanel
+      title="Search and filters"
+      description="Filters apply as you type — no Apply step. The export follows whatever is shown."
+    >
       <div class="filter-strip">
-        <BaseSearchBar v-model="filterForm.query" placeholder="Search member, class, device or date" />
-        <BaseSelect v-model="filterForm.course" :options="courseOptions" />
-        <BaseSelect v-model="filterForm.status" :options="statusOptions" />
-        <BaseSelect v-model="filterForm.studentId" :options="studentOptions" />
-        <BaseSelect v-model="filterForm.deviceId" :options="deviceOptions" />
-        <BaseButton label="Apply" @click="applyFilters" />
-        <BaseButton label="Reset" severity="secondary" outlined :disabled="!hasActiveFilters" @click="resetFilters" />
+        <BaseSearchBar v-model="attendanceStore.filters.query" placeholder="Search member, class, device or date" />
+        <BaseSelect v-model="attendanceStore.filters.course" :options="courseOptions" />
+        <BaseSelect v-model="attendanceStore.filters.status" :options="statusOptions" />
+        <BaseSelect v-model="attendanceStore.filters.studentId" :options="studentOptions" />
+        <BaseSelect v-model="attendanceStore.filters.deviceId" :options="deviceOptions" />
+        <label class="date-field">
+          <span class="type-label">From</span>
+          <BaseTextInput v-model="fromDate" type="date" />
+        </label>
+        <label class="date-field">
+          <span class="type-label">To</span>
+          <BaseTextInput v-model="toDate" type="date" />
+        </label>
+        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
       </div>
+
+      <p v-if="rangeIsBackwards" class="form-error-banner">
+        The “to” date is before the “from” date, so nothing can match. Swap them to see results.
+      </p>
     </BaseFilterPanel>
+
+    <p v-if="attendanceStore.errorMessage" class="form-error-banner">{{ attendanceStore.errorMessage }}</p>
+
+    <!--
+      The queue sits above the log on purpose: a day a member has reported is
+      more urgent than the log it came from, and reviewing it needs the record
+      right there, which is why this is not a separate page.
+    -->
+    <CorrectionReviewQueue @resolved="attendanceStore.loadAttendance()" />
 
     <BaseSection title="Attendance log" description="Click a row to open the full record. Corrections and deletions are audited.">
       <BaseCard>
@@ -232,13 +355,34 @@ onMounted(async () => {
           @rowClick="openDetails($event.data.id)"
         >
           <template #empty>
-            <BaseEmptyState title="No attendance records" description="No scan matches the current filters." action-label="Reset filters" @action="resetFilters" />
+            <BaseEmptyState
+              title="No attendance records"
+              :description="
+                hasActiveFilters
+                  ? 'No scan matches the current filters.'
+                  : 'No attendance has been recorded yet.'
+              "
+              :action-label="hasActiveFilters ? 'Clear filters' : undefined"
+              @action="clearFilters"
+            />
           </template>
 
           <TableColumn header="Member" field="studentName" sortable>
             <template #body="slotProps">
               <div class="cell-stack">
-                <strong>{{ slotProps.data.studentName }}</strong>
+                <!--
+                  Attendance → member. The row itself opens the record, so the
+                  name has to stop the event from reaching it.
+                -->
+                <button
+                  v-if="slotProps.data.studentId"
+                  type="button"
+                  class="member-link"
+                  @click.stop="openMember(slotProps.data.studentId)"
+                >
+                  {{ slotProps.data.studentName }}
+                </button>
+                <strong v-else>{{ slotProps.data.studentName }}</strong>
                 <small>{{ slotProps.data.course }} · {{ slotProps.data.className }}</small>
               </div>
             </template>
@@ -300,6 +444,24 @@ onMounted(async () => {
         <p><strong>Date:</strong> {{ selectedRecord.date }}</p>
         <p><strong>Entry:</strong> {{ selectedRecord.entry ?? 'n/a' }} • <strong>Exit:</strong> {{ selectedRecord.exit ?? 'n/a' }}</p>
         <p><strong>Hours:</strong> {{ selectedRecord.hours ?? 0 }}</p>
+        <!--
+          Says which bucket this day's hours landed in and why, resolved through
+          the same rule that produces every total.
+        -->
+        <p v-if="recordPeriod">
+          <strong>Counts as:</strong> {{ PARTICIPATION_KIND_LABELS[recordPeriod.kind] }}
+          <span class="type-meta">
+            ({{ recordPeriod.startDate }} → {{ recordPeriod.endDate ?? 'present' }}) ·
+            {{ PARTICIPATION_KIND_CREDIT[recordPeriod.kind] }}
+          </span>
+        </p>
+        <p v-else>
+          <strong>Counts as:</strong> Unclassified
+          <span class="type-meta">
+            No participation period covers {{ selectedRecord.date }}, so these hours count towards
+            neither the surplus certificate nor the FCT requirement.
+          </span>
+        </p>
         <p><strong>Device:</strong> {{ selectedRecord.deviceName }}</p>
         <p><strong>Corrections:</strong> {{ selectedRecord.corrections }}</p>
         <p><strong>Notes:</strong> {{ selectedRecord.notes || 'None' }}</p>
@@ -358,3 +520,22 @@ onMounted(async () => {
     />
   </section>
 </template>
+
+<style scoped>
+/* Matches the task table's assignee link: a name that reads as text until you reach it. */
+.member-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.member-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+</style>

@@ -1,9 +1,15 @@
-import { PhCalendar, PhCertificate, PhClockCounterClockwise, PhFileText, PhGearSix, PhHouse, PhIdentificationCard, PhMegaphone, PhNotePencil, PhSuitcaseSimple, PhTimer } from "@phosphor-icons/vue";
+import { PhCalendar, PhCamera, PhListChecks, PhCertificate, PhClockCounterClockwise, PhFileText, PhGearSix, PhHouse, PhIdentificationCard, PhMegaphone, PhNotePencil, PhTimer } from "@phosphor-icons/vue";
 
-import type { NavigationItem } from "../../shared/types";
+import type { NavigationEntry, NavigationItem } from "../../shared/types";
+import { flattenNavigation } from "../../shared/types";
 
-export const studentNavigationItems: NavigationItem[] = [
+/**
+ * The student sidebar. Flat: the portal has no area big enough to need a group,
+ * and inventing one would add a rank the student does not have to reason about.
+ */
+export const studentNavigationEntries: NavigationEntry[] = [
   {
+    kind: "link",
     name: "student-dashboard",
     path: "/student/dashboard",
     label: "Dashboard",
@@ -11,6 +17,7 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhHouse,
   },
   {
+    kind: "link",
     name: "student-attendance",
     path: "/student/attendance",
     label: "Attendance",
@@ -18,13 +25,15 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhClockCounterClockwise,
   },
   {
+    kind: "link",
     name: "student-worked-hours",
     path: "/student/worked-hours",
     label: "Worked Hours",
-    description: "Progress and time summary",
+    description: "Internship progress, hours and milestones",
     icon: PhTimer,
   },
   {
+    kind: "link",
     name: "student-calendar",
     path: "/student/calendar",
     label: "Calendar",
@@ -32,13 +41,15 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhCalendar,
   },
   {
-    name: "student-internship",
-    path: "/student/internship",
-    label: "Internship",
-    description: "Progress and milestones",
-    icon: PhSuitcaseSimple,
+    kind: "link",
+    name: "student-work",
+    path: "/student/my-work",
+    label: "My Work",
+    description: "Tasks assigned to you",
+    icon: PhListChecks,
   },
   {
+    kind: "link",
     name: "student-daily-log",
     path: "/student/daily-log",
     label: "Daily Report",
@@ -46,6 +57,7 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhNotePencil,
   },
   {
+    kind: "link",
     name: "student-reports",
     path: "/student/reports",
     label: "Internship Reports",
@@ -53,6 +65,7 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhFileText,
   },
   {
+    kind: "link",
     name: "student-certificates",
     path: "/student/certificates",
     label: "Certificates",
@@ -60,6 +73,15 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhCertificate,
   },
   {
+    kind: "link",
+    name: "student-moments",
+    path: "/student/moments",
+    label: "Team Moments",
+    description: "Today's photos from the team",
+    icon: PhCamera,
+  },
+  {
+    kind: "link",
     name: "student-announcements",
     path: "/student/announcements",
     label: "Announcements",
@@ -67,6 +89,7 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhMegaphone,
   },
   {
+    kind: "link",
     name: "student-profile",
     path: "/student/profile",
     label: "Profile",
@@ -74,6 +97,7 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhIdentificationCard,
   },
   {
+    kind: "link",
     name: "student-settings",
     path: "/student/settings",
     label: "Settings",
@@ -81,3 +105,5 @@ export const studentNavigationItems: NavigationItem[] = [
     icon: PhGearSix,
   },
 ];
+
+export const studentNavigationItems: NavigationItem[] = flattenNavigation(studentNavigationEntries);

@@ -1,5 +1,6 @@
 import type { AuthSession, LoginPayload, RefreshSessionPayload, StaffRole, UserRole } from "../types/auth";
 
+import { SEEDED_STUDENT_MEMBER_ID } from "../../../shared/constants";
 import { mockRequest } from "../../../services/mockTransport";
 
 interface MockAccount {
@@ -9,6 +10,13 @@ interface MockAccount {
   password: string;
   role: UserRole;
   staffRole: StaffRole | null;
+  /**
+   * The roster member this account signs in as.
+   *
+   * Null for staff accounts that are not on the roster. The mock resolves this
+   * from a fixed table; the real API resolves it from the account record.
+   */
+  memberId: string | null;
 }
 
 type MockTokenType = "access" | "refresh";
@@ -31,6 +39,7 @@ const mockAccounts: MockAccount[] = [
     password: "password",
     role: "administrator",
     staffRole: "administrator",
+    memberId: null,
   },
   {
     // Same workspace, narrower permissions — sign in as this account to see the
@@ -41,6 +50,7 @@ const mockAccounts: MockAccount[] = [
     password: "password",
     role: "administrator",
     staffRole: "coordinator",
+    memberId: null,
   },
   {
     id: "stu-1",
@@ -49,6 +59,8 @@ const mockAccounts: MockAccount[] = [
     password: "password",
     role: "student",
     staffRole: null,
+    // The seeded roster member this account acts as.
+    memberId: SEEDED_STUDENT_MEMBER_ID,
   },
 ];
 
@@ -99,6 +111,7 @@ function buildSession(account: MockAccount): AuthSession {
       id: account.id,
       fullName: account.fullName,
       email: account.email,
+      memberId: account.memberId,
     },
     role: account.role,
     staffRole: account.staffRole,

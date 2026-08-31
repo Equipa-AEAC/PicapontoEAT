@@ -53,11 +53,11 @@ onMounted(resize);
 <style scoped>
 .base-textarea {
   width: 100%;
-  border: 1px solid var(--surface-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
-  background: rgba(9, 15, 26, 0.72);
-  color: var(--text-primary);
+  background: var(--input);
+  color: var(--foreground);
   resize: vertical;
   font-family: inherit;
 }
@@ -68,11 +68,12 @@ onMounted(resize);
 }
 
 .base-textarea::placeholder {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
 }
 
 .base-textarea:focus {
   outline: none;
-  border-color: rgba(122, 167, 255, 0.55);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 </style>

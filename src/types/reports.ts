@@ -4,13 +4,14 @@
  * internship hours only. The two are deliberately separate report types because they
  * count towards two different things.
  */
-export type ReportType = "attendance" | "team-hours" | "internship" | "student" | "device";
+export type ReportType = "attendance" | "team-hours" | "internship" | "project" | "student" | "device";
 export type ReportExportFormat = "pdf" | "excel" | "csv";
 
 export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   attendance: "Attendance",
   "team-hours": "Team hours (surplus)",
   internship: "Internship (FCT)",
+  project: "Project delivery",
   student: "Member",
   device: "Device",
 };
@@ -31,12 +32,26 @@ export interface ReportFilterValues {
 
 export interface ReportSummary {
   generatedAt: string;
+  /**
+   * Whether a date range narrowed the dated figures below.
+   *
+   * The page uses it to say plainly which numbers are period-scoped, because
+   * three of these are not dated concepts and cannot be.
+   */
+  rangeApplied: boolean;
+  /** Attendance rows inside the range. */
   attendanceTotal: number;
+  /** Current roster count — not period-scoped. */
   activeStudents: number;
   /** Volunteer team hours across the roster. */
   teamHours: number;
   /** FCT internship hours only. */
   internshipHours: number;
+  /** Projects not archived. Reporting covers delivery as well as hours. */
+  activeProjects: number;
+  /** Tasks completed across every project, and how many are still late. */
+  completedTasks: number;
+  overdueTasks: number;
 }
 
 export interface ReportPreview {

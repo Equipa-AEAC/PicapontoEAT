@@ -3,6 +3,7 @@ import type { UploadedFile } from "./uploads.service";
 
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
+import { computeParticipationHours } from "./participation.service";
 import { INTERNSHIP_HOST_ENTITY } from "../shared/constants";
 
 export async function listCertificateTemplates(): Promise<CertificateTemplate[]> {
@@ -55,7 +56,15 @@ export async function generateCertificate(kind: CertificateKind, memberId: strin
 
     const internship = mockDatabase.internships.find((item) => item.studentId === memberId);
 
-    if (kind === "surplus" && member.teamHours <= 0) {
+    /*
+     * The two certificates read two different buckets and are never combined:
+     * `surplus` is volunteer time, `fct` is the regulated placement. Both come
+     * from the member's participation periods, so a day counts towards exactly
+     * one of them — the one that applied on the day it happened.
+     */
+    const participation = computeParticipationHours(memberId);
+
+    if (kind === "surplus" && participation.teamHours <= 0) {
       throw new Error("This member has no volunteer team hours registered yet.");
     }
 
@@ -63,7 +72,7 @@ export async function generateCertificate(kind: CertificateKind, memberId: strin
       throw new Error("The FCT certificate is only available once the internship is complete.");
     }
 
-    const hours = kind === "surplus" ? member.teamHours : (internship?.completedHours ?? 0);
+    const hours = kind === "surplus" ? participation.teamHours : participation.internshipHours;
     const slug = member.fullName.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
     const generatedAt = new Date().toISOString();
 

@@ -42,7 +42,7 @@ defineProps<{
   top: 16px;
   bottom: 0;
   width: 1px;
-  background: var(--surface-border);
+  background: var(--border);
 }
 
 .base-timeline__marker {
@@ -76,16 +76,16 @@ defineProps<{
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 4px;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
 }
 
 .base-timeline__header strong {
-  color: var(--text-primary);
+  color: var(--foreground);
 }
 
 .base-timeline__content p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
 }
 </style>

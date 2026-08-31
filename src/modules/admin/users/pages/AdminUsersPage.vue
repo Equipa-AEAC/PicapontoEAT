@@ -579,14 +579,14 @@ onMounted(async () => {
 }
 
 .permission-icon--no {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
 }
 
 .temporary-password {
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 1.05rem;
   letter-spacing: 0.04em;
-  color: var(--text-primary);
+  color: var(--foreground);
 }
 
 .user-form__link {
@@ -596,9 +596,9 @@ onMounted(async () => {
   flex-wrap: wrap;
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--surface-border);
-  background: var(--surface-soft);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: var(--surface-subtle);
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
 }
 </style>

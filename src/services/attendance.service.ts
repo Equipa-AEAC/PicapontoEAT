@@ -17,7 +17,14 @@ export async function listAttendance(filters: Partial<AttendanceFilters> = {}): 
         const matchesStudent = !filters.studentId || filters.studentId === "all" || item.studentId === filters.studentId;
         const matchesDevice = !filters.deviceId || filters.deviceId === "all" || item.deviceId === filters.deviceId;
 
-        return matchesQuery && matchesStatus && matchesCourse && matchesStudent && matchesDevice;
+        // `dateRange` has been on `AttendanceFilters` all along but was never
+        // read, so picking dates changed nothing. Both ends are optional, which
+        // makes "everything since March" and "everything up to June" work too.
+        const [from, to] = filters.dateRange ?? [null, null];
+        const matchesFrom = !from || item.date >= from;
+        const matchesTo = !to || item.date <= to;
+
+        return matchesQuery && matchesStatus && matchesCourse && matchesStudent && matchesDevice && matchesFrom && matchesTo;
       }),
     );
   });

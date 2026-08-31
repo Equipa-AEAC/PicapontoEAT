@@ -8,7 +8,6 @@ import {
   BaseConfirmDialog,
   BaseEmptyState,
   BaseFormDialog,
-  BaseInputNumber,
   BaseLoading,
   BasePageHeader,
   BaseSearchBar,
@@ -25,6 +24,7 @@ import InternshipFormDialog from "../../../../components/internships/InternshipF
 import { INTERNSHIP_HOST_ENTITY } from "../../../../shared/constants";
 import { useInternshipsStore, useMembersStore } from "../../../../shared/stores";
 import type { InternshipFormValues, InternshipProgressUpdateValues, InternshipSummary } from "../../../../types/internships";
+import { formatTimestamp } from "../../../../shared/utils/date";
 
 const internshipsStore = useInternshipsStore();
 const membersStore = useMembersStore();
@@ -37,8 +37,16 @@ const progressDialogVisible = ref(false);
 const discardConfirmVisible = ref(false);
 const activeProgressStudentId = ref<string | null>(null);
 
+/**
+ * Hours are not editable here any more.
+ *
+ * They are summed from the attendance inside the member's internship
+ * participation periods, so a box asking an administrator to type hours would be
+ * asking for a number the system would ignore. What a reviewer still decides is
+ * the state of the placement and the note explaining it.
+ */
 const progressForm = reactive<InternshipProgressUpdateValues>({
-  completedHours: 0,
+  status: "active",
   notes: "",
 });
 
@@ -98,12 +106,19 @@ function openAssignDialog(memberId?: string) {
 }
 
 function openProgressDialog(studentId: string) {
+  const internship = internshipsStore.items.find((item) => item.studentId === studentId);
+
   activeProgressStudentId.value = studentId;
-  progressForm.completedHours = 0;
-  progressForm.notes = "";
+  progressForm.status = internship?.status ?? "active";
+  progressForm.notes = internship?.notes ?? "";
   clearProgressErrors();
   progressDialogVisible.value = true;
 }
+
+/** The derived hours, shown so the reviewer can see what they are signing off. */
+const progressInternship = computed(() =>
+  internshipsStore.items.find((item) => item.studentId === activeProgressStudentId.value) ?? null,
+);
 
 function openInternshipDetails(studentId: string) {
   void internshipsStore.loadInternship(studentId);
@@ -120,12 +135,6 @@ async function submitAssignForm(values: InternshipFormValues) {
 }
 
 function validateProgressForm() {
-  if (progressForm.completedHours <= 0) {
-    progressErrors.completedHours = "Enter a progress increment.";
-    return false;
-  }
-
-  delete progressErrors.completedHours;
   return true;
 }
 
@@ -270,7 +279,7 @@ onMounted(async () => {
           <BaseCard v-if="internshipsStore.certificatePreview" title="Certificate preview" description="Mock output returned by the certificate generator.">
             <div class="module-summary">
               <p>{{ internshipsStore.certificatePreview.fileName }}</p>
-              <p>{{ internshipsStore.certificatePreview.issuedAt }}</p>
+              <p>{{ formatTimestamp(internshipsStore.certificatePreview.issuedAt) }}</p>
               <p>{{ internshipsStore.certificatePreview.summary }}</p>
             </div>
           </BaseCard>
@@ -292,7 +301,7 @@ onMounted(async () => {
     <BaseFormDialog
       :visible="progressDialogVisible"
       title="Update internship progress"
-      subtitle="Adds FCT internship hours only — volunteer team hours are counted separately."
+      subtitle="Hours come from attendance inside the internship period. Set the placement state here."
       confirm-label="Update"
       :loading="internshipsStore.saving"
       @update:visible="progressDialogVisible = $event"
@@ -300,10 +309,13 @@ onMounted(async () => {
       @cancel="requestCloseDialog"
     >
       <div class="settings-grid">
+        <p v-if="progressInternship" class="settings-grid__wide type-meta">
+          {{ progressInternship.completedHours }}h of {{ progressInternship.requiredHours }}h recorded from
+          attendance during this member's internship period. Volunteer hours are excluded.
+        </p>
         <label>
-          <span>Hours to add *</span>
-          <BaseInputNumber v-model="progressForm.completedHours" :min="1" />
-          <small v-if="progressErrors.completedHours" class="student-form__error">{{ progressErrors.completedHours }}</small>
+          <span>Placement state</span>
+          <BaseSelect v-model="progressForm.status" :options="statusOptions.filter((option) => option.value !== 'all')" />
         </label>
         <label class="settings-grid__wide">
           <span>Notes</span>

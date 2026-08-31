@@ -21,13 +21,24 @@ import {
   BaseTextInput,
   BaseToolbar,
 } from "../../../../shared/components/base";
-import { CURRENT_MEMBER_ID } from "../../../../shared/constants";
 import { useInternshipReportsStore } from "../../../../shared/stores";
 import { listProjects } from "../../../../services/internshipReports.service";
 import { todayIsoDate } from "../../../../shared/utils/date";
 import type { DailyLogEntry, DailyLogFormValues, DailyLogStatus, Project } from "../../../../types/internshipReports";
+import { useAuthStore } from "../../../../modules/authentication";
 
+const authStore = useAuthStore();
 const reportsStore = useInternshipReportsStore();
+
+/**
+ * The member whose data this page shows, resolved from the session.
+ *
+ * Falls back to an empty id rather than a hardcoded member: an empty id matches
+ * nobody, so a session without a member sees nothing instead of somebody else's
+ * records. This is a safe *default*, not authorization — see the note on
+ * `authStore.currentMemberId`.
+ */
+const memberId = computed(() => authStore.currentMemberId ?? "");
 const projects = ref<Project[]>([]);
 
 const searchQuery = ref("");
@@ -153,8 +164,8 @@ async function submitForm() {
   }
 
   const succeeded = editingEntryId.value
-    ? await reportsStore.editDailyLog(CURRENT_MEMBER_ID, editingEntryId.value, { ...form })
-    : await reportsStore.addDailyLog(CURRENT_MEMBER_ID, { ...form });
+    ? await reportsStore.editDailyLog(memberId.value, editingEntryId.value, { ...form })
+    : await reportsStore.addDailyLog(memberId.value, { ...form });
 
   if (succeeded) {
     formDialogVisible.value = false;
@@ -168,7 +179,7 @@ function requestSubmitEntry(entryId: string) {
 
 async function confirmSubmitEntry() {
   if (pendingEntryId.value) {
-    await reportsStore.submitEntry(CURRENT_MEMBER_ID, pendingEntryId.value);
+    await reportsStore.submitEntry(memberId.value, pendingEntryId.value);
   }
 
   pendingEntryId.value = null;
@@ -182,7 +193,7 @@ function requestDelete(entryId: string) {
 
 async function confirmDelete() {
   if (pendingEntryId.value) {
-    await reportsStore.removeEntry(CURRENT_MEMBER_ID, pendingEntryId.value);
+    await reportsStore.removeEntry(memberId.value, pendingEntryId.value);
   }
 
   pendingEntryId.value = null;
@@ -190,7 +201,7 @@ async function confirmDelete() {
 }
 
 onMounted(async () => {
-  const [, loadedProjects] = await Promise.all([reportsStore.loadJournal(CURRENT_MEMBER_ID), listProjects()]);
+  const [, loadedProjects] = await Promise.all([reportsStore.loadJournal(memberId.value), listProjects()]);
   projects.value = loadedProjects;
 });
 </script>
@@ -202,7 +213,7 @@ onMounted(async () => {
       description="Register what you did each day. These entries feed your monthly reports and the final internship report."
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="reportsStore.loading" @click="reportsStore.loadJournal(CURRENT_MEMBER_ID)" />
+        <BaseButton label="Refresh" severity="secondary" outlined :loading="reportsStore.loading" @click="reportsStore.loadJournal(memberId)" />
         <BaseButton label="New entry" @click="openCreateDialog()" />
       </template>
     </BasePageHeader>

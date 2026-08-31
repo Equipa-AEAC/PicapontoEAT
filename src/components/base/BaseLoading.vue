@@ -10,22 +10,17 @@
 .base-loading {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--surface-border);
-  background: rgba(15, 23, 42, 0.46);
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface);
 }
 
 .base-loading__bar {
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(148, 163, 184, 0.12) 25%,
-    rgba(148, 163, 184, 0.24) 37%,
-    rgba(148, 163, 184, 0.12) 63%
-  );
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--skeleton) 25%, var(--track) 37%, var(--skeleton) 63%);
   background-size: 400% 100%;
   animation: base-loading-shimmer 1.4s ease infinite;
 }

@@ -10,12 +10,15 @@ const props = withDefaults(
     confirmLabel?: string;
     cancelLabel?: string;
     loading?: boolean;
+    /** Block confirm while the form is invalid, without hiding the button. */
+    confirmDisabled?: boolean;
     dismissableMask?: boolean;
   }>(),
   {
     confirmLabel: "Save",
     cancelLabel: "Cancel",
     loading: false,
+    confirmDisabled: false,
     dismissableMask: true,
   },
 );
@@ -45,7 +48,7 @@ const emit = defineEmits<{
     <template #footer>
       <div class="base-form-dialog__footer">
         <BaseButton :label="props.cancelLabel" severity="secondary" text :disabled="props.loading" @click="emit('cancel')" />
-        <BaseButton :label="props.confirmLabel" :loading="props.loading" @click="emit('confirm')" />
+        <BaseButton :label="props.confirmLabel" :loading="props.loading" :disabled="props.confirmDisabled" @click="emit('confirm')" />
       </div>
     </template>
   </BaseDialog>
@@ -54,7 +57,7 @@ const emit = defineEmits<{
 <style>
 .base-form-dialog__subtitle {
   margin: 0 0 16px;
-  color: var(--text-secondary);
+  color: var(--foreground-secondary);
   font-size: 0.9rem;
 }
 

@@ -20,3 +20,29 @@ export async function listAuditLogs(filters: Partial<AuditFilters> = {}): Promis
     );
   });
 }
+
+/**
+ * Append an entry to the audit trail.
+ *
+ * The audit log used to be read-only from the service layer, which meant any
+ * workflow with a reviewable decision had nowhere to record it. Domain services
+ * call this so the decision survives independently of the record it changed.
+ */
+export function appendAuditLog(entry: {
+  userName: string;
+  action: string;
+  entity: string;
+  description: string;
+  deviceName?: string;
+}): void {
+  mockDatabase.auditLogs.unshift({
+    id: `aud-${mockDatabase.auditLogs.length + 1}-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    userName: entry.userName,
+    action: entry.action,
+    entity: entry.entity,
+    description: entry.description,
+    ipAddress: "—",
+    deviceName: entry.deviceName ?? "Admin Console",
+  });
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { PhCalendarCheck, PhClipboardText, PhDownloadSimple, PhFolders, PhNotePencil, PhTimer, PhUsersThree, PhWarning } from "@phosphor-icons/vue";
 
 import {
@@ -23,15 +24,19 @@ import {
   BaseToolbar,
 } from "../../../../shared/components/base";
 import type { BaseTabItem } from "../../../../shared/components/base";
-import { useAdminJournalStore, useDevicesStore, useMembersStore } from "../../../../shared/stores";
+import ProjectProgressBar from "../../../../components/projects/ProjectProgressBar.vue";
+import { useAdminJournalStore, useDevicesStore, useMembersStore, useProjectsStore } from "../../../../shared/stores";
 import { exportReport, getReportSummary, previewReport } from "../../../../services/reports.service";
 import { REPORT_TYPE_OPTIONS } from "../../../../types/reports";
 import type { ReportExportFormat, ReportFilterValues, ReportPreview, ReportSummary } from "../../../../types/reports";
 import type { TeamJournalEntry } from "../../../../types/internshipReports";
+import { journalCoverageState } from "../../../../shared/types";
 
 const journalStore = useAdminJournalStore();
 const membersStore = useMembersStore();
 const devicesStore = useDevicesStore();
+const projectsStore = useProjectsStore();
+const router = useRouter();
 
 const activeTab = ref("activity");
 const selectedEntry = ref<TeamJournalEntry | null>(null);
@@ -39,7 +44,7 @@ const selectedEntry = ref<TeamJournalEntry | null>(null);
 const tabs = computed<BaseTabItem[]>(() => [
   { value: "activity", label: "Activity feed", icon: PhNotePencil, badge: journalStore.entries.length },
   { value: "coverage", label: "Coverage", icon: PhCalendarCheck, badge: journalStore.staleContributors.length },
-  { value: "projects", label: "Projects", icon: PhFolders, badge: journalStore.summary?.projects.length ?? 0 },
+  { value: "delivery", label: "Delivery", icon: PhFolders, badge: deliveryRows.value.length },
   { value: "exports", label: "Exports", icon: PhDownloadSimple },
 ]);
 
@@ -101,17 +106,51 @@ function openEntry(entry: TeamJournalEntry) {
   selectedEntry.value = entry;
 }
 
-/** Nothing written for over two weeks is the signal worth flagging. */
-function coverageTone(daysSinceLastEntry: number | null) {
-  if (daysSinceLastEntry === null) return "danger";
-  if (daysSinceLastEntry > 14) return "warning";
-  return "success";
-}
-
 function coverageLabel(daysSinceLastEntry: number | null) {
   if (daysSinceLastEntry === null) return "Never written";
   if (daysSinceLastEntry === 0) return "Today";
   return `${daysSinceLastEntry}d ago`;
+}
+
+/* --------------------------------------------------------------- Delivery */
+
+/**
+ * Project delivery: the journal rollup Reports already produced, joined with the
+ * task progress the project boards own.
+ *
+ * The two halves answer different questions — hours say how much time went into a
+ * project, completed tasks say how much of it is finished — and an operational
+ * report needs both side by side. Neither number is recomputed here; both are read
+ * from the store that owns them.
+ */
+const deliveryRows = computed(() => {
+  const journalByProject = new Map(
+    (journalStore.summary?.projects ?? []).map((project) => [project.projectId, project]),
+  );
+
+  return projectsStore.allProjects
+    .filter((project) => project.status !== "archived")
+    .map((project) => {
+      const journal = journalByProject.get(project.id);
+
+      return {
+        id: project.id,
+        name: project.name,
+        owner: project.owner,
+        status: project.status,
+        progress: project.progress,
+        isOverdue: project.isOverdue,
+        hours: journal?.hours ?? project.journalHours,
+        entries: journal?.entries ?? project.journalEntries,
+        contributors: journal?.contributors ?? project.participants.map((participant) => participant.name),
+        lastActivityDate: journal?.lastActivityDate ?? null,
+      };
+    })
+    .sort((first, second) => second.progress.overdue - first.progress.overdue || second.hours - first.hours);
+});
+
+function openProject(projectId: string) {
+  void router.push({ name: "project-details", params: { projectId } });
 }
 
 /* ----------------------------------------------------------------- Exports */
@@ -154,7 +193,7 @@ async function loadPreview() {
   loadError.value = null;
 
   try {
-    summary.value = await getReportSummary();
+    summary.value = await getReportSummary(currentDateRange());
     preview.value = await previewReport({ ...form, dateRange: currentDateRange() });
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : "Unable to load the report preview.";
@@ -181,7 +220,12 @@ function openDownload() {
 }
 
 onMounted(async () => {
-  await Promise.all([membersStore.loadAllMembers(), devicesStore.loadDevices(), journalStore.loadJournal()]);
+  await Promise.all([
+    membersStore.loadAllMembers(),
+    devicesStore.loadDevices(),
+    journalStore.loadJournal(),
+    projectsStore.loadProjects(),
+  ]);
   await loadPreview();
 });
 </script>
@@ -193,7 +237,8 @@ onMounted(async () => {
       description="The work journal every member keeps — what was done, on which project, and by whom — plus the exports handed over at the end of a period."
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="journalStore.loading" @click="journalStore.loadJournal()" />
+        <BaseButton label="Project management" severity="secondary" @click="router.push({ name: 'projects-overview' })" />
+        <BaseButton label="Refresh" severity="secondary" :loading="journalStore.loading" @click="journalStore.loadJournal()" />
       </template>
     </BasePageHeader>
 
@@ -201,7 +246,16 @@ onMounted(async () => {
       <BaseStatsCard label="Journal entries" :value="String(journalStore.summary?.totalEntries ?? 0)" caption="Days registered across the roster" :icon="PhClipboardText" />
       <BaseStatsCard label="Hours described" :value="`${journalStore.summary?.totalHours ?? 0}h`" caption="Work accounted for in writing" :icon="PhTimer" />
       <BaseStatsCard label="Contributors" :value="String(journalStore.summary?.contributors ?? 0)" caption="Members who have written at least once" :icon="PhUsersThree" />
-      <BaseStatsCard label="Needs a nudge" :value="String(journalStore.staleContributors.length)" caption="No entry in the last two weeks" :icon="PhWarning" />
+      <!-- The count is only useful if it leads to the names behind it. -->
+      <BaseStatsCard
+        label="Interns behind"
+        :value="String(journalStore.staleContributors.length)"
+        caption="Required journal, no entry in two weeks — open the coverage list"
+        :icon="PhWarning"
+        interactive
+        action-hint="Show the interns who are behind on their journal"
+        @action="activeTab = 'coverage'"
+      />
     </section>
 
     <p v-if="journalStore.errorMessage" class="form-error-banner">{{ journalStore.errorMessage }}</p>
@@ -248,8 +302,16 @@ onMounted(async () => {
               </BaseTableColumn>
               <BaseTableColumn header="Project" width="180px">
                 <template #body="slotProps">
-                  <BaseStatusPill v-if="slotProps.data.projectName" :label="slotProps.data.projectName" tone="info" />
-                  <span v-else class="journal-muted">Unassigned</span>
+                  <!-- The entry already carries the project id; only the link was missing. -->
+                  <button
+                    v-if="slotProps.data.projectName"
+                    type="button"
+                    class="journal-project"
+                    @click.stop="openProject(slotProps.data.projectId)"
+                  >
+                    {{ slotProps.data.projectName }}
+                  </button>
+                  <span v-else class="journal-muted">No project</span>
                 </template>
               </BaseTableColumn>
               <BaseTableColumn header="Activities">
@@ -271,7 +333,7 @@ onMounted(async () => {
       <template #coverage>
         <BaseSection
           title="Who is still writing"
-          description="Keeping a journal is optional but recommended — for interns it is what the FCT report is assembled from. This shows where the gaps are."
+          description="Interns must keep the journal — their monthly balance and final report are assembled from it. For everyone else it is recommended, and a quiet week is not a fault."
         >
           <BaseCard>
             <BaseTable :value="journalStore.summary?.coverage ?? []" dataKey="memberId" paginator :rows="10">
@@ -283,7 +345,9 @@ onMounted(async () => {
                 <template #body="slotProps">
                   <div class="cell-stack">
                     <strong>{{ slotProps.data.memberName }}</strong>
-                    <small>{{ slotProps.data.isIntern ? 'FCT intern' : 'Team member' }}</small>
+                    <small>
+                      {{ slotProps.data.isIntern ? 'FCT intern · journal required' : 'Team member · journal optional' }}
+                    </small>
                   </div>
                 </template>
               </BaseTableColumn>
@@ -306,8 +370,8 @@ onMounted(async () => {
               <BaseTableColumn header="Status" width="140px">
                 <template #body="slotProps">
                   <BaseStatusPill
-                    :label="slotProps.data.daysSinceLastEntry === null ? 'No journal' : slotProps.data.daysSinceLastEntry > 14 ? 'Behind' : 'Up to date'"
-                    :tone="coverageTone(slotProps.data.daysSinceLastEntry)"
+                    :label="journalCoverageState(slotProps.data.isIntern, slotProps.data.daysSinceLastEntry).label"
+                    :tone="journalCoverageState(slotProps.data.isIntern, slotProps.data.daysSinceLastEntry).tone"
                   />
                 </template>
               </BaseTableColumn>
@@ -316,35 +380,72 @@ onMounted(async () => {
         </BaseSection>
       </template>
 
-      <!-- ------------------------------------------------------- Projects -->
-      <template #projects>
+      <!-- ------------------------------------------------------- Delivery -->
+      <template #delivery>
         <BaseSection
-          title="Where the hours went"
-          description="Daily entries rolled up by project. This is the seam a fuller task board would grow from."
+          title="Delivery by project"
+          description="Hours booked through the daily journal alongside the task progress from the project boards."
         >
           <BaseCard>
             <BaseEmptyState
-              v-if="!journalStore.summary?.projects.length"
-              title="No projects yet"
-              description="Projects appear here once they exist and daily entries are tagged against them."
+              v-if="deliveryRows.length === 0"
+              title="No active projects"
+              description="Create a project in the Project management workspace and it will be reported here."
+              action-label="Open project management"
+              @action="router.push({ name: 'projects-overview' })"
             />
 
-            <article v-for="project in journalStore.summary?.projects ?? []" :key="project.projectId" class="list-row">
-              <div>
-                <strong>{{ project.projectName }}</strong>
-                <p>
-                  {{ project.owner }} • {{ project.hours }}h across {{ project.entries }}
-                  {{ project.entries === 1 ? 'entry' : 'entries' }}
-                  <template v-if="project.contributors.length"> • {{ project.contributors.join(', ') }}</template>
-                  <template v-else> • no contributions yet</template>
-                </p>
-                <p v-if="project.lastActivityDate" class="journal-muted">Last activity {{ project.lastActivityDate }}</p>
-              </div>
-              <BaseStatusPill
-                :label="project.status"
-                :tone="project.status === 'active' ? 'success' : project.status === 'paused' ? 'warning' : 'info'"
-              />
-            </article>
+            <BaseTable v-else :value="deliveryRows" data-key="id">
+              <BaseTableColumn header="Project">
+                <template #body="{ data }">
+                  <button type="button" class="delivery-link" @click="openProject((data as any).id)">
+                    <span class="delivery-link__name">{{ (data as any).name }}</span>
+                    <span class="delivery-link__meta">{{ (data as any).owner }}</span>
+                  </button>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn header="Progress" width="170px">
+                <template #body="{ data }">
+                  <ProjectProgressBar :progress="(data as any).progress" />
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn header="Tasks done" width="110px">
+                <template #body="{ data }">
+                  <span class="type-numeric">
+                    {{ (data as any).progress.done }} / {{ (data as any).progress.total }}
+                  </span>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn header="Overdue" width="100px">
+                <template #body="{ data }">
+                  <BaseStatusPill
+                    v-if="(data as any).progress.overdue > 0"
+                    :label="String((data as any).progress.overdue)"
+                    tone="danger"
+                  />
+                  <span v-else class="journal-muted">—</span>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn header="Journal hours" width="130px">
+                <template #body="{ data }">
+                  <span class="cell-stack">
+                    <span class="type-numeric">{{ (data as any).hours }}</span>
+                    <small>{{ (data as any).entries }} {{ (data as any).entries === 1 ? 'entry' : 'entries' }}</small>
+                  </span>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn header="Contributors">
+                <template #body="{ data }">
+                  <span v-if="(data as any).contributors.length">{{ (data as any).contributors.join(', ') }}</span>
+                  <span v-else class="journal-muted">Nobody yet</span>
+                </template>
+              </BaseTableColumn>
+            </BaseTable>
           </BaseCard>
         </BaseSection>
       </template>
@@ -420,16 +521,24 @@ onMounted(async () => {
                 </li>
               </ul>
             </div>
-            <BaseEmptyState v-else title="No preview yet" description="Run a preview to generate mocked report output." action-label="Preview report" @action="loadPreview()" />
+            <BaseEmptyState v-else title="No preview yet" description="Choose a report type and period, then run a preview to see what will be exported." action-label="Preview report" @action="loadPreview()" />
           </BaseCard>
 
           <BaseCard v-if="summary" title="Period snapshot" description="What the export will cover.">
             <div class="module-summary">
               <BaseStatusPill label="Audit safe" tone="success" />
+              <!--
+                Says which figures the period actually narrowed. Attendance and the
+                two hour buckets are dated; the roster count is not, and pretending
+                otherwise is what made this card misleading before.
+              -->
               <p>
-                {{ summary.activeStudents }} active members and {{ summary.attendanceTotal }} attendance entries.
-                {{ summary.teamHours }}h of volunteer team hours and {{ summary.internshipHours }}h of FCT internship hours are tracked separately.
+                {{ summary.attendanceTotal }} attendance entries
+                {{ summary.rangeApplied ? 'in the selected period' : 'in the full record' }}:
+                {{ summary.teamHours }}h of volunteer team hours and
+                {{ summary.internshipHours }}h of FCT internship hours, tracked separately.
               </p>
+              <p class="type-meta">{{ summary.activeStudents }} active members on the roster today (not period-scoped).</p>
               <p>{{ journalStore.summary?.entriesThisMonth ?? 0 }} journal entries were written this month.</p>
             </div>
           </BaseCard>
@@ -462,7 +571,7 @@ onMounted(async () => {
 
 <style scoped>
 .journal-muted {
-  color: var(--text-muted);
+  color: var(--foreground-muted);
   font-size: 0.82rem;
 }
 
@@ -473,5 +582,47 @@ onMounted(async () => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 420px;
+}
+
+.delivery-link {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.delivery-link__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--foreground);
+}
+
+.delivery-link:hover .delivery-link__name {
+  color: var(--primary);
+}
+
+.delivery-link__meta {
+  font-size: var(--text-xs);
+  color: var(--foreground-muted);
+}
+
+.journal-project {
+  padding: 2px var(--space-2);
+  border: var(--border-width) solid var(--info-border);
+  border-radius: var(--radius-sm);
+  background: var(--info-subtle);
+  color: var(--info-foreground);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.journal-project:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 </style>

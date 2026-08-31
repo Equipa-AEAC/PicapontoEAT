@@ -43,37 +43,38 @@ const emit = defineEmits<{
 }
 
 .base-toggle__track {
-  width: 44px;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(71, 85, 105, 0.4);
-  border: 1px solid var(--surface-border);
+  width: 38px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+  border: var(--border-width) solid var(--input-border);
   position: relative;
-  transition: background-color 160ms ease;
+  transition: background-color var(--transition-base), border-color var(--transition-base);
 }
 
 .base-toggle--on .base-toggle__track {
-  background: linear-gradient(180deg, var(--primary), var(--primary-strong));
-  border-color: transparent;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .base-toggle__thumb {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: #eef2ff;
-  transition: transform 160ms ease;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base);
 }
 
 .base-toggle--on .base-toggle__thumb {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 .base-toggle__input:focus-visible ~ .base-toggle__track {
-  outline: 2px solid rgba(122, 167, 255, 0.55);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: 2px;
 }
 </style>

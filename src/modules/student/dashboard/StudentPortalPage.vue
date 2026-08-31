@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
 import BaseButton from "../../../components/base/BaseButton.vue";
 import BaseEmptyState from "../../../components/base/BaseEmptyState.vue";
@@ -10,15 +11,44 @@ import BaseDataCard from "../../../components/base/BaseDataCard.vue";
 import BasePageHeader from "../../../components/base/BasePageHeader.vue";
 import BaseStatusPill from "../../../components/base/BaseStatusPill.vue";
 import { usePortalStore } from "../../../stores/portal";
+import { useAttendanceStore } from "../../../stores/attendance";
+import { useAuthStore } from "../../../modules/authentication";
+import { hoursByMonth, hoursByWeekday, mostRecent } from "../../../utils/attendanceStats";
+import { formatIsoDate } from "../../../utils/date";
 
+const router = useRouter();
 const portalStore = usePortalStore();
+const attendanceStore = useAttendanceStore();
+const authStore = useAuthStore();
 const portalError = ref<string | null>(null);
 
 const portal = computed(() => portalStore.summary);
-const attendanceCalendar = computed(() => portal.value?.attendanceCalendar ?? []);
-const recentAttendance = computed(() => portal.value?.recentAttendance ?? []);
-const weeklyStatistics = computed(() => portal.value?.weeklyStatistics ?? []);
-const monthlyStatistics = computed(() => portal.value?.monthlyStatistics ?? []);
+
+/**
+ * The member whose data this page shows, resolved from the session.
+ *
+ * Falls back to an empty id rather than a hardcoded member: an empty id matches
+ * nobody, so a session without a member sees nothing instead of somebody else's
+ * records.
+ */
+const memberId = computed(() => authStore.currentMemberId ?? "");
+
+/** This member's attendance — the one source every card below is built from. */
+const myAttendance = computed(() => attendanceStore.items.filter((row) => row.studentId === memberId.value));
+
+/**
+ * Every one of these is derived from `myAttendance`.
+ *
+ * They used to be hand-written arrays on the portal summary that owed nothing to
+ * the attendance collection: seven fixed July days in the strip, rhythm bars
+ * claiming hours on weekdays this member never worked, and a "Recent attendance"
+ * list of days no longer in the record. Two cards on one page cannot be allowed
+ * to contradict each other, and a correction has to move all of them at once.
+ */
+const attendanceCalendar = computed(() => mostRecent(myAttendance.value, 7).reverse());
+const recentAttendance = computed(() => mostRecent(myAttendance.value, 5));
+const weeklyStatistics = computed(() => hoursByWeekday(myAttendance.value));
+const monthlyStatistics = computed(() => hoursByMonth(myAttendance.value, 4));
 const achievements = computed(() => portal.value?.achievements ?? []);
 const announcements = computed(() => portal.value?.announcements ?? []);
 
@@ -29,11 +59,12 @@ const completionProgress = computed(() => {
   return total > 0 ? Math.round((completed / total) * 100) : 0;
 });
 
+/** The canonical `AttendanceStatus` values — `absent` and `holiday` were never among them. */
 const calendarToneMap: Record<string, "success" | "warning" | "danger" | "info"> = {
   present: "success",
   late: "warning",
-  absent: "danger",
-  holiday: "info",
+  missing: "danger",
+  corrected: "info",
 };
 
 function formatStatisticBar(value: number) {
@@ -44,7 +75,8 @@ async function loadPortal() {
   portalError.value = null;
 
   try {
-    await portalStore.loadPortalSummary();
+    attendanceStore.filters.studentId = memberId.value;
+    await Promise.all([portalStore.loadPortalSummary(memberId.value), attendanceStore.loadAttendance()]);
   } catch (error) {
     portalError.value = error instanceof Error ? error.message : "Unable to load the student portal summary.";
   }
@@ -64,7 +96,12 @@ onMounted(async () => {
       >
         <template #actions>
             <BaseButton label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="loadPortal()" />
-          <BaseButton label="Download summary" />
+          <!--
+            The primary action on a student's own dashboard is the thing they owe
+            the school every day, not an export. This replaces a button that had
+            no handler at all.
+          -->
+          <BaseButton label="Write today's entry" @click="router.push({ name: 'student-daily-log' })" />
         </template>
       </BasePageHeader>
 
@@ -96,10 +133,11 @@ onMounted(async () => {
             </BaseCard>
 
             <section class="student-portal__stats-grid">
-              <BaseDataCard title="Completed hours" :value="String(portal.completedHours)" description="Internship time already completed" trend-label="On track" />
-              <BaseDataCard title="Remaining hours" :value="String(portal.remainingHours)" description="Hours still required to finish" trend-label="Forecast" />
-              <BaseDataCard title="Attendance today" :value="portal.attendanceToday" description="Today’s live attendance state" trend-label="Live status" />
-              <BaseDataCard title="Internship progress" :value="`${completionProgress}%`" description="Overall placement completion" trend-label="Progress" />
+              <!-- Named so neither figure can be read as "all the hours I have done". -->
+              <BaseDataCard title="Internship hours" :value="String(portal.internshipHours)" description="Counted towards your FCT requirement" />
+              <BaseDataCard title="Technical Team hours" :value="String(portal.teamHours)" description="Volunteer time, counted separately" />
+              <BaseDataCard title="Attendance today" :value="portal.attendanceToday" description="Today’s live attendance state" />
+              <BaseDataCard title="Internship progress" :value="`${completionProgress}%`" description="Overall placement completion" />
             </section>
           </div>
         </template>
@@ -115,10 +153,10 @@ onMounted(async () => {
                 <BaseStatusPill :label="day.status" :tone="calendarToneMap[day.status]" />
               </article>
             </div>
-            <BaseEmptyState v-else title="No calendar entries" description="The current mock portal summary does not include attendance calendar data." />
+            <BaseEmptyState v-else title="No calendar entries" description="Your daily attendance appears here once you scan your card at a terminal." />
           </BaseCard>
 
-          <BaseCard title="Weekly and monthly rhythm" description="Simple view of hours logged across recent periods.">
+          <BaseCard title="Weekly and monthly rhythm" description="Hours by weekday, then by month, across your recorded days.">
             <div v-if="weeklyStatistics.length || monthlyStatistics.length" class="progress-bars">
               <div v-for="item in weeklyStatistics" :key="item.label" class="progress-bars__row">
                 <span>{{ item.label }}</span>
@@ -135,25 +173,25 @@ onMounted(async () => {
                 <strong>{{ item.value }}</strong>
               </div>
           </div>
-            <BaseEmptyState v-else title="No statistics available" description="The current mock portal summary does not include time series statistics." />
+            <BaseEmptyState v-else title="No statistics available" description="Hours logged per day and per week appear here once you have attendance records." />
           </BaseCard>
         </section>
 
         <section class="student-portal__grid">
           <BaseCard title="Recent attendance" description="Your latest attendance records.">
             <div v-if="recentAttendance.length" class="portal-table">
-              <article v-for="record in recentAttendance" :key="record.date" class="portal-table__row">
+              <article v-for="record in recentAttendance" :key="record.id" class="portal-table__row">
                 <div>
-                  <strong>{{ record.date }}</strong>
-                  <p>{{ record.entry }} → {{ record.exit }}</p>
+                  <strong>{{ formatIsoDate(record.date) }}</strong>
+                  <p>{{ record.entry ?? '—' }} → {{ record.exit ?? '—' }}</p>
                 </div>
                 <div>
-                  <p>{{ record.hours }} hours</p>
-                  <BaseBadge :label="record.status" :tone="record.status === 'Present' ? 'success' : record.status === 'Holiday' ? 'info' : 'warning'" />
+                  <p>{{ record.hours ?? 0 }} hours</p>
+                  <BaseBadge :label="record.status" :tone="calendarToneMap[record.status]" />
                 </div>
               </article>
             </div>
-            <BaseEmptyState v-else title="No attendance records" description="There are no recent attendance records in the mock dataset." />
+            <BaseEmptyState v-else title="No attendance records" description="Your most recent check-ins will be listed here." />
           </BaseCard>
 
           <BaseCard title="Announcements" description="Updates from the academic and internship team.">
@@ -162,7 +200,7 @@ onMounted(async () => {
               <p>{{ announcement.description }}</p>
               <BaseStatusPill :label="announcement.publishedAt" tone="info" />
             </article>
-            <BaseEmptyState v-else title="No announcements" description="There are no announcements in the mock portal summary." />
+            <BaseEmptyState v-else title="No announcements" description="Notices from the coordination team will appear here." />
           </BaseCard>
         </section>
 
@@ -173,7 +211,7 @@ onMounted(async () => {
               <p>{{ achievement.description }}</p>
               <BaseStatusPill :label="achievement.achievedAt" tone="success" />
             </article>
-            <BaseEmptyState v-else title="No achievements yet" description="There are no milestones available in the mock portal summary." />
+            <BaseEmptyState v-else title="No achievements yet" description="Milestones are awarded as you progress through your internship hours." />
           </BaseCard>
 
           <BaseCard title="Internship oversight" description="Who follows your FCT internship, and where it stands.">
@@ -194,138 +232,115 @@ onMounted(async () => {
 <style scoped>
 .student-portal {
   display: grid;
-  gap: 1.25rem;
+  gap: var(--space-6);
 }
 
+/*
+ * The hero is a plain bordered panel, not a gradient banner. It groups the
+ * member's identity with today's status; the visual weight comes from being the
+ * first block on the page rather than from decoration.
+ */
 .student-portal__hero {
-  padding: 1.5rem;
-  border-radius: 1.5rem;
-  background:
-    radial-gradient(circle at top right, rgba(110, 168, 254, 0.18), transparent 32%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.82));
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
 }
 
 .student-portal__hero-grid,
 .student-portal__grid {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .student-portal__stats-grid {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .student-profile {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: center;
 }
 
 .student-profile__avatar {
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 1.25rem;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: var(--radius-lg);
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(110, 168, 254, 0.35), rgba(62, 207, 142, 0.28));
+  background: var(--primary-subtle);
   background-size: cover;
   background-position: center;
-  color: #eff6ff;
-  font-size: 1.2rem;
-  font-weight: 700;
+  color: var(--primary-contrast);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
 .student-profile h3,
 .portal-note h3 {
-  margin: 0 0 0.25rem;
-}
-
-.attendance-calendar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  gap: 0.75rem;
-}
-
-.attendance-calendar__day {
-  min-height: 5rem;
-  border-radius: 1rem;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.attendance-calendar__day--present {
-  box-shadow: inset 0 0 0 1px rgba(62, 207, 142, 0.4);
-}
-
-.attendance-calendar__day--late {
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.42);
-}
-
-.attendance-calendar__day--absent {
-  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.45);
-}
-
-.attendance-calendar__day--holiday {
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.38);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
 }
 
 .progress-bars {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .progress-bars__row {
   display: grid;
   grid-template-columns: 60px 1fr auto;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: center;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bars__track {
-  height: 0.75rem;
-  border-radius: 999px;
+  height: 6px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--track);
 }
 
 .progress-bars__fill {
   height: 100%;
   border-radius: inherit;
+  transition: width var(--transition-base);
 }
 
 .progress-bars__fill--weekly {
-  background: linear-gradient(90deg, rgba(110, 168, 254, 0.9), rgba(62, 207, 142, 0.8));
+  background: var(--primary);
 }
 
 .progress-bars__fill--monthly {
-  background: linear-gradient(90deg, rgba(250, 204, 21, 0.9), rgba(249, 115, 22, 0.8));
+  background: var(--success);
 }
 
 .portal-table,
 .student-portal__summary {
   display: grid;
-  gap: 0.875rem;
+  gap: var(--space-2);
 }
 
 .portal-table__row,
 .portal-note {
-  padding: 0.95rem 1rem;
-  border-radius: 1rem;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: var(--border-width) solid var(--border);
+  font-size: var(--text-sm);
 }
 
 .portal-table__row {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 </style>

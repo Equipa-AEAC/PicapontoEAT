@@ -43,6 +43,28 @@ export interface MemberDetails extends MemberSummary {
   internshipEndDate: string | null;
 }
 
+/**
+ * What the mock actually stores for a member.
+ *
+ * Every hour figure and every internship date is omitted: `teamHours` is summed
+ * from attendance inside the member's team-member participation periods, and the
+ * internship fields are read from the internship record itself. They were all
+ * stored once, and a single progress update left the member page and the
+ * internship page showing different numbers.
+ *
+ * `internshipStatus` stays stored. It describes what is true *now* — used for
+ * filtering, announcement targeting and current-participation display — and must
+ * never be used to classify historical attendance.
+ */
+export type StoredMember = Omit<
+  MemberDetails,
+  | "teamHours"
+  | "internshipRequiredHours"
+  | "internshipCompletedHours"
+  | "internshipStartDate"
+  | "internshipEndDate"
+>;
+
 export interface MemberFormValues {
   photoUrl: string;
   memberNumber: string;
@@ -77,6 +99,14 @@ export interface MemberAttendanceHistoryItem {
   hours: number;
   deviceName: string;
   status: "present" | "corrected" | "missing";
+}
+
+/** Narrowing applied to one member's attendance history. */
+export interface MemberAttendanceHistoryFilters {
+  status?: MemberAttendanceHistoryItem["status"] | "all";
+  /** Inclusive `YYYY-MM-DD` bounds. Either end may be omitted. */
+  from?: string | null;
+  to?: string | null;
 }
 
 export interface MemberInternshipSummary {

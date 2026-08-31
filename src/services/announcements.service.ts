@@ -1,4 +1,4 @@
-import type { AnnouncementFormValues, AnnouncementSummary } from "../types/announcements";
+import type { AnnouncementFormValues, AnnouncementRead, AnnouncementSummary, MemberAnnouncement } from "../types/announcements";
 import type { PlacementProgram } from "../types/placements";
 
 import { cloneRecord, mockRequest } from "./mockTransport";
@@ -105,4 +105,83 @@ export async function deleteAnnouncement(announcementId: string): Promise<void> 
       mockDatabase.announcements.splice(index, 1);
     }
   });
+}
+
+/* ------------------------------------------------------------- Read state */
+
+/*
+ * Whether a member has opened a notice.
+ *
+ * Backend swap point:
+ *   GET  /announcements/mine
+ *   POST /announcements/:id/read
+ *   GET  /announcements/mine/unread/count
+ * The member is taken from the session, never from the request body.
+ */
+
+function readKey(memberId: string, announcementId: string) {
+  return (entry: AnnouncementRead) => entry.memberId === memberId && entry.announcementId === announcementId;
+}
+
+/** Published announcements for this member's track, with their read state. */
+export async function listAnnouncementsForMember(
+  memberId: string,
+  program: PlacementProgram,
+): Promise<MemberAnnouncement[]> {
+  return mockRequest(() => {
+    const visible = mockDatabase.announcements.filter(
+      (announcement) =>
+        announcement.status === "published" &&
+        (announcement.audience === "all" || announcement.audience === program),
+    );
+
+    return cloneRecord(
+      visible
+        .map((announcement) => ({
+          ...announcement,
+          readAt: mockDatabase.announcementReads.find(readKey(memberId, announcement.id))?.readAt ?? null,
+        }))
+        .sort((first, second) => (second.publishedAt ?? "").localeCompare(first.publishedAt ?? "")),
+    );
+  });
+}
+
+/** Idempotent: opening a notice twice must not move the timestamp. */
+export async function markAnnouncementRead(memberId: string, announcementId: string): Promise<MemberAnnouncement> {
+  return mockRequest(() => {
+    const announcement = mockDatabase.announcements.find((item) => item.id === announcementId);
+
+    if (!announcement) {
+      throw new Error("That announcement no longer exists.");
+    }
+
+    const existing = mockDatabase.announcementReads.find(readKey(memberId, announcementId));
+
+    if (!existing) {
+      mockDatabase.announcementReads.push({
+        memberId,
+        announcementId,
+        readAt: new Date().toISOString(),
+      });
+    }
+
+    return cloneRecord({
+      ...announcement,
+      readAt: mockDatabase.announcementReads.find(readKey(memberId, announcementId))?.readAt ?? null,
+    });
+  });
+}
+
+/** Drives the sidebar badge. Counted rather than listed, so it stays cheap. */
+export async function countUnreadAnnouncements(memberId: string, program: PlacementProgram): Promise<number> {
+  return mockRequest(
+    () =>
+      mockDatabase.announcements.filter(
+        (announcement) =>
+          announcement.status === "published" &&
+          (announcement.audience === "all" || announcement.audience === program) &&
+          !mockDatabase.announcementReads.some(readKey(memberId, announcement.id)),
+      ).length,
+    60,
+  );
 }

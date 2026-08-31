@@ -27,24 +27,25 @@ withDefaults(
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(79, 140, 255, 0.9), rgba(68, 211, 157, 0.65));
-  color: #04101f;
-  font-weight: 700;
-  font-size: 0.82rem;
+  background: var(--primary-subtle);
+  color: var(--primary-contrast);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
 }
 
 .base-avatar--large {
   width: 56px;
   height: 56px;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .base-avatar--xlarge {
-  width: 88px;
-  height: 88px;
-  font-size: 1.4rem;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xl);
 }
 
 .base-avatar__image {

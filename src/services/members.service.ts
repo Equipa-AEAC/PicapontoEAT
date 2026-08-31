@@ -1,9 +1,33 @@
 import type { PaginatedResponse } from "../types/api";
-import type { MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberFormValues, MemberInternshipSummary, MemberSummary } from "../types/members";
+import type { MemberAttendanceHistoryFilters, MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberFormValues, MemberInternshipSummary, MemberSummary, StoredMember } from "../types/members";
 
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { isExternalSchool, SCHOOL_NAME } from "../shared/constants";
+import { computeParticipationHours } from "./participation.service";
+
+/**
+ * Fill in a member's derived figures.
+ *
+ * `teamHours` and every internship field are not stored on the member any more:
+ * hours are summed from the attendance inside the member's participation periods,
+ * and the internship dates/requirement come from the internship record. Deriving
+ * them here means the member page, the internship page and the student portal
+ * cannot disagree, which they previously did after any progress edit.
+ */
+function withDerivedFigures(member: StoredMember): MemberDetails {
+  const internship = mockDatabase.internships.find((item) => item.studentId === member.id) ?? null;
+  const hours = computeParticipationHours(member.id);
+
+  return {
+    ...member,
+    teamHours: hours.teamHours,
+    internshipRequiredHours: internship?.requiredHours ?? 0,
+    internshipCompletedHours: hours.internshipHours,
+    internshipStartDate: internship?.startDate ?? null,
+    internshipEndDate: internship?.endDate ?? null,
+  };
+}
 
 export async function listMembers(filters: Partial<MemberFilters> = {}): Promise<PaginatedResponse<MemberSummary>> {
   return mockRequest(() => {
@@ -25,7 +49,7 @@ export async function listMembers(filters: Partial<MemberFilters> = {}): Promise
     });
 
     return {
-      items: cloneRecord(filteredItems),
+      items: cloneRecord(filteredItems.map(withDerivedFigures)),
       page: 1,
       pageSize: filteredItems.length,
       total: filteredItems.length,
@@ -34,7 +58,10 @@ export async function listMembers(filters: Partial<MemberFilters> = {}): Promise
 }
 
 export async function getMemberById(memberId: string): Promise<MemberDetails | null> {
-  return mockRequest(() => cloneRecord(mockDatabase.members.find((member) => member.id === memberId) ?? null));
+  return mockRequest(() => {
+    const member = mockDatabase.members.find((item) => item.id === memberId);
+    return member ? cloneRecord(withDerivedFigures(member)) : null;
+  });
 }
 
 export async function saveMember(values: MemberFormValues, memberId?: string): Promise<MemberDetails> {
@@ -66,12 +93,12 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
         notes: values.notes,
       });
 
-      return cloneRecord(currentMember);
+      return cloneRecord(withDerivedFigures(currentMember));
     }
 
     const originSchool = values.originSchool || SCHOOL_NAME;
 
-    const createdMember: MemberDetails = {
+    const createdMember: StoredMember = {
       id: `mem-${mockDatabase.members.length + 1001}`,
       photoUrl: values.photoUrl || null,
       memberNumber: values.memberNumber,
@@ -86,19 +113,20 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
       status: values.status,
       assignedCardUid: values.assignedCardUid || null,
       internshipStatus: "not-assigned",
-      teamHours: 0,
       birthDate: values.birthDate,
       emergencyContact: values.emergencyContact,
       notes: values.notes,
       orientadorName: null,
-      internshipRequiredHours: 0,
-      internshipCompletedHours: 0,
-      internshipStartDate: null,
-      internshipEndDate: null,
     };
 
     mockDatabase.members.unshift(createdMember);
-    return cloneRecord(createdMember);
+
+    /*
+     * A new member starts with no participation period, so their attendance is
+     * *unclassified* until staff record one. That is deliberate: guessing a start
+     * date would silently credit hours to a period nobody agreed to.
+     */
+    return cloneRecord(withDerivedFigures(createdMember));
   });
 }
 
@@ -117,14 +145,81 @@ export async function assignMemberCard(memberId: string, cardUid: string): Promi
     }
 
     member.assignedCardUid = cardUid;
-    return cloneRecord(member);
+    return cloneRecord(withDerivedFigures(member));
   });
 }
 
-export async function listMemberAttendanceHistory(memberId: string): Promise<MemberAttendanceHistoryItem[]> {
-  return mockRequest(() => cloneRecord(mockDatabase.memberHistory[memberId] ?? []));
+/**
+ * One member's attendance, newest first.
+ *
+ * This used to read `mockDatabase.memberHistory`, a second hand-maintained copy
+ * of the same days — so the member page and the attendance page could disagree
+ * about what happened. It now projects the one attendance collection, which
+ * means a correction applied on the attendance page shows up here immediately.
+ *
+ * BACKEND CONTRACT: this is a filtered read of the attendance collection scoped
+ * to one member, not its own resource. See docs/ai/BACKEND_CONTRACTS.md.
+ */
+export async function listMemberAttendanceHistory(
+  memberId: string,
+  filters: MemberAttendanceHistoryFilters = {},
+): Promise<MemberAttendanceHistoryItem[]> {
+  return mockRequest(() =>
+    cloneRecord(
+      mockDatabase.attendance
+        .filter((record) => {
+          if (record.studentId !== memberId) {
+            return false;
+          }
+
+          const matchesStatus = !filters.status || filters.status === "all" || record.status === filters.status;
+          const matchesFrom = !filters.from || record.date >= filters.from;
+          const matchesTo = !filters.to || record.date <= filters.to;
+
+          return matchesStatus && matchesFrom && matchesTo;
+        })
+        .sort((first, second) => second.date.localeCompare(first.date))
+        .map((record) => ({
+          id: record.id,
+          date: record.date,
+          entry: record.entry ?? "—",
+          exit: record.exit ?? "—",
+          hours: record.hours ?? 0,
+          deviceName: record.deviceName,
+          // The history model has a narrower status set than attendance itself.
+          status: record.status === "late" ? "present" : record.status,
+        })),
+    ),
+  );
 }
 
+/**
+ * The member's internship, as the member pages want it.
+ *
+ * Projected from the internship record rather than read from a second
+ * per-member copy — that copy existed, held its own hour figures, and drifted
+ * from the internship record the first time progress was edited.
+ */
 export async function getMemberInternship(memberId: string): Promise<MemberInternshipSummary | null> {
-  return mockRequest(() => cloneRecord(mockDatabase.memberInternships[memberId] ?? null));
+  return mockRequest(() => {
+    const internship = mockDatabase.internships.find((item) => item.studentId === memberId);
+
+    if (!internship) {
+      return null;
+    }
+
+    const completedHours = computeParticipationHours(memberId).internshipHours;
+
+    return cloneRecord({
+      memberId,
+      requiredHours: internship.requiredHours,
+      completedHours,
+      remainingHours: Math.max(internship.requiredHours - completedHours, 0),
+      orientador: internship.orientador,
+      monitor: internship.monitor,
+      startDate: internship.startDate,
+      endDate: internship.endDate,
+      status: internship.status === "complete" ? "complete" : "in-progress",
+    } as MemberInternshipSummary);
+  });
 }

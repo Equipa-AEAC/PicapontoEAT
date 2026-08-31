@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { PhArrowClockwise, PhDeviceMobileSlash, PhSealCheck, PhWifiHigh } from "@phosphor-icons/vue";
 
 import BaseButton from "../../../../components/base/BaseButton.vue";
 import BaseCard from "../../../../components/base/BaseCard.vue";
 import BaseConfirmDialog from "../../../../components/base/BaseConfirmDialog.vue";
 import BaseEmptyState from "../../../../components/base/BaseEmptyState.vue";
+import BaseErrorState from "../../../../components/base/BaseErrorState.vue";
+import BaseFilterPanel from "../../../../components/base/BaseFilterPanel.vue";
 import BaseFormDialog from "../../../../components/base/BaseFormDialog.vue";
 import BaseLoading from "../../../../components/base/BaseLoading.vue";
 import BaseMetricCard from "../../../../components/base/BaseMetricCard.vue";
@@ -17,10 +19,9 @@ import BaseTextarea from "../../../../components/base/BaseTextarea.vue";
 import BaseTextInput from "../../../../components/base/BaseTextInput.vue";
 import { useDevicesStore } from "../../../../stores/devices";
 import type { DeviceFormValues } from "../../../../types/devices";
+import { formatTimestamp } from "../../../../shared/utils/date";
 
 const devicesStore = useDevicesStore();
-const selectedFirmware = ref("all");
-const selectedStatus = ref("all");
 
 const formVisible = ref(false);
 const editingDeviceId = ref<string | null>(null);
@@ -59,30 +60,51 @@ const firmwareChannelOptions = [
 
 const dialogTitle = computed(() => (editingDeviceId.value ? "Edit device" : "Add device"));
 
-const visibleDevices = computed(() => {
-  return devicesStore.items.filter((device) => {
-    const matchesQuery = devicesStore.filters.query.trim().length === 0 || [device.name, device.location, device.ipAddress, device.firmwareVersion].some((value) => value.toLowerCase().includes(devicesStore.filters.query.toLowerCase()));
-    const matchesStatus = selectedStatus.value === "all" || device.status === selectedStatus.value;
-    const matchesFirmware = selectedFirmware.value === "all" || device.firmwareChannel === selectedFirmware.value;
-    return matchesQuery && matchesStatus && matchesFirmware;
-  });
-});
+/**
+ * The list is whatever the service returned.
+ *
+ * The page used to re-filter these rows by query, status and channel a second
+ * time in the browser, over local refs that shadowed the store filters. That
+ * meant the visible list moved as you typed while the store had not been asked
+ * for anything, and Reset cleared the shadows without clearing the filters the
+ * store had actually been given — the selects read "All" while the list stayed
+ * narrowed. `listDevices` already applies all three.
+ */
+const visibleDevices = computed(() => devicesStore.items);
 
 const onlineCount = computed(() => devicesStore.items.filter((device) => device.status === "online").length);
 const warningCount = computed(() => devicesStore.items.filter((device) => device.status === "warning").length);
 const offlineCount = computed(() => devicesStore.items.filter((device) => device.status === "offline").length);
 const queueCount = computed(() => devicesStore.items.reduce((total, device) => total + device.queueSize, 0));
 
-function resetFilters() {
-  devicesStore.filters.query = "";
-  selectedStatus.value = "all";
-  selectedFirmware.value = "all";
-}
+const hasActiveFilters = computed(
+  () =>
+    devicesStore.filters.query.trim().length > 0 ||
+    devicesStore.filters.status !== "all" ||
+    devicesStore.filters.firmwareChannel !== "all",
+);
 
-async function applyFilters() {
-  devicesStore.filters.status = selectedStatus.value as "all" | "online" | "offline" | "warning" | "maintenance";
-  devicesStore.filters.firmwareChannel = selectedFirmware.value as "all" | "stable" | "beta" | "edge";
-  await devicesStore.loadDevices();
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Typing filters the list directly — debounced so it is one request, not one per key. */
+watch(
+  () => devicesStore.filters.query,
+  () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => void devicesStore.loadDevices(), 250);
+  },
+);
+
+watch(
+  () => [devicesStore.filters.status, devicesStore.filters.firmwareChannel],
+  () => {
+    void devicesStore.loadDevices();
+  },
+);
+
+function clearFilters() {
+  devicesStore.resetFilters();
+  void devicesStore.loadDevices();
 }
 
 async function openDetails(deviceId: string) {
@@ -156,28 +178,48 @@ onMounted(async () => {
       </template>
     </BasePageHeader>
 
+    <BaseErrorState
+      v-if="devicesStore.errorMessage"
+      :message="devicesStore.errorMessage"
+      @retry="devicesStore.loadDevices()"
+    />
+
     <section class="metric-grid">
-      <BaseMetricCard label="Online devices" :value="String(onlineCount)" caption="Currently reporting heartbeats" :icon="PhWifiHigh" trend-label="Healthy" trend-tone="positive" />
-      <BaseMetricCard label="Warnings" :value="String(warningCount)" caption="Devices requiring attention" :icon="PhSealCheck" trend-label="Check queue" trend-tone="neutral" />
-      <BaseMetricCard label="Offline devices" :value="String(offlineCount)" caption="Terminals without a heartbeat" :icon="PhDeviceMobileSlash" trend-label="Needs recovery" trend-tone="negative" />
-      <BaseMetricCard label="Queue depth" :value="String(queueCount)" caption="Pending scans across the fleet" :icon="PhArrowClockwise" trend-label="Live load" trend-tone="positive" />
+      <!--
+        These count the rows in the current view, not the whole fleet: filtering
+        to Offline necessarily makes "Online" read 0. The captions say so rather
+        than claiming a fleet-wide number the filter has already excluded.
+      -->
+      <BaseMetricCard label="Online devices" :value="String(onlineCount)" caption="Reporting heartbeats, in the current view" :icon="PhWifiHigh" />
+      <BaseMetricCard label="Warnings" :value="String(warningCount)" caption="Devices requiring attention, in the current view" :icon="PhSealCheck" :trend-label="warningCount > 0 ? 'Needs review' : 'All clear'" :trend-tone="warningCount > 0 ? 'negative' : 'positive'" />
+      <BaseMetricCard label="Offline devices" :value="String(offlineCount)" caption="Terminals without a heartbeat, in the current view" :icon="PhDeviceMobileSlash" :trend-label="offlineCount > 0 ? 'Needs recovery' : 'All reporting'" :trend-tone="offlineCount > 0 ? 'negative' : 'positive'" />
+      <BaseMetricCard label="Queue depth" :value="String(queueCount)" caption="Pending scans, in the current view" :icon="PhArrowClockwise" />
     </section>
 
     <BaseLoading v-if="devicesStore.loading" />
 
-    <BaseCard title="Filters" description="Search and segment devices by operational state.">
+    <BaseFilterPanel title="Search and filters" description="Filters apply as you type — no Apply step.">
       <div class="filter-strip">
         <BaseTextInput v-model="devicesStore.filters.query" placeholder="Search devices, IP address or location" />
-        <BaseSelect v-model="selectedStatus" :options="statusOptions" />
-        <BaseSelect v-model="selectedFirmware" :options="firmwareOptions" />
-        <BaseButton label="Apply filters" @click="applyFilters" />
-        <BaseButton label="Reset" severity="secondary" outlined @click="resetFilters" />
+        <BaseSelect v-model="devicesStore.filters.status" :options="statusOptions" />
+        <BaseSelect v-model="devicesStore.filters.firmwareChannel" :options="firmwareOptions" />
+        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
       </div>
-    </BaseCard>
+    </BaseFilterPanel>
 
     <section class="dashboard-grid">
       <BaseCard title="Fleet overview" description="Each row exposes the terminal state, queue pressure and quick maintenance actions.">
-        <BaseEmptyState v-if="visibleDevices.length === 0" title="No devices found" description="No devices match the current filters." />
+        <BaseEmptyState
+          v-if="visibleDevices.length === 0"
+          title="No devices found"
+          :description="
+            hasActiveFilters
+              ? 'No device matches the current filters.'
+              : 'No terminals are registered yet. Use Add device to register one.'
+          "
+          :action-label="hasActiveFilters ? 'Clear filters' : undefined"
+          @action="clearFilters"
+        />
         <article v-for="device in visibleDevices" :key="device.id" class="list-row">
           <div>
             <strong>{{ device.name }}</strong>
@@ -199,7 +241,7 @@ onMounted(async () => {
           <BaseStatusPill :label="devicesStore.selectedDevice.status" :tone="devicesStore.selectedDevice.status === 'online' ? 'success' : devicesStore.selectedDevice.status === 'offline' ? 'danger' : 'warning'" />
           <p><strong>Location:</strong> {{ devicesStore.selectedDevice.location }}</p>
           <p><strong>Firmware:</strong> {{ devicesStore.selectedDevice.firmwareVersion }} ({{ devicesStore.selectedDevice.firmwareChannel }})</p>
-          <p><strong>Heartbeat:</strong> {{ devicesStore.selectedDevice.lastHeartbeatAt }}</p>
+          <p><strong>Heartbeat:</strong> {{ formatTimestamp(devicesStore.selectedDevice.lastHeartbeatAt) }}</p>
           <p><strong>Notes:</strong> {{ devicesStore.selectedDevice.notes }}</p>
         </div>
       </BaseCard>

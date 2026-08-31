@@ -83,9 +83,8 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: rgba(4, 8, 16, 0.6);
-  backdrop-filter: blur(4px);
+  padding: var(--space-6);
+  background: var(--overlay);
 }
 
 .base-dialog {
@@ -94,9 +93,9 @@ watch(
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--surface-border);
-  background: linear-gradient(180deg, rgba(20, 30, 48, 0.98), rgba(13, 20, 33, 0.98));
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid var(--border);
+  background: var(--surface-elevated);
   box-shadow: var(--shadow-lg);
 }
 
@@ -104,30 +103,32 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--surface-border);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-width) solid var(--border);
 }
 
 .base-dialog__title {
   margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--foreground);
 }
 
 .base-dialog__close {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--foreground-muted);
   background: transparent;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .base-dialog__close:hover {
-  background: rgba(148, 163, 184, 0.14);
-  color: var(--text-primary);
+  background: var(--hover);
+  color: var(--foreground);
 }
 
 .base-dialog__close svg {
@@ -136,11 +137,17 @@ watch(
 }
 
 .base-dialog__body {
-  padding: 24px;
+  padding: var(--space-5);
 }
 
 .base-dialog__footer {
-  padding: 16px 24px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: var(--border-width) solid var(--border);
+  background: var(--surface-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .base-dialog-fade-enter-active,

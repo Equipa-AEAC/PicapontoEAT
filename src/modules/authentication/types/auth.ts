@@ -10,9 +10,23 @@ export type UserRole = "administrator" | "student";
 export type { StaffRole };
 
 export interface AuthUser {
+  /** The account id. Distinct from `memberId` — an account is not a member. */
   id: string;
   fullName: string;
   email: string;
+  /**
+   * The roster member this account acts as, or null for a staff account with no
+   * member record (most administrators).
+   *
+   * This is the single seam through which member-scoped data is resolved. Every
+   * student page reads it from `authStore.currentMemberId` rather than from a
+   * constant, so connecting a real session means changing what fills this field
+   * and nothing else.
+   *
+   * BACKEND CONTRACT: the API must issue this from the authenticated session and
+   * must not accept it from the client. See docs/ai/BACKEND_CONTRACTS.md.
+   */
+  memberId: string | null;
 }
 
 export interface LoginPayload {
