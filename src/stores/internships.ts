@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import type { InternshipDetails, InternshipFormValues, InternshipProgressUpdateValues, InternshipSummary } from "../types/internships";
 import type { CertificatePreview } from "../services/internships.service";
+import { t } from "../i18n";
 import {
   assignInternship,
   generateCertificatePreview,
@@ -49,7 +50,7 @@ export const useInternshipsStore = defineStore("internships", () => {
       await loadInternships();
       return true;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Unable to assign the internship.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.assignInternship");
       return false;
     } finally {
       saving.value = false;

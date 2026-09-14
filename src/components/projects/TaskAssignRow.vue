@@ -5,12 +5,8 @@ import { PhArrowRight, PhWarningCircle } from "@phosphor-icons/vue";
 import { BaseBadge, BaseButton } from "../../shared/components/base";
 import ParticipantPicker from "./ParticipantPicker.vue";
 import type { ProjectParticipant, ProjectTaskSummary } from "../../shared/types";
-import {
-  PROJECT_PRIORITY_LABELS,
-  PROJECT_PRIORITY_TONES,
-  TASK_STATUS_LABELS,
-  TASK_STATUS_TONES,
-} from "../../shared/types";
+import { PROJECT_PRIORITY_TONES, TASK_STATUS_TONES } from "../../shared/types";
+import { projectPriorityLabel, taskStatusLabel } from "../../i18n/vocabulary";
 
 /**
  * One task, with reassignment inline.
@@ -72,13 +68,13 @@ watch(
         </button>
         <template v-if="showProject"> · </template>
         <span v-if="task.assignees.length">{{ assigneeNames }}</span>
-        <span v-else class="assign-row__unowned-tag">Nobody assigned</span>
+        <span v-else class="assign-row__unowned-tag">{{ $t("components.taskAssign.nobodyAssigned") }}</span>
       </span>
     </div>
 
     <div class="assign-row__state">
-      <BaseBadge :label="TASK_STATUS_LABELS[task.status]" :tone="TASK_STATUS_TONES[task.status]" />
-      <BaseBadge :label="PROJECT_PRIORITY_LABELS[task.priority]" :tone="PROJECT_PRIORITY_TONES[task.priority]" />
+      <BaseBadge :label="taskStatusLabel(task.status)" :tone="TASK_STATUS_TONES[task.status]" />
+      <BaseBadge :label="projectPriorityLabel(task.priority)" :tone="PROJECT_PRIORITY_TONES[task.priority]" />
     </div>
 
     <span class="assign-row__due type-meta" :class="{ 'assign-row__due--overdue': task.isOverdue }">
@@ -89,7 +85,7 @@ watch(
     <div class="assign-row__action">
       <BaseButton
         v-if="!editing"
-        :label="task.assignees.length ? 'Reassign' : 'Assign'"
+        :label="task.assignees.length ? $t('components.taskAssign.reassign') : $t('components.taskAssign.assign')"
         severity="secondary"
         size="small"
         :outlined="task.assignees.length === 0"
@@ -99,17 +95,17 @@ watch(
     </div>
 
     <div v-if="editing" class="assign-row__editor">
-      <ParticipantPicker v-model="draft" :participants="participants" label="Responsible" />
+      <ParticipantPicker v-model="draft" :participants="participants" :label="$t('components.taskAssign.responsible')" />
       <div class="assign-row__editor-actions">
-        <BaseButton label="Cancel" severity="secondary" text size="small" @click="editing = false" />
+        <BaseButton :label="$t('common.actions.cancel')" severity="secondary" text size="small" @click="editing = false" />
         <BaseButton
-          label="Save"
+          :label="$t('common.actions.save')"
           size="small"
           :loading="saving"
           :disabled="!changed"
           @click="apply"
         >
-          Save
+          {{ $t("common.actions.save") }}
           <PhArrowRight weight="bold" />
         </BaseButton>
       </div>

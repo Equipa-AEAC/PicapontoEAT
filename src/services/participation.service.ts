@@ -8,6 +8,7 @@ import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { appendAuditLog } from "./audit.service";
 import { resolvePeriodForDate, sortPeriods, summariseParticipation, validatePeriod } from "../utils/participation";
+import { t } from "../i18n";
 
 /*
  * Participation periods, and the hours derived from them.
@@ -126,7 +127,7 @@ export async function saveParticipationPeriod(
     const member = mockDatabase.members.find((item) => item.id === memberId);
 
     if (!member) {
-      throw new Error("Member not found.");
+      throw new Error(t("errors.memberNotFound"));
     }
 
     const existing = mockDatabase.participationPeriods.filter((p) => p.memberId === memberId);
@@ -136,11 +137,11 @@ export async function saveParticipationPeriod(
       const internship = mockDatabase.internships.find((item) => item.id === candidate.internshipId);
 
       if (!internship) {
-        throw new Error("That internship does not exist.");
+        throw new Error(t("errors.internshipGone"));
       }
 
       if (internship.studentId !== memberId) {
-        throw new Error("That internship belongs to a different member.");
+        throw new Error(t("errors.internshipOtherMember"));
       }
     }
 
@@ -176,7 +177,7 @@ export async function deleteParticipationPeriod(periodId: string): Promise<void>
     const index = mockDatabase.participationPeriods.findIndex((period) => period.id === periodId);
 
     if (index < 0) {
-      throw new Error("Participation period not found.");
+      throw new Error(t("errors.periodNotFound"));
     }
 
     const [removed] = mockDatabase.participationPeriods.splice(index, 1);

@@ -4,6 +4,7 @@ import { reactive, ref } from "vue";
 import BaseButton from "../../../components/base/BaseButton.vue";
 import BaseCheckbox from "../../../components/base/BaseCheckbox.vue";
 import BaseTextInput from "../../../components/base/BaseTextInput.vue";
+import AppLanguageToggle from "../../../components/navigation/AppLanguageToggle.vue";
 import type { LoginPayload } from "../types/auth";
 
 const props = defineProps<{
@@ -29,6 +30,9 @@ const form = reactive<LoginPayload>({
  */
 const showRecoveryHint = ref(false);
 
+/** Where a password reset actually comes from. One place, so it cannot drift. */
+const SUPPORT_EMAIL = "coordenacao@picaponto.edu";
+
 function submit() {
   emit("submit", {
     email: form.email,
@@ -40,27 +44,46 @@ function submit() {
 
 <template>
   <section class="login-card">
+    <!--
+      The language switch belongs on this screen, not only inside the app.
+      Somebody who lands in a language they cannot read has to be able to change
+      it before they are asked to type anything.
+    -->
+    <div class="login-card__language">
+      <AppLanguageToggle />
+    </div>
+
     <div class="login-card__brand">
-      <img src="/vite.svg" alt="School logo" class="login-card__logo" />
-      <h1>Pica Ponto</h1>
-      <p>RFID Attendance Platform</p>
+      <img src="/vite.svg" :alt="$t('auth.logoAlt')" class="login-card__logo" />
+      <h1>{{ $t("shell.brand.name") }}</h1>
+      <p>{{ $t("auth.tagline") }}</p>
     </div>
 
     <form class="login-card__form" @submit.prevent="submit">
       <label>
-        <span>Email</span>
-        <BaseTextInput v-model="form.email" type="email" autocomplete="username" placeholder="admin@school.local" />
+        <span>{{ $t("auth.email") }}</span>
+        <BaseTextInput
+          v-model="form.email"
+          type="email"
+          autocomplete="username"
+          :placeholder="$t('auth.emailPlaceholder')"
+        />
       </label>
 
       <label>
-        <span>Password</span>
-        <BaseTextInput v-model="form.password" type="password" autocomplete="current-password" placeholder="password" />
+        <span>{{ $t("auth.password") }}</span>
+        <BaseTextInput
+          v-model="form.password"
+          type="password"
+          autocomplete="current-password"
+          :placeholder="$t('auth.passwordPlaceholder')"
+        />
       </label>
 
       <div class="login-card__row">
         <label class="login-card__remember">
           <BaseCheckbox v-model="form.rememberMe" />
-          <span>Remember me</span>
+          <span>{{ $t("auth.rememberMe") }}</span>
         </label>
         <button
           type="button"
@@ -69,26 +92,28 @@ function submit() {
           aria-controls="login-recovery-hint"
           @click="showRecoveryHint = !showRecoveryHint"
         >
-          Forgot password
+          {{ $t("auth.forgotPassword") }}
         </button>
       </div>
 
-      <p v-if="showRecoveryHint" id="login-recovery-hint" class="login-card__hint">
-        Passwords are reset by the coordination team. Ask them in person or email
-        <a href="mailto:coordenacao@picaponto.edu">coordenacao@picaponto.edu</a> from your school address.
-      </p>
+      <i18n-t v-if="showRecoveryHint" keypath="auth.recoveryHint" tag="p" id="login-recovery-hint" class="login-card__hint">
+        <template #email>
+          <a :href="`mailto:${SUPPORT_EMAIL}`">{{ SUPPORT_EMAIL }}</a>
+        </template>
+      </i18n-t>
 
       <p v-if="props.errorMessage" class="login-card__error">{{ props.errorMessage }}</p>
 
-      <BaseButton type="submit" label="Sign In" :loading="props.loading" />
+      <BaseButton type="submit" :label="$t('auth.signIn')" :loading="props.loading" />
     </form>
 
-    <footer class="login-card__footer">Version {{ props.appVersion }}</footer>
+    <footer class="login-card__footer">{{ $t("auth.version", { version: props.appVersion }) }}</footer>
   </section>
 </template>
 
 <style scoped>
 .login-card {
+  position: relative;
   width: min(400px, 92vw);
   padding: var(--space-7);
   border-radius: var(--radius-lg);
@@ -97,6 +122,12 @@ function submit() {
   box-shadow: var(--shadow-md);
   display: grid;
   gap: var(--space-5);
+}
+
+.login-card__language {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
 }
 
 .login-card__brand {

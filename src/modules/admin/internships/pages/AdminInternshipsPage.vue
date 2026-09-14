@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
 import { PhBriefcase, PhSealCheck, PhTimer, PhUsersThree } from "@phosphor-icons/vue";
 
 import {
@@ -21,19 +22,34 @@ import {
   BaseToolbar,
 } from "../../../../shared/components/base";
 import InternshipFormDialog from "../../../../components/internships/InternshipFormDialog.vue";
+import InternshipDetailsDialog from "../../../../components/internships/InternshipDetailsDialog.vue";
 import { INTERNSHIP_HOST_ENTITY } from "../../../../shared/constants";
-import { useInternshipsStore, useMembersStore } from "../../../../shared/stores";
+import {
+  useInternshipReportsStore,
+  useInternshipsStore,
+  useMembersStore,
+  useParticipationStore,
+} from "../../../../shared/stores";
 import type { InternshipFormValues, InternshipProgressUpdateValues, InternshipSummary } from "../../../../types/internships";
-import { formatTimestamp } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import {
+  internshipStatusLabel,
+  internshipStatusOptions,
+} from "../../../../i18n/vocabulary";
 
+const router = useRouter();
 const internshipsStore = useInternshipsStore();
 const membersStore = useMembersStore();
+const participationStore = useParticipationStore();
+const reportsStore = useInternshipReportsStore();
 
 const searchQuery = ref("");
 const statusFilter = ref<"all" | InternshipSummary["status"]>("all");
 const assignDialogVisible = ref(false);
 const assignMemberId = ref<string | null>(null);
 const progressDialogVisible = ref(false);
+const detailsDialogVisible = ref(false);
+const detailsStudentId = ref<string | null>(null);
 const discardConfirmVisible = ref(false);
 const activeProgressStudentId = ref<string | null>(null);
 
@@ -52,13 +68,10 @@ const progressForm = reactive<InternshipProgressUpdateValues>({
 
 const progressErrors = reactive<Partial<Record<keyof InternshipProgressUpdateValues, string>>>({});
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Planned", value: "planned" },
-  { label: "Active", value: "active" },
-  { label: "Paused", value: "paused" },
-  { label: "Complete", value: "complete" },
-];
+const statusOptions = computed(() => [
+  { label: t("common.filters.allStatuses"), value: "all" },
+  ...internshipStatusOptions(),
+]);
 
 /** Only members who are not already interns can be assigned an internship. */
 const assignableMembers = computed(() =>
@@ -120,8 +133,38 @@ const progressInternship = computed(() =>
   internshipsStore.items.find((item) => item.studentId === activeProgressStudentId.value) ?? null,
 );
 
-function openInternshipDetails(studentId: string) {
-  void internshipsStore.loadInternship(studentId);
+/**
+ * Open one placement in full, over the row it belongs to.
+ *
+ * "Open" used to load the internship into a card appended below the assignable-
+ * members list at the bottom of the page — a button that, from where the reader
+ * was looking, did nothing. Everything a reviewer needs now arrives in a modal:
+ * the derived hours, the participation history behind them, the reports, and the
+ * two actions worth taking from there.
+ */
+async function openInternshipDetails(studentId: string) {
+  detailsStudentId.value = studentId;
+  detailsDialogVisible.value = true;
+
+  await Promise.all([
+    internshipsStore.loadInternship(studentId),
+    participationStore.load(studentId),
+    reportsStore.loadStudentReports(studentId),
+  ]);
+}
+
+const detailsOriginSchool = computed(
+  () => (detailsStudentId.value ? memberFor(detailsStudentId.value)?.originSchool ?? "" : ""),
+);
+
+function openMemberRecord(studentId: string) {
+  detailsDialogVisible.value = false;
+  void router.push({ name: "member-details", params: { memberId: studentId } });
+}
+
+function openProgressFromDetails(studentId: string) {
+  detailsDialogVisible.value = false;
+  openProgressDialog(studentId);
 }
 
 async function submitAssignForm(values: InternshipFormValues) {
@@ -158,8 +201,16 @@ function confirmDiscard() {
   progressDialogVisible.value = false;
 }
 
-async function previewCertificate(studentId: string) {
-  await internshipsStore.previewCertificate(studentId);
+/**
+ * Certificates are requested by the member and approved on the Certificates page.
+ *
+ * This button used to produce a "preview" object — a filename and a sentence,
+ * rendered in a card at the bottom of the page — that was neither a document nor
+ * a record of anything. Generation now only happens as the consequence of an
+ * approved request, so the honest action here is to go to the queue.
+ */
+function openCertificates() {
+  void router.push({ name: "certificates" });
 }
 
 onMounted(async () => {
@@ -170,31 +221,31 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Internships"
-      description="FCT internships hosted by Equipa Técnica. Interns may be enrolled at another school; these hours are tracked separately from the volunteer team hours every member accumulates."
+      :title="$t('admin.internships.title')"
+      :description="$t('admin.internships.pageDescription')"
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="internshipsStore.loading" @click="internshipsStore.loadInternships()" />
-        <BaseButton label="Assign internship" :disabled="assignableMembers.length === 0" @click="openAssignDialog()" />
+        <BaseButton :label="$t('common.actions.refresh')" severity="secondary" outlined :loading="internshipsStore.loading" @click="internshipsStore.loadInternships()" />
+        <BaseButton :label="$t('admin.internships.assign')" :disabled="assignableMembers.length === 0" @click="openAssignDialog()" />
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
-      <BaseStatsCard label="Active internships" :value="String(activeCount)" caption="Currently running FCT placements" :icon="PhBriefcase" />
-      <BaseStatsCard label="Completed" :value="String(completeCount)" caption="Ready for the FCT certificate" :icon="PhSealCheck" />
-      <BaseStatsCard label="FCT hours logged" :value="String(fctHoursLogged)" caption="Internship hours only" :icon="PhTimer" />
-      <BaseStatsCard label="From other schools" :value="String(externalCount)" caption="Interns enrolled outside this school" :icon="PhUsersThree" />
+      <BaseStatsCard :label="$t('admin.internships.metricActive')" :value="String(activeCount)" :caption="$t('admin.internships.metricActiveCaption')" :icon="PhBriefcase" />
+      <BaseStatsCard :label="$t('admin.internships.metricCompleted')" :value="String(completeCount)" :caption="$t('admin.internships.metricCompletedCaption')" :icon="PhSealCheck" />
+      <BaseStatsCard :label="$t('admin.internships.metricHours')" :value="String(fctHoursLogged)" :caption="$t('admin.internships.metricHoursCaption')" :icon="PhTimer" />
+      <BaseStatsCard :label="$t('admin.internships.metricExternal')" :value="String(externalCount)" :caption="$t('admin.internships.metricExternalCaption')" :icon="PhUsersThree" />
     </section>
 
     <BaseToolbar>
       <template #left>
         <div class="filter-strip">
-          <BaseSearchBar v-model="searchQuery" placeholder="Search by member, orientador or monitor" />
+          <BaseSearchBar v-model="searchQuery" :placeholder="$t('admin.internships.search')" />
           <BaseSelect v-model="statusFilter" :options="statusOptions" />
         </div>
       </template>
       <template #right>
-        <BaseStatusPill :label="`Host: ${INTERNSHIP_HOST_ENTITY}`" tone="info" />
+        <BaseStatusPill :label="$t('admin.internships.hostLabel', { host: INTERNSHIP_HOST_ENTITY })" tone="info" />
       </template>
     </BaseToolbar>
 
@@ -203,14 +254,14 @@ onMounted(async () => {
     <BaseLoading v-if="internshipsStore.loading || membersStore.loading" />
 
     <template v-else>
-      <BaseSection title="FCT internships" description="Only members carrying out an internship appear here.">
+      <BaseSection :title="$t('admin.internships.tableTitle')" :description="$t('admin.internships.tableDescription')">
         <BaseCard>
           <BaseTable :value="visibleInternships" dataKey="id" paginator :rows="8">
             <template #empty>
-              <BaseEmptyState title="No internships found" description="No member is carrying out an FCT internship yet." action-label="Assign internship" @action="openAssignDialog()" />
+              <BaseEmptyState :title="$t('admin.internships.emptyTitle')" :description="$t('admin.internships.emptyDescription')" :action-label="$t('admin.internships.assign')" @action="openAssignDialog()" />
             </template>
 
-            <BaseTableColumn header="Member" sortable field="studentName">
+            <BaseTableColumn :header="$t('admin.internships.colMember')" sortable field="studentName">
               <template #body="slotProps">
                 <div class="cell-stack">
                   <strong>{{ slotProps.data.studentName }}</strong>
@@ -218,25 +269,35 @@ onMounted(async () => {
                 </div>
               </template>
             </BaseTableColumn>
-            <BaseTableColumn field="orientador" header="Orientador de Estágio" sortable />
-            <BaseTableColumn field="monitor" header="Monitor de Estágio" />
-            <BaseTableColumn header="Hours" sortable field="completedHours">
+            <BaseTableColumn field="orientador" :header="$t('admin.internships.colOrientador')" sortable />
+            <BaseTableColumn field="monitor" :header="$t('admin.internships.colMonitor')" />
+            <BaseTableColumn :header="$t('common.fields.hours')" sortable field="completedHours">
               <template #body="slotProps">
                 <span>{{ slotProps.data.completedHours }} / {{ slotProps.data.requiredHours }}h</span>
               </template>
             </BaseTableColumn>
-            <BaseTableColumn field="remainingHours" header="Remaining" sortable />
-            <BaseTableColumn field="status" header="Status">
+            <BaseTableColumn field="remainingHours" :header="$t('admin.internships.colRemaining')" sortable />
+            <BaseTableColumn field="status" :header="$t('common.fields.status')">
               <template #body="slotProps">
-                <BaseStatusPill :label="slotProps.data.status" :tone="statusTone(slotProps.data.status)" />
+                <BaseStatusPill
+                  :label="internshipStatusLabel(slotProps.data.status)"
+                  :tone="statusTone(slotProps.data.status)"
+                />
               </template>
             </BaseTableColumn>
-            <BaseTableColumn header="Actions">
+            <BaseTableColumn :header="$t('common.fields.actions')">
               <template #body="slotProps">
                 <div class="inline-actions">
-                  <BaseButton label="Open" text size="small" @click="openInternshipDetails(slotProps.data.studentId)" />
-                  <BaseButton label="Progress" text size="small" @click="openProgressDialog(slotProps.data.studentId)" />
-                  <BaseButton label="Certificate" text size="small" :disabled="slotProps.data.status !== 'complete'" @click="previewCertificate(slotProps.data.studentId)" />
+                  <BaseButton :label="$t('admin.internships.open')" text size="small" @click="openInternshipDetails(slotProps.data.studentId)" />
+                  <BaseButton :label="$t('admin.internships.progress')" text size="small" @click="openProgressDialog(slotProps.data.studentId)" />
+                  <BaseButton
+                    :label="$t('admin.internships.certificates')"
+                    text
+                    size="small"
+                    :disabled="slotProps.data.status !== 'complete'"
+                    :title="$t('admin.internships.certificatesHint')"
+                    @click="openCertificates()"
+                  />
                 </div>
               </template>
             </BaseTableColumn>
@@ -244,48 +305,46 @@ onMounted(async () => {
         </BaseCard>
       </BaseSection>
 
-      <BaseSection title="Team members without an internship" description="Volunteers who help around and have projects assigned. They accrue team hours towards the surplus-hours certificate.">
+      <BaseSection :title="$t('admin.internships.volunteersTitle')" :description="$t('admin.internships.volunteersDescription')">
         <BaseCard>
-          <BaseEmptyState v-if="assignableMembers.length === 0" title="Everyone has an internship" description="Every member on the roster is currently carrying out an FCT internship." />
+          <BaseEmptyState v-if="assignableMembers.length === 0" :title="$t('admin.internships.volunteersEmptyTitle')" :description="$t('admin.internships.volunteersEmptyDescription')" />
           <article v-for="member in assignableMembers" :key="member.id" class="list-row">
             <div>
               <strong>{{ member.fullName }}</strong>
-              <p>{{ member.originSchool }} • {{ member.className || 'no class' }} • {{ member.teamHours }}h of team hours</p>
+              <p>
+                {{
+                  $t("admin.internships.volunteerLine", {
+                    school: member.originSchool,
+                    className: member.className || $t("admin.internships.noClass"),
+                    hours: member.teamHours,
+                  })
+                }}
+              </p>
             </div>
             <div class="inline-actions">
-              <BaseStatusPill v-if="member.isExternal" label="External" tone="warning" />
-              <BaseStatusPill v-else label="Team member" tone="success" />
-              <BaseButton label="Assign internship" severity="secondary" text @click="openAssignDialog(member.id)" />
+              <BaseStatusPill v-if="member.isExternal" :label="$t('admin.internships.external')" tone="warning" />
+              <BaseStatusPill v-else :label="$t('admin.internships.teamMember')" tone="success" />
+              <BaseButton :label="$t('admin.internships.assign')" severity="secondary" text @click="openAssignDialog(member.id)" />
             </div>
           </article>
         </BaseCard>
       </BaseSection>
 
-      <BaseSection v-if="internshipsStore.selectedInternship || internshipsStore.certificatePreview" title="Details">
-        <div class="dashboard-grid">
-          <BaseCard v-if="internshipsStore.selectedInternship" title="Selected internship" description="Latest state loaded from the service layer.">
-            <div class="module-summary">
-              <BaseStatusPill :label="internshipsStore.selectedInternship.status" :tone="statusTone(internshipsStore.selectedInternship.status)" />
-              <p><strong>Member:</strong> {{ internshipsStore.selectedInternship.studentName }}</p>
-              <p><strong>Enrolled at:</strong> {{ memberFor(internshipsStore.selectedInternship.studentId)?.originSchool ?? INTERNSHIP_HOST_ENTITY }}</p>
-              <p><strong>Host:</strong> {{ internshipsStore.selectedInternship.hostEntity }}</p>
-              <p><strong>Orientador de Estágio:</strong> {{ internshipsStore.selectedInternship.orientador }}</p>
-              <p><strong>Monitor de Estágio:</strong> {{ internshipsStore.selectedInternship.monitor }}</p>
-              <p><strong>FCT hours:</strong> {{ internshipsStore.selectedInternship.completedHours }}/{{ internshipsStore.selectedInternship.requiredHours }}</p>
-              <p><strong>Notes:</strong> {{ internshipsStore.selectedInternship.notes }}</p>
-            </div>
-          </BaseCard>
-
-          <BaseCard v-if="internshipsStore.certificatePreview" title="Certificate preview" description="Mock output returned by the certificate generator.">
-            <div class="module-summary">
-              <p>{{ internshipsStore.certificatePreview.fileName }}</p>
-              <p>{{ formatTimestamp(internshipsStore.certificatePreview.issuedAt) }}</p>
-              <p>{{ internshipsStore.certificatePreview.summary }}</p>
-            </div>
-          </BaseCard>
-        </div>
-      </BaseSection>
     </template>
+
+    <InternshipDetailsDialog
+      :visible="detailsDialogVisible"
+      :internship="internshipsStore.selectedInternship"
+      :origin-school="detailsOriginSchool"
+      :hours="participationStore.hours"
+      :timeline="participationStore.timeline"
+      :monthly-reports="reportsStore.monthlyReports"
+      :final-report="reportsStore.finalReport"
+      :loading="internshipsStore.loadingDetails"
+      @update:visible="detailsDialogVisible = $event"
+      @open-member="openMemberRecord"
+      @update-progress="openProgressFromDetails"
+    />
 
     <InternshipFormDialog
       :visible="assignDialogVisible"
@@ -300,9 +359,10 @@ onMounted(async () => {
 
     <BaseFormDialog
       :visible="progressDialogVisible"
-      title="Update internship progress"
-      subtitle="Hours come from attendance inside the internship period. Set the placement state here."
-      confirm-label="Update"
+      :title="$t('admin.internships.updateTitle')"
+      :subtitle="$t('admin.internships.updateSubtitle')"
+      :confirm-label="$t('admin.internships.update')"
+      :cancel-label="$t('common.actions.cancel')"
       :loading="internshipsStore.saving"
       @update:visible="progressDialogVisible = $event"
       @confirm="submitProgressForm"
@@ -310,15 +370,19 @@ onMounted(async () => {
     >
       <div class="settings-grid">
         <p v-if="progressInternship" class="settings-grid__wide type-meta">
-          {{ progressInternship.completedHours }}h of {{ progressInternship.requiredHours }}h recorded from
-          attendance during this member's internship period. Volunteer hours are excluded.
+          {{
+            $t("admin.internships.progressNote", {
+              done: progressInternship.completedHours,
+              required: progressInternship.requiredHours,
+            })
+          }}
         </p>
         <label>
-          <span>Placement state</span>
+          <span>{{ $t("admin.internships.placementState") }}</span>
           <BaseSelect v-model="progressForm.status" :options="statusOptions.filter((option) => option.value !== 'all')" />
         </label>
         <label class="settings-grid__wide">
-          <span>Notes</span>
+          <span>{{ $t("common.fields.notes") }}</span>
           <BaseTextInput v-model="progressForm.notes" />
         </label>
       </div>
@@ -326,8 +390,8 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="discardConfirmVisible"
-      title="Discard changes"
-      message="Any unsaved internship form changes will be lost."
+      :title="$t('admin.internships.discardTitle')"
+      :message="$t('admin.internships.discardMessage')"
       severity="primary"
       @update:visible="discardConfirmVisible = $event"
       @confirm="confirmDiscard"

@@ -5,9 +5,10 @@ import BaseButton from "../base/BaseButton.vue";
 import BaseEmptyState from "../base/BaseEmptyState.vue";
 import BaseStatusPill from "../base/BaseStatusPill.vue";
 import type { MemberParticipationHours, ParticipationPeriod } from "../../types/participation";
-import { PARTICIPATION_KIND_CREDIT, PARTICIPATION_KIND_LABELS } from "../../types/participation";
 import { formatHours } from "../../utils/participation";
 import { formatIsoDate } from "../../utils/date";
+import { participationCreditLabel, participationKindLabel } from "../../i18n/vocabulary";
+import { t } from "../../i18n";
 
 /**
  * A member's participation, as a history rather than a status.
@@ -35,7 +36,9 @@ const kindIcons = { "team-member": PhUsersThree, internship: PhBriefcase };
 
 function rangeLabel(period: ParticipationPeriod): string {
   const from = formatIsoDate(period.startDate);
-  return period.endDate ? `${from} → ${formatIsoDate(period.endDate)}` : `${from} → present`;
+  return period.endDate
+    ? `${from} → ${formatIsoDate(period.endDate)}`
+    : t("common.time.toPresent", { from });
 }
 </script>
 
@@ -43,9 +46,9 @@ function rangeLabel(period: ParticipationPeriod): string {
   <div class="participation">
     <BaseEmptyState
       v-if="timeline.length === 0"
-      title="No participation recorded"
-      description="Add a period so this member's attendance can be counted as team or internship hours. Until then it stays unclassified."
-      :action-label="props.editable ? 'Add participation period' : undefined"
+      :title="$t('components.participation.emptyTitle')"
+      :description="$t('components.participation.emptyDescription')"
+      :action-label="props.editable ? $t('components.participation.addPeriod') : undefined"
       @action="emit('add')"
     />
 
@@ -57,21 +60,25 @@ function rangeLabel(period: ParticipationPeriod): string {
       -->
       <div class="participation__totals">
         <div class="participation__total">
-          <span class="type-label">Technical Team</span>
+          <span class="type-label">{{ participationKindLabel("team-member") }}</span>
           <strong>{{ formatHours(props.hours?.teamHours ?? 0) }}</strong>
-          <span class="type-meta">Surplus-hours certificate</span>
+          <span class="type-meta">{{ $t("components.participation.teamCertificate") }}</span>
         </div>
         <div class="participation__total">
-          <span class="type-label">Internship</span>
+          <span class="type-label">{{ $t("components.participation.internshipTotal") }}</span>
           <strong>{{ formatHours(props.hours?.internshipHours ?? 0) }}</strong>
-          <span class="type-meta">FCT requirement</span>
+          <span class="type-meta">{{ $t("components.participation.fctRequirement") }}</span>
         </div>
       </div>
 
       <p v-if="(props.hours?.unclassifiedDays ?? 0) > 0" class="participation__warning">
         <PhWarningCircle weight="fill" />
-        {{ props.hours?.unclassifiedDays }} day(s) — {{ formatHours(props.hours?.unclassifiedHours ?? 0) }} —
-        fall outside every period, so they count towards neither total. Extend a period to include them.
+        {{
+          $t("components.participation.unclassifiedWarning", {
+            days: props.hours?.unclassifiedDays ?? 0,
+            hours: formatHours(props.hours?.unclassifiedHours ?? 0),
+          })
+        }}
       </p>
 
       <ol class="participation__list">
@@ -82,25 +89,30 @@ function rangeLabel(period: ParticipationPeriod): string {
 
           <div class="participation__body">
             <div class="participation__head">
-              <span class="participation__kind">{{ PARTICIPATION_KIND_LABELS[entry.period.kind] }}</span>
-              <BaseStatusPill v-if="entry.period.endDate === null" label="Current" tone="success" />
+              <span class="participation__kind">{{ participationKindLabel(entry.period.kind) }}</span>
+              <BaseStatusPill v-if="entry.period.endDate === null" :label="$t('components.participation.current')" tone="success" />
               <span class="participation__hours">{{ formatHours(entry.hours) }}</span>
             </div>
 
             <p class="participation__range type-meta">
-              {{ rangeLabel(entry.period) }} · {{ entry.days }} day(s) recorded
+              {{
+                $t("components.participation.rangeLine", {
+                  range: rangeLabel(entry.period),
+                  days: entry.days,
+                })
+              }}
             </p>
-            <p class="participation__credit type-meta">{{ PARTICIPATION_KIND_CREDIT[entry.period.kind] }}</p>
+            <p class="participation__credit type-meta">{{ participationCreditLabel(entry.period.kind) }}</p>
             <p v-if="entry.period.note" class="participation__note">{{ entry.period.note }}</p>
 
             <div v-if="props.editable" class="participation__actions">
-              <BaseButton label="Edit" severity="secondary" text size="small" @click="emit('edit', entry.period)" />
-              <BaseButton label="Remove" severity="danger" text size="small" @click="emit('remove', entry.period)" />
+              <BaseButton :label="$t('common.actions.edit')" severity="secondary" text size="small" @click="emit('edit', entry.period)" />
+              <BaseButton :label="$t('common.actions.remove')" severity="danger" text size="small" @click="emit('remove', entry.period)" />
             </div>
           </div>
 
           <!-- Names the boundary between two periods, which is the thing being explained. -->
-          <span v-if="index < timeline.length - 1" class="participation__transition type-label">transition</span>
+          <span v-if="index < timeline.length - 1" class="participation__transition type-label">{{ $t("components.participation.transition") }}</span>
         </li>
       </ol>
     </template>

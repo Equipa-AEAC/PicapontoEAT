@@ -1,3 +1,11 @@
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
+
 /**
  * The staff permission tier of an account. Distinct from the workspace role in
  * `modules/authentication/types/auth.ts`, which only decides whether someone lands
@@ -32,16 +40,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, AdminPermission[]> = {
   viewer: [],
 };
 
-export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
-  administrator: "Full control, including creating and deactivating other accounts.",
-  coordinator: "Runs the roster: edit accounts and reset passwords, but cannot create or deactivate them.",
-  teacher: "Read-only access to members, attendance and reports.",
-  viewer: "Read-only access to reports and dashboards.",
-};
-
 export function roleCan(role: UserRole | null, permission: AdminPermission): boolean {
   return role ? ROLE_PERMISSIONS[role].includes(permission) : false;
 }
+
+export const ADMIN_PERMISSIONS: AdminPermission[] = ALL_PERMISSIONS;
 
 export interface UserSummary {
   id: string;
@@ -52,6 +55,17 @@ export interface UserSummary {
   lastLoginAt: string;
   /** Set when the account was created from a member record on the roster. */
   memberId: string | null;
+  /**
+   * Permissions granted to this account specifically, or null to follow the role.
+   *
+   * The role remains the default and the thing most accounts are described by —
+   * "a coordinator" is a useful sentence, "an account with four of six
+   * permissions" is not. But a role is a preset, not a straitjacket: somebody
+   * has to be able to give one coordinator the ability to create accounts
+   * without inventing a new tier for them. Null means "whatever the role says",
+   * which is what keeps the common case readable.
+   */
+  permissions: AdminPermission[] | null;
 }
 
 export interface UserFormValues {
@@ -60,6 +74,49 @@ export interface UserFormValues {
   role: UserRole;
   status: UserStatus;
   memberId: string | null;
+  permissions: AdminPermission[] | null;
+}
+
+/**
+ * What an account may actually do.
+ *
+ * One function, used by the session to gate controls and by the Users page to
+ * display the effective set, so the list somebody reads and the check the app
+ * performs can never disagree.
+ */
+export function effectivePermissions(
+  role: UserRole | null,
+  overrides: AdminPermission[] | null | undefined,
+): AdminPermission[] {
+  if (overrides) {
+    return ALL_PERMISSIONS.filter((permission) => overrides.includes(permission));
+  }
+
+  return role ? ROLE_PERMISSIONS[role] : [];
+}
+
+export function accountCan(
+  role: UserRole | null,
+  overrides: AdminPermission[] | null | undefined,
+  permission: AdminPermission,
+): boolean {
+  return effectivePermissions(role, overrides).includes(permission);
+}
+
+/** True when the account's own list differs from what its role would give it. */
+export function hasCustomPermissions(
+  role: UserRole,
+  overrides: AdminPermission[] | null | undefined,
+): boolean {
+  if (!overrides) {
+    return false;
+  }
+
+  const fromRole = ROLE_PERMISSIONS[role];
+
+  return (
+    overrides.length !== fromRole.length || overrides.some((permission) => !fromRole.includes(permission))
+  );
 }
 
 export interface PermissionMatrixRow {

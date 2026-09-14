@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type { StudentPortalSummary } from "../types/portal";
@@ -31,7 +32,7 @@ export const usePortalStore = defineStore("portal", () => {
     try {
       summary.value = await getStudentPortalSummary(memberId);
     } catch (error) {
-      errorMessage.value = describeError(error, "Your portal could not be loaded.");
+      errorMessage.value = describeError(error, t("errors.loadPortal"));
     } finally {
       loading.value = false;
     }

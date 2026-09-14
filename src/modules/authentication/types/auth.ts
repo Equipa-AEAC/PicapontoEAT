@@ -1,4 +1,4 @@
-import type { UserRole as StaffRole } from "../../../types/users";
+import type { AdminPermission, UserRole as StaffRole } from "../../../types/users";
 
 /**
  * Which workspace the session lands in. Deliberately *not* the staff permission
@@ -42,6 +42,14 @@ export interface AuthSession {
   role: UserRole;
   /** Permission tier inside the admin workspace. Null for student sessions. */
   staffRole: StaffRole | null;
+  /**
+   * Permissions granted to this account specifically, or null to follow the role.
+   *
+   * BACKEND CONTRACT: the server decides this and sends it with the session. It
+   * must also enforce it — a permission list the client holds is a description
+   * of what the UI should offer, never the thing that stops an action.
+   */
+  staffPermissions: AdminPermission[] | null;
 }
 
 export interface RefreshSessionPayload {

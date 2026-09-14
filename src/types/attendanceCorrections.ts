@@ -1,5 +1,12 @@
 import type { AttendanceStatus } from "./attendance";
 
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
 /**
  * A member's request to have one of their attendance records fixed.
  *
@@ -15,13 +22,6 @@ import type { AttendanceStatus } from "./attendance";
  */
 export type CorrectionRequestStatus = "pending" | "approved" | "rejected" | "withdrawn";
 
-export const CORRECTION_STATUS_LABELS: Record<CorrectionRequestStatus, string> = {
-  pending: "Waiting for review",
-  approved: "Approved",
-  rejected: "Not changed",
-  withdrawn: "Withdrawn",
-};
-
 /**
  * What the member says is wrong. This is a small closed list on purpose: it is
  * what makes the queue triageable, and it is phrased the way a student would
@@ -33,27 +33,6 @@ export type CorrectionRequestKind =
   | "wrong-times"
   | "wrong-day"
   | "not-mine";
-
-export const CORRECTION_KIND_LABELS: Record<CorrectionRequestKind, string> = {
-  "missing-entry": "My check-in is missing",
-  "missing-exit": "My check-out is missing",
-  "wrong-times": "The times are wrong",
-  "wrong-day": "I was not here on this day",
-  "not-mine": "This is not my record",
-};
-
-/** Short form for tables, where the full sentence is too long to sit in a column. */
-export const CORRECTION_KIND_SHORT: Record<CorrectionRequestKind, string> = {
-  "missing-entry": "Missing check-in",
-  "missing-exit": "Missing check-out",
-  "wrong-times": "Wrong times",
-  "wrong-day": "Not here that day",
-  "not-mine": "Not my record",
-};
-
-export const CORRECTION_KIND_OPTIONS = (
-  Object.keys(CORRECTION_KIND_LABELS) as CorrectionRequestKind[]
-).map((value) => ({ label: CORRECTION_KIND_LABELS[value], value }));
 
 /** Kinds where proposing corrected times is meaningful. */
 export const KINDS_WITH_TIMES: CorrectionRequestKind[] = ["missing-entry", "missing-exit", "wrong-times"];

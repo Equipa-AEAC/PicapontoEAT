@@ -12,6 +12,7 @@ const adminPageComponents = {
   members: () => import("../../modules/admin/members/pages/AdminMembersPage.vue"),
   cards: () => import("../../modules/admin/cards/pages/AdminCardsPage.vue"),
   attendance: () => import("../../modules/admin/attendance/pages/AdminAttendancePage.vue"),
+  calendar: () => import("../../modules/admin/calendar/pages/AdminCalendarPage.vue"),
   internships: () => import("../../modules/admin/internships/pages/AdminInternshipsPage.vue"),
   announcements: () => import("../../modules/admin/announcements/pages/AdminAnnouncementsPage.vue"),
   certificates: () => import("../../modules/admin/certificates/pages/AdminCertificatesPage.vue"),
@@ -40,7 +41,9 @@ const studentPageComponents = {
   announcements: () => import("../../modules/student/announcements/pages/StudentAnnouncementsPage.vue"),
   settings: () => import("../../modules/student/settings/pages/StudentSettingsPage.vue"),
   moments: () => import("../../modules/student/moments/pages/StudentTeamMomentsPage.vue"),
-  work: () => import("../../modules/student/work/pages/StudentWorkPage.vue"),
+  projects: () => import("../../modules/student/projects/pages/StudentProjectsPage.vue"),
+  projectDetail: () => import("../../modules/student/projects/pages/StudentProjectDetailPage.vue"),
+  tasks: () => import("../../modules/student/projects/pages/StudentTasksPage.vue"),
 } as const;
 
 const adminChildRoutes = adminNavigationItems.map((item) => ({
@@ -92,8 +95,8 @@ const router = createRouter({
           name: "project-details",
           component: () => import("../../modules/admin/projects/pages/ProjectDetailsPage.vue"),
           meta: {
-            title: "Project",
-            subtitle: "Tasks, team and activity for one project",
+            title: "nav.project-details.label",
+            subtitle: "nav.project-details.description",
             workspace: "admin",
           },
         },
@@ -102,8 +105,8 @@ const router = createRouter({
           name: "member-details",
           component: () => import("../../modules/admin/members/pages/MemberDetailsPage.vue"),
           meta: {
-            title: "Member details",
-            subtitle: "Profile and internship drill-down",
+            title: "nav.member-details.label",
+            subtitle: "nav.member-details.description",
             workspace: "admin",
           },
         },
@@ -112,8 +115,8 @@ const router = createRouter({
           name: "member-attendance-history",
           component: () => import("../../modules/admin/members/pages/MemberAttendanceHistoryPage.vue"),
           meta: {
-            title: "Attendance history",
-            subtitle: "Detailed attendance records by member",
+            title: "nav.member-attendance-history.label",
+            subtitle: "nav.member-attendance-history.description",
             workspace: "admin",
           },
         },
@@ -133,8 +136,8 @@ const router = createRouter({
           name: "student-dashboard",
           component: studentPageComponents.dashboard,
           meta: {
-            title: "Dashboard",
-            subtitle: "Student workspace overview",
+            title: "nav.student-dashboard.label",
+            subtitle: "nav.student-dashboard.description",
           },
         },
         {
@@ -142,8 +145,8 @@ const router = createRouter({
           name: "student-attendance",
           component: studentPageComponents.attendance,
           meta: {
-            title: "Attendance",
-            subtitle: "View your attendance history",
+            title: "nav.student-attendance.label",
+            subtitle: "nav.student-attendance.description",
           },
         },
         {
@@ -151,8 +154,8 @@ const router = createRouter({
           name: "student-worked-hours",
           component: studentPageComponents.workedHours,
           meta: {
-            title: "Worked Hours",
-            subtitle: "Track completed and remaining hours",
+            title: "nav.student-worked-hours.label",
+            subtitle: "nav.student-worked-hours.description",
           },
         },
         {
@@ -160,8 +163,8 @@ const router = createRouter({
           name: "student-calendar",
           component: studentPageComponents.calendar,
           meta: {
-            title: "Calendar",
-            subtitle: "Attendance calendar overview",
+            title: "nav.student-calendar.label",
+            subtitle: "nav.student-calendar.description",
           },
         },
         {
@@ -169,8 +172,8 @@ const router = createRouter({
           name: "student-daily-log",
           component: studentPageComponents.dailyLog,
           meta: {
-            title: "Daily Report",
-            subtitle: "Register your daily internship activity",
+            title: "nav.student-daily-log.label",
+            subtitle: "nav.student-daily-log.description",
           },
         },
         {
@@ -178,8 +181,8 @@ const router = createRouter({
           name: "student-reports",
           component: studentPageComponents.reports,
           meta: {
-            title: "Internship Reports",
-            subtitle: "Monthly balance and final report",
+            title: "nav.student-reports.label",
+            subtitle: "nav.student-reports.description",
           },
         },
         {
@@ -187,8 +190,8 @@ const router = createRouter({
           name: "student-certificates",
           component: studentPageComponents.certificates,
           meta: {
-            title: "Certificates",
-            subtitle: "Preview internship completion certificates",
+            title: "nav.student-certificates.label",
+            subtitle: "nav.student-certificates.description",
           },
         },
         {
@@ -196,8 +199,8 @@ const router = createRouter({
           name: "student-profile",
           component: studentPageComponents.profile,
           meta: {
-            title: "Profile",
-            subtitle: "Personal and course information",
+            title: "nav.student-profile.label",
+            subtitle: "nav.student-profile.description",
           },
         },
         {
@@ -205,8 +208,8 @@ const router = createRouter({
           name: "student-announcements",
           component: studentPageComponents.announcements,
           meta: {
-            title: "Announcements",
-            subtitle: "Latest student updates",
+            title: "nav.student-announcements.label",
+            subtitle: "nav.student-announcements.description",
           },
         },
         {
@@ -215,21 +218,48 @@ const router = createRouter({
           redirect: { name: "student-worked-hours" },
         },
         {
-          path: "my-work",
-          name: "student-work",
-          component: studentPageComponents.work,
+          path: "projects",
+          name: "student-projects",
+          component: studentPageComponents.projects,
           meta: {
-            title: "My Work",
-            subtitle: "Tasks assigned to you across the team's projects",
+            title: "nav.student-projects.label",
+            subtitle: "nav.student-projects.description",
           },
+        },
+        {
+          path: "projects/tasks",
+          name: "student-tasks",
+          component: studentPageComponents.tasks,
+          meta: {
+            title: "nav.student-tasks.label",
+            subtitle: "nav.student-tasks.description",
+          },
+        },
+        {
+          /*
+           * Under an explicit `detail` segment so a project id can never be
+           * mistaken for `tasks` above it — the same guard the admin routes use.
+           */
+          path: "projects/detail/:projectId",
+          name: "student-project-detail",
+          component: studentPageComponents.projectDetail,
+          meta: {
+            title: "nav.student-project-detail.label",
+            subtitle: "nav.student-project-detail.description",
+          },
+        },
+        {
+          // My Work became My tasks inside Project management; keep old links alive.
+          path: "my-work",
+          redirect: { name: "student-tasks" },
         },
         {
           path: "moments",
           name: "student-moments",
           component: studentPageComponents.moments,
           meta: {
-            title: "Team Moments",
-            subtitle: "What the team is working on today",
+            title: "nav.student-moments.label",
+            subtitle: "nav.student-moments.description",
           },
         },
         {
@@ -237,8 +267,8 @@ const router = createRouter({
           name: "student-settings",
           component: studentPageComponents.settings,
           meta: {
-            title: "Settings",
-            subtitle: "Student portal preferences",
+            title: "nav.student-settings.label",
+            subtitle: "nav.student-settings.description",
           },
         },
       ],
@@ -257,8 +287,8 @@ const router = createRouter({
           name: "login",
           component: () => import("../../modules/authentication/pages/LoginPage.vue"),
           meta: {
-            title: "Login",
-            subtitle: "Select your workspace",
+            title: "nav.login.label",
+            subtitle: "nav.login.description",
             workspace: "authentication",
           },
         },

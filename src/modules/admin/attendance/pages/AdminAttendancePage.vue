@@ -19,6 +19,7 @@ import {
 import BaseButton from "../../../../components/base/BaseButton.vue";
 import BaseCard from "../../../../components/base/BaseCard.vue";
 import BaseConfirmDialog from "../../../../components/base/BaseConfirmDialog.vue";
+import BaseDatePicker from "../../../../components/base/BaseDatePicker.vue";
 import BaseDialog from "../../../../components/base/BaseDialog.vue";
 import BaseEmptyState from "../../../../components/base/BaseEmptyState.vue";
 import BaseFilterPanel from "../../../../components/base/BaseFilterPanel.vue";
@@ -41,7 +42,14 @@ import { useAttendanceCorrectionsStore } from "../../../../shared/stores";
 import { csvFilename, downloadCsv, toCsv } from "../../../../shared/utils/csv";
 import { classifyAttendanceDate } from "../../../../services/participation.service";
 import type { ParticipationPeriod } from "../../../../types/participation";
-import { PARTICIPATION_KIND_CREDIT, PARTICIPATION_KIND_LABELS } from "../../../../types/participation";
+import { t } from "../../../../i18n";
+import {
+  attendanceCorrectionReasonLabel,
+  attendanceStatusLabel,
+  attendanceStatusOptions,
+  participationCreditLabel,
+  participationKindLabel,
+} from "../../../../i18n/vocabulary";
 
 const router = useRouter();
 const attendanceStore = useAttendanceStore();
@@ -63,10 +71,10 @@ const correctionForm = reactive<AttendanceCorrectionFormValues>({
 });
 
 const correctionReasonOptions: Array<{ label: string; value: AttendanceCorrectionReason }> = [
-  { label: "Forgot to check out", value: "forgot-to-check-out" },
-  { label: "Wrong device", value: "wrong-device" },
-  { label: "Duplicate scan", value: "duplicate-scan" },
-  { label: "Manual entry", value: "manual-entry" },
+  { label: attendanceCorrectionReasonLabel("forgot-to-check-out"), value: "forgot-to-check-out" },
+  { label: attendanceCorrectionReasonLabel("wrong-device"), value: "wrong-device" },
+  { label: attendanceCorrectionReasonLabel("duplicate-scan"), value: "duplicate-scan" },
+  { label: attendanceCorrectionReasonLabel("manual-entry"), value: "manual-entry" },
 ];
 
 /**
@@ -97,23 +105,20 @@ const deletingRecord = computed(() => attendanceStore.items.find((item) => item.
 
 const courseOptions = computed(() => {
   const values = new Set(membersStore.allMembers.map((member) => member.course).filter((value) => value.trim().length > 0));
-  return [{ label: "All courses", value: "all" }, ...Array.from(values).map((value) => ({ label: value, value }))];
+  return [{ label: t("common.filters.allCourses"), value: "all" }, ...Array.from(values).map((value) => ({ label: value, value }))];
 });
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Present", value: "present" },
-  { label: "Late", value: "late" },
-  { label: "Missing", value: "missing" },
-  { label: "Corrected", value: "corrected" },
-];
+const statusOptions = computed(() => [
+  { label: t("common.filters.allStatuses"), value: "all" },
+  ...attendanceStatusOptions(),
+]);
 
 const studentOptions = computed(() => [
-  { label: "All members", value: "all" },
+  { label: t("common.filters.allMembers"), value: "all" },
   ...membersStore.allMembers.map((student) => ({ label: student.fullName, value: student.id })),
 ]);
 const deviceOptions = computed(() => [
-  { label: "All devices", value: "all" },
+  { label: t("common.filters.allDevices"), value: "all" },
   ...devicesStore.items.map((device) => ({ label: device.name, value: device.id })),
 ]);
 
@@ -290,48 +295,50 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Attendance"
-      description="Review scan validation, duplicates, entry and exit records from a single module."
+      :title="$t('admin.attendance.title')"
+      :description="$t('admin.attendance.description')"
     >
       <template #actions>
-        <BaseButton label="Reload" severity="secondary" outlined :loading="attendanceStore.loading" @click="attendanceStore.loadAttendance()" />
+        <BaseButton :label="$t('admin.attendance.reload')" severity="secondary" outlined :loading="attendanceStore.loading" @click="attendanceStore.loadAttendance()" />
         <BaseButton :disabled="attendanceStore.items.length === 0" @click="exportCsv">
           <PhDownloadSimple weight="bold" />
-          Export CSV
+          {{ $t("common.actions.exportCsv") }}
         </BaseButton>
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
-      <BaseMetricCard label="Total records" :value="String(totalRecords)" caption="Attendance rows in the current view" :icon="PhFingerprint" />
-      <BaseMetricCard label="Present" :value="String(presentRecords)" caption="Validated present records" :icon="PhUsersThree" />
-      <BaseMetricCard label="Corrections" :value="String(correctionRecords)" caption="Records updated by administrators" :icon="PhClockCounterClockwise" :trend-label="correctionRecords > 0 ? 'Needs review' : 'All clear'" :trend-tone="correctionRecords > 0 ? 'negative' : 'positive'" />
-      <BaseMetricCard label="Hours logged" :value="String(Math.round(hoursRecorded))" caption="Approved attendance hours" :icon="PhTimer" />
+      <BaseMetricCard :label="$t('admin.attendance.metricTotal')" :value="String(totalRecords)" :caption="$t('admin.attendance.metricTotalCaption')" :icon="PhFingerprint" />
+      <BaseMetricCard :label="$t('admin.attendance.metricPresent')" :value="String(presentRecords)" :caption="$t('admin.attendance.metricPresentCaption')" :icon="PhUsersThree" />
+      <BaseMetricCard :label="$t('admin.attendance.metricCorrections')" :value="String(correctionRecords)" :caption="$t('admin.attendance.metricCorrectionsCaption')" :icon="PhClockCounterClockwise" :trend-label="
+          correctionRecords > 0 ? $t('admin.attendance.needsReview') : $t('admin.attendance.allClear')
+        " :trend-tone="correctionRecords > 0 ? 'negative' : 'positive'" />
+      <BaseMetricCard :label="$t('admin.attendance.metricHours')" :value="String(Math.round(hoursRecorded))" :caption="$t('admin.attendance.metricHoursCaption')" :icon="PhTimer" />
     </section>
 
     <BaseFilterPanel
-      title="Search and filters"
-      description="Filters apply as you type — no Apply step. The export follows whatever is shown."
+      :title="$t('admin.attendance.filtersTitle')"
+      :description="$t('admin.attendance.filtersDescription')"
     >
       <div class="filter-strip">
-        <BaseSearchBar v-model="attendanceStore.filters.query" placeholder="Search member, class, device or date" />
+        <BaseSearchBar v-model="attendanceStore.filters.query" :placeholder="$t('admin.attendance.search')" />
         <BaseSelect v-model="attendanceStore.filters.course" :options="courseOptions" />
         <BaseSelect v-model="attendanceStore.filters.status" :options="statusOptions" />
         <BaseSelect v-model="attendanceStore.filters.studentId" :options="studentOptions" />
         <BaseSelect v-model="attendanceStore.filters.deviceId" :options="deviceOptions" />
         <label class="date-field">
-          <span class="type-label">From</span>
-          <BaseTextInput v-model="fromDate" type="date" />
+          <span class="type-label">{{ $t("common.time.from") }}</span>
+          <BaseDatePicker v-model="fromDate" />
         </label>
         <label class="date-field">
-          <span class="type-label">To</span>
-          <BaseTextInput v-model="toDate" type="date" />
+          <span class="type-label">{{ $t("common.time.to") }}</span>
+          <BaseDatePicker v-model="toDate" />
         </label>
-        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
+        <BaseButton :label="$t('common.actions.clearFilters')" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
       </div>
 
       <p v-if="rangeIsBackwards" class="form-error-banner">
-        The “to” date is before the “from” date, so nothing can match. Swap them to see results.
+        {{ $t("admin.attendance.invertedRange") }}
       </p>
     </BaseFilterPanel>
 
@@ -344,7 +351,7 @@ onMounted(async () => {
     -->
     <CorrectionReviewQueue @resolved="attendanceStore.loadAttendance()" />
 
-    <BaseSection title="Attendance log" description="Click a row to open the full record. Corrections and deletions are audited.">
+    <BaseSection :title="$t('admin.attendance.tableTitle')" :description="$t('admin.attendance.tableDescription')">
       <BaseCard>
         <BaseTable
           :value="attendanceStore.items"
@@ -356,18 +363,18 @@ onMounted(async () => {
         >
           <template #empty>
             <BaseEmptyState
-              title="No attendance records"
+              :title="$t('admin.attendance.emptyTitle')"
               :description="
                 hasActiveFilters
-                  ? 'No scan matches the current filters.'
-                  : 'No attendance has been recorded yet.'
+                  ? $t('admin.attendance.emptyFiltered')
+                  : $t('admin.attendance.emptyNone')
               "
-              :action-label="hasActiveFilters ? 'Clear filters' : undefined"
+              :action-label="hasActiveFilters ? $t('common.actions.clearFilters') : undefined"
               @action="clearFilters"
             />
           </template>
 
-          <TableColumn header="Member" field="studentName" sortable>
+          <TableColumn :header="$t('admin.attendance.colMember')" field="studentName" sortable>
             <template #body="slotProps">
               <div class="cell-stack">
                 <!--
@@ -387,8 +394,8 @@ onMounted(async () => {
               </div>
             </template>
           </TableColumn>
-          <TableColumn field="date" header="Date" sortable />
-          <TableColumn header="Entry → Exit" width="150px">
+          <TableColumn field="date" :header="$t('common.time.date')" sortable />
+          <TableColumn :header="$t('admin.attendance.colTimes')" width="150px">
             <template #body="slotProps">
               <span class="attendance-span">
                 <span>{{ slotProps.data.entry ?? '—' }}</span>
@@ -397,31 +404,34 @@ onMounted(async () => {
               </span>
             </template>
           </TableColumn>
-          <TableColumn header="Hours" field="hours" sortable width="90px">
+          <TableColumn :header="$t('common.fields.hours')" field="hours" sortable width="90px">
             <template #body="slotProps">
               <span>{{ slotProps.data.hours ?? 0 }}h</span>
             </template>
           </TableColumn>
-          <TableColumn field="deviceName" header="Device" />
-          <TableColumn header="Status" field="status" sortable width="140px">
+          <TableColumn field="deviceName" :header="$t('admin.attendance.colDevice')" />
+          <TableColumn :header="$t('common.fields.status')" field="status" sortable width="140px">
             <template #body="slotProps">
               <span class="status-cell">
                 <component :is="statusMeta[slotProps.data.status as AttendanceStatus].icon" weight="fill" :class="`status-cell__icon status-cell__icon--${statusMeta[slotProps.data.status as AttendanceStatus].tone}`" />
-                <BaseStatusPill :label="slotProps.data.status" :tone="statusMeta[slotProps.data.status as AttendanceStatus].tone" />
+                <BaseStatusPill
+                  :label="attendanceStatusLabel(slotProps.data.status as AttendanceStatus)"
+                  :tone="statusMeta[slotProps.data.status as AttendanceStatus].tone"
+                />
               </span>
             </template>
           </TableColumn>
-          <TableColumn field="corrections" header="Corr." sortable width="80px" />
-          <TableColumn header="Actions" width="130px">
+          <TableColumn field="corrections" :header="$t('admin.attendance.colCorrections')" sortable width="80px" />
+          <TableColumn :header="$t('common.fields.actions')" width="130px">
             <template #body="slotProps">
               <div class="icon-actions" @click.stop>
-                <button type="button" class="icon-actions__button" title="View record" aria-label="View record" @click="openDetails(slotProps.data.id)">
+                <button type="button" class="icon-actions__button" :title="$t('admin.attendance.viewRecord')" :aria-label="$t('admin.attendance.viewRecord')" @click="openDetails(slotProps.data.id)">
                   <PhEye weight="bold" />
                 </button>
-                <button type="button" class="icon-actions__button" title="Correct record" aria-label="Correct record" @click="openCorrection(slotProps.data)">
+                <button type="button" class="icon-actions__button" :title="$t('admin.attendance.correctRecord')" :aria-label="$t('admin.attendance.correctRecord')" @click="openCorrection(slotProps.data)">
                   <PhPencilSimple weight="bold" />
                 </button>
-                <button type="button" class="icon-actions__button icon-actions__button--danger" title="Delete record" aria-label="Delete record" @click="requestDelete(slotProps.data.id)">
+                <button type="button" class="icon-actions__button icon-actions__button--danger" :title="$t('admin.attendance.deleteRecord')" :aria-label="$t('admin.attendance.deleteRecord')" @click="requestDelete(slotProps.data.id)">
                   <PhTrash weight="bold" />
                 </button>
               </div>
@@ -433,55 +443,74 @@ onMounted(async () => {
 
     <BaseDialog
       :visible="detailsVisible && Boolean(selectedRecord)"
-      header="Attendance record"
+      :header="$t('admin.attendance.recordHeader')"
       @update:visible="closeDetails"
     >
       <div v-if="selectedRecord" class="module-summary">
-        <BaseStatusPill :label="selectedRecord.status" :tone="statusMeta[selectedRecord.status].tone" />
-        <p><strong>Member:</strong> {{ selectedRecord.studentName }}</p>
-        <p><strong>Course:</strong> {{ selectedRecord.course }}</p>
-        <p><strong>Class:</strong> {{ selectedRecord.className }}</p>
-        <p><strong>Date:</strong> {{ selectedRecord.date }}</p>
-        <p><strong>Entry:</strong> {{ selectedRecord.entry ?? 'n/a' }} • <strong>Exit:</strong> {{ selectedRecord.exit ?? 'n/a' }}</p>
-        <p><strong>Hours:</strong> {{ selectedRecord.hours ?? 0 }}</p>
+        <BaseStatusPill
+          :label="attendanceStatusLabel(selectedRecord.status)"
+          :tone="statusMeta[selectedRecord.status].tone"
+        />
+        <p><strong>{{ $t("admin.attendance.memberLabel") }}</strong> {{ selectedRecord.studentName }}</p>
+        <p><strong>{{ $t("admin.attendance.courseLabel") }}</strong> {{ selectedRecord.course }}</p>
+        <p><strong>{{ $t("admin.attendance.classLabel") }}</strong> {{ selectedRecord.className }}</p>
+        <p><strong>{{ $t("admin.attendance.dateLabel") }}</strong> {{ selectedRecord.date }}</p>
+        <p>
+          <strong>{{ $t("admin.attendance.entryLabel") }}</strong>
+          {{ selectedRecord.entry ?? $t("admin.attendance.notAvailable") }} •
+          <strong>{{ $t("admin.attendance.exitLabel") }}</strong>
+          {{ selectedRecord.exit ?? $t("admin.attendance.notAvailable") }}
+        </p>
+        <p><strong>{{ $t("admin.attendance.hoursLabel") }}</strong> {{ selectedRecord.hours ?? 0 }}</p>
         <!--
           Says which bucket this day's hours landed in and why, resolved through
           the same rule that produces every total.
         -->
         <p v-if="recordPeriod">
-          <strong>Counts as:</strong> {{ PARTICIPATION_KIND_LABELS[recordPeriod.kind] }}
+          <strong>{{ $t("admin.attendance.countsAs") }}</strong> {{ participationKindLabel(recordPeriod.kind) }}
           <span class="type-meta">
-            ({{ recordPeriod.startDate }} → {{ recordPeriod.endDate ?? 'present' }}) ·
-            {{ PARTICIPATION_KIND_CREDIT[recordPeriod.kind] }}
+            ({{ recordPeriod.startDate }} → {{ recordPeriod.endDate ?? $t("admin.attendance.present") }}) ·
+            {{ participationCreditLabel(recordPeriod.kind) }}
           </span>
         </p>
         <p v-else>
-          <strong>Counts as:</strong> Unclassified
+          <strong>{{ $t("admin.attendance.countsAs") }}</strong> {{ $t("admin.attendance.unclassified") }}
           <span class="type-meta">
-            No participation period covers {{ selectedRecord.date }}, so these hours count towards
-            neither the surplus certificate nor the FCT requirement.
+            {{ $t("admin.attendance.unclassifiedHint", { date: selectedRecord.date }) }}
           </span>
         </p>
-        <p><strong>Device:</strong> {{ selectedRecord.deviceName }}</p>
-        <p><strong>Corrections:</strong> {{ selectedRecord.corrections }}</p>
-        <p><strong>Notes:</strong> {{ selectedRecord.notes || 'None' }}</p>
-        <p><strong>Created by:</strong> {{ selectedRecord.createdBy }}</p>
-        <p><strong>Updated:</strong> {{ selectedRecord.updatedAt ?? 'not updated' }}<template v-if="selectedRecord.updatedBy"> by {{ selectedRecord.updatedBy }}</template></p>
+        <p><strong>{{ $t("admin.attendance.deviceLabel") }}</strong> {{ selectedRecord.deviceName }}</p>
+        <p>
+          <strong>{{ $t("admin.attendance.correctionsLabel") }}</strong> {{ selectedRecord.corrections }}
+        </p>
+        <p>
+          <strong>{{ $t('admin.attendance.notesLabel') }}</strong>
+          {{ selectedRecord.notes || $t('admin.attendance.none') }}
+        </p>
+        <p><strong>{{ $t("admin.attendance.createdBy") }}</strong> {{ selectedRecord.createdBy }}</p>
+        <p>
+          <strong>{{ $t("admin.attendance.updatedLabel") }}</strong>
+          {{ selectedRecord.updatedAt ?? $t("admin.attendance.notUpdated") }}
+          <template v-if="selectedRecord.updatedBy">
+            {{ $t("admin.attendance.updatedByName", { name: selectedRecord.updatedBy }) }}
+          </template>
+        </p>
       </div>
 
       <template #footer>
         <div class="inline-actions inline-actions--end">
-          <BaseButton label="Close" severity="secondary" text @click="closeDetails" />
-          <BaseButton v-if="selectedRecord" label="Correct record" @click="openCorrection(selectedRecord)" />
+          <BaseButton :label="$t('common.actions.close')" severity="secondary" text @click="closeDetails" />
+          <BaseButton v-if="selectedRecord" :label="$t('admin.attendance.correctRecord')" @click="openCorrection(selectedRecord)" />
         </div>
       </template>
     </BaseDialog>
 
     <BaseFormDialog
       :visible="correctionVisible"
-      title="Correct attendance record"
-      subtitle="Adjust entry/exit times and leave a note explaining the correction."
-      confirm-label="Save correction"
+      :title="$t('admin.attendance.correctTitle')"
+      :subtitle="$t('admin.attendance.correctSubtitle')"
+      :confirm-label="$t('admin.attendance.saveCorrection')"
+      :cancel-label="$t('common.actions.cancel')"
       :loading="attendanceStore.saving"
       @update:visible="correctionVisible = $event"
       @confirm="submitCorrection"
@@ -489,30 +518,35 @@ onMounted(async () => {
     >
       <div class="settings-grid">
         <label>
-          <span>Reason</span>
+          <span>{{ $t("admin.attendance.reasonLabel") }}</span>
           <BaseSelect v-model="correctionForm.reason" :options="correctionReasonOptions" />
         </label>
         <label>
-          <span>Entry time</span>
+          <span>{{ $t("admin.attendance.entryTime") }}</span>
           <BaseTextInput v-model="correctionForm.entryTime" placeholder="HH:mm" />
         </label>
         <label>
-          <span>Exit time</span>
+          <span>{{ $t("admin.attendance.exitTime") }}</span>
           <BaseTextInput v-model="correctionForm.exitTime" placeholder="HH:mm" />
         </label>
         <label class="settings-grid__wide">
-          <span>Administrator notes</span>
-          <BaseTextInput v-model="correctionForm.administratorNotes" placeholder="Reason for the correction" />
+          <span>{{ $t("admin.attendance.adminNotes") }}</span>
+          <BaseTextInput v-model="correctionForm.administratorNotes" :placeholder="$t('admin.attendance.notePlaceholder')" />
         </label>
       </div>
     </BaseFormDialog>
 
     <BaseConfirmDialog
       :visible="deleteConfirmVisible"
-      title="Delete attendance record"
-      :message="deletingRecord
-        ? `Delete the ${deletingRecord.date} record for ${deletingRecord.studentName}? Attendance hours already credited to this member will no longer include it.`
-        : 'Delete this attendance record?'"
+      :title="$t('admin.attendance.deleteTitle')"
+      :message="
+        deletingRecord
+          ? $t('admin.attendance.deleteMessageFor', {
+              date: deletingRecord.date,
+              name: deletingRecord.studentName,
+            })
+          : $t('admin.attendance.deleteQuestion')
+      "
       :loading="attendanceStore.saving"
       @update:visible="deleteConfirmVisible = $event"
       @confirm="confirmDelete"

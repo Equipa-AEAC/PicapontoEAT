@@ -3,13 +3,16 @@ import { computed } from "vue";
 import { PhCalendarBlank, PhWarningCircle } from "@phosphor-icons/vue";
 
 import type { ProjectTaskSummary } from "../../types/projects";
-import { PROJECT_PRIORITY_LABELS } from "../../types/projects";
+import { t } from "../../i18n";
+import { projectPriorityLabel } from "../../i18n/vocabulary";
 
 /**
  * One task on the board. Draggable, and the whole card is a button so it is
  * reachable and openable from the keyboard as well as the mouse.
  */
-const props = defineProps<{ task: ProjectTaskSummary }>();
+const props = withDefaults(defineProps<{ task: ProjectTaskSummary; draggable?: boolean }>(), {
+  draggable: true,
+});
 
 const emit = defineEmits<{ open: [task: ProjectTaskSummary]; dragstart: [task: ProjectTaskSummary] }>();
 
@@ -17,7 +20,7 @@ const dueLabel = computed(() => props.task.dueLabel);
 
 const assigneeLabel = computed(() =>
   props.task.assignees.length === 0
-    ? "Nobody assigned"
+    ? t("projects.task.nobodyAssigned")
     : props.task.assignees.map((assignee) => assignee.name).join(", "),
 );
 </script>
@@ -30,7 +33,7 @@ const assigneeLabel = computed(() =>
       'task-card--critical': task.priority === 'critical',
       'task-card--high': task.priority === 'high',
     }"
-    draggable="true"
+    :draggable="draggable"
     role="button"
     tabindex="0"
     :aria-label="`${task.title}. ${assigneeLabel}.`"
@@ -50,7 +53,7 @@ const assigneeLabel = computed(() =>
       </span>
 
       <span v-if="task.priority === 'critical' || task.priority === 'high'" class="task-card__priority type-meta">
-        {{ PROJECT_PRIORITY_LABELS[task.priority] }}
+        {{ projectPriorityLabel(task.priority) }}
       </span>
     </div>
 

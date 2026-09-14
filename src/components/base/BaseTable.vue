@@ -1,6 +1,7 @@
 <script lang="ts">
 import { computed, defineComponent, h, ref, watch, type PropType, type VNode } from "vue";
 import TableColumnDef from "./TableColumn.vue";
+import { t } from "../../i18n";
 
 interface ColumnDef {
   field?: string;
@@ -200,15 +201,23 @@ export default defineComponent({
       return h("div", { class: "base-table-wrapper" }, [
         slots.header ? h("div", { class: "base-table__header" }, slots.header()) : null,
         props.loading
-          ? h("div", { class: "base-table__loading" }, slots.loading ? slots.loading() : "Loading records...")
+          ? h("div", { class: "base-table__loading" }, slots.loading ? slots.loading() : t("common.state.loading"))
           : pagedRows.value.length === 0
-            ? h("div", { class: "base-table__empty" }, slots.empty ? slots.empty() : "No records found.")
+            ? h("div", { class: "base-table__empty" }, slots.empty ? slots.empty() : t("common.empty.noRows"))
             : scrollWrap,
         props.paginator && !props.loading && pagedRows.value.length > 0
           ? h("div", { class: "base-table__paginator" }, [
-              h("button", { type: "button", disabled: page.value === 0, onClick: () => page.value-- }, "Prev"),
-              h("span", `Page ${page.value + 1} of ${pageCount.value}`),
-              h("button", { type: "button", disabled: page.value >= pageCount.value - 1, onClick: () => page.value++ }, "Next"),
+              h(
+                "button",
+                { type: "button", disabled: page.value === 0, onClick: () => page.value-- },
+                t("common.actions.previous"),
+              ),
+              h("span", t("common.table.pageOf", { page: page.value + 1, total: pageCount.value })),
+              h(
+                "button",
+                { type: "button", disabled: page.value >= pageCount.value - 1, onClick: () => page.value++ },
+                t("common.actions.next"),
+              ),
             ])
           : null,
         slots.footer ? h("div", { class: "base-table__footer" }, slots.footer()) : null,

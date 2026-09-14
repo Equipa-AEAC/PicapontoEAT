@@ -1,3 +1,5 @@
+import { t } from "../../i18n";
+
 export const WORKSPACE_KEYS = {
   admin: "admin",
   student: "student",
@@ -41,11 +43,18 @@ export const PARTNER_SCHOOLS = [
 /** Sentinel that switches the origin-school select into a free-text input. */
 export const OTHER_SCHOOL_VALUE = "__other__";
 
-export const SCHOOL_OPTIONS = [
-  { label: `${SCHOOL_NAME} (this school)`, value: SCHOOL_NAME },
-  ...PARTNER_SCHOOLS.map((value) => ({ label: value, value })),
-  { label: "Other school…", value: OTHER_SCHOOL_VALUE },
-];
+/*
+ * A function, not a constant: the first and last rows are written words and a
+ * constant would freeze them in whichever language loaded first. The school
+ * names in between are data and are never translated.
+ */
+export function schoolOptions() {
+  return [
+    { label: t("common.filters.thisSchoolSuffix", { school: SCHOOL_NAME }), value: SCHOOL_NAME },
+    ...PARTNER_SCHOOLS.map((value) => ({ label: value, value })),
+    { label: t("common.filters.otherSchool"), value: OTHER_SCHOOL_VALUE },
+  ];
+}
 
 export function isExternalSchool(originSchool: string): boolean {
   return originSchool.trim().length > 0 && originSchool !== SCHOOL_NAME;

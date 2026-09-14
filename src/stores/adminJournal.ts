@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import type { Project, TeamJournalEntry, TeamJournalFilters, TeamJournalSummary } from "../types/internshipReports";
 import { getTeamJournalSummary, listAllDailyLogs, listProjects } from "../services/internshipReports.service";
 import { journalCoverageState } from "../types/internshipReports";
+import { t } from "../i18n";
 
 /**
  * The admin-side view of the daily work journal. `useInternshipReportsStore` is
@@ -60,7 +61,7 @@ export const useAdminJournalStore = defineStore("adminJournal", () => {
       summary.value = loadedSummary;
       projects.value = loadedProjects;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Unable to load the work journal.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.loadJournal");
     } finally {
       loading.value = false;
     }

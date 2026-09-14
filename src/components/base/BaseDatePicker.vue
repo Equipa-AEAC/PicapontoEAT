@@ -31,7 +31,13 @@ const emit = defineEmits<{
   padding: 9px 14px;
   background: var(--input);
   color: var(--foreground);
-  color-scheme: dark;
+  /*
+   * No forced `color-scheme` here: the native calendar icon and popup take
+   * their scheme from the inherited value on `:root` (light.css sets it to
+   * `light`, the `[data-theme="dark"]` override sets it to `dark`). Hardcoding
+   * `dark` here — a leftover from when this was the only theme — rendered the
+   * calendar icon white-on-white and invisible in light mode.
+   */
 }
 
 .base-date-picker:focus {

@@ -1,3 +1,11 @@
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
+
 /**
  * Team moments — a lightweight, temporary photo feed of what the team is doing.
  *
@@ -33,17 +41,6 @@ export const MOMENT_IMAGE_MAX_EDGE = 1280;
 export type MomentStatus = "visible" | "reported" | "hidden";
 
 export type MomentReportReason = "inappropriate" | "wrong-person" | "not-work-related" | "other";
-
-export const MOMENT_REPORT_REASON_LABELS: Record<MomentReportReason, string> = {
-  inappropriate: "Inappropriate content",
-  "wrong-person": "Shows someone who did not consent",
-  "not-work-related": "Not related to team work",
-  other: "Other",
-};
-
-export const MOMENT_REPORT_REASON_OPTIONS = (Object.keys(MOMENT_REPORT_REASON_LABELS) as MomentReportReason[]).map(
-  (value) => ({ label: MOMENT_REPORT_REASON_LABELS[value], value }),
-);
 
 export interface MomentReport {
   id: string;

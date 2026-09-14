@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 export interface UploadedFile {
   /** Location the stored image is served from. Persisted on the member record. */
   url: string;
@@ -10,11 +12,11 @@ export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 export function validateImage(file: File): string | null {
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-    return "Use a PNG, JPG or WebP image.";
+    return t("errors.imageFormat");
   }
 
   if (file.size > MAX_IMAGE_BYTES) {
-    return "The image must be 2 MB or smaller.";
+    return t("errors.imageTooLarge");
   }
 
   return null;
@@ -25,11 +27,11 @@ export const ACCEPTED_DOCUMENT_TYPES = ["application/pdf"];
 
 export function validateDocument(file: File): string | null {
   if (!ACCEPTED_DOCUMENT_TYPES.includes(file.type)) {
-    return "Use a PDF document.";
+    return t("errors.documentFormat");
   }
 
   if (file.size > MAX_DOCUMENT_BYTES) {
-    return "The document must be 5 MB or smaller.";
+    return t("errors.documentTooLarge");
   }
 
   return null;
@@ -39,7 +41,7 @@ function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Unable to read the selected file."));
+    reader.onerror = () => reject(new Error(t("errors.fileUnreadable")));
     reader.readAsDataURL(file);
   });
 }

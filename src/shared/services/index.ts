@@ -16,3 +16,7 @@ export * from "../../services/members.service";
 export * from "../../services/users.service";
 export * from "../../services/attendanceCorrections.service";
 export * from "../../services/participation.service";
+export * from "../../services/calendarEvents.service";
+export * from "../../services/certificates.service";
+export * from "../../services/profileChangeRequests.service";
+export * from "../../services/uploads.service";

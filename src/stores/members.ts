@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import type { MemberAttendanceHistoryFilters, MemberAttendanceHistoryItem, MemberDetails, MemberFilters, MemberFormValues, MemberInternshipSummary, MemberSummary } from "../types/members";
 import { assignMemberCard, deleteMember, getMemberById, getMemberInternship, listMemberAttendanceHistory, listMembers, saveMember } from "../services/members.service";
+import { t } from "../i18n";
 
 export const useMembersStore = defineStore("members", () => {
   const items = ref<MemberSummary[]>([]);
@@ -31,7 +32,7 @@ export const useMembersStore = defineStore("members", () => {
     try {
       attendanceHistory.value = await listMemberAttendanceHistory(memberId, filters);
     } catch (loadError) {
-      error.value = loadError instanceof Error ? loadError.message : "Unable to load attendance history.";
+      error.value = loadError instanceof Error ? loadError.message : t("common.feedback.loadAttendanceHistory");
     } finally {
       loadingDetails.value = false;
     }
@@ -45,7 +46,7 @@ export const useMembersStore = defineStore("members", () => {
       const response = await listMembers(filters.value);
       items.value = response.items;
     } catch (loadError) {
-      error.value = loadError instanceof Error ? loadError.message : "Unable to load members.";
+      error.value = loadError instanceof Error ? loadError.message : t("common.feedback.loadMembers");
     } finally {
       loading.value = false;
     }
@@ -57,7 +58,7 @@ export const useMembersStore = defineStore("members", () => {
       const response = await listMembers({});
       allMembers.value = response.items;
     } catch (loadError) {
-      error.value = loadError instanceof Error ? loadError.message : "Unable to load members.";
+      error.value = loadError instanceof Error ? loadError.message : t("common.feedback.loadMembers");
     }
   }
 

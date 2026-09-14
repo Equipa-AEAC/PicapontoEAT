@@ -16,12 +16,24 @@ import type {
   TaskFormValues,
   TaskStatus,
 } from "../types/projects";
-import { TASK_STATUS_LABELS, TASK_STATUS_ORDER, UNASSIGNED_ASSIGNEE } from "../types/projects";
+import { TASK_STATUS_ORDER, UNASSIGNED_ASSIGNEE } from "../types/projects";
+import type { MemberProjectRights } from "../types/projectPermissions";
+import {
+  assignmentTouchesOthers,
+  memberCanEditTask,
+  memberCanRemoveTask,
+  memberProjectRights,
+  resolveAssigneeIds,
+  toAccessShape,
+  toOwnershipShape,
+} from "../types/projectPermissions";
 import type { UserRole } from "../types/users";
 
+import { appendAuditLog } from "./audit.service";
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { formatDueLabel, todayIsoDate } from "../utils/date";
+import { t } from "../i18n";
 
 /**
  * Project management data access.
@@ -42,6 +54,31 @@ export interface ProjectActor {
   id: string | null;
   name: string;
 }
+
+/**
+ * English names for the statuses, used only for the `summary` written into an
+ * activity or audit row.
+ *
+ * The interface never reads these - it renders `messageKey` through the active
+ * language. They exist so a stored record and an export still say something in
+ * the project's development language rather than a bare enum member, which is
+ * the same role this text will have once a real backend writes it.
+ */
+const EN_TASK_STATUS: Record<TaskStatus, string> = {
+  todo: "To do",
+  "in-progress": "In progress",
+  blocked: "Blocked",
+  review: "In review",
+  done: "Done",
+};
+
+const EN_PROJECT_STATUS: Record<string, string> = {
+  planned: "Planned",
+  active: "Active",
+  paused: "Paused",
+  done: "Completed",
+  archived: "Archived",
+};
 
 const DUE_SOON_DAYS = 7;
 const RECENT_ACTIVITY_LIMIT = 12;
@@ -78,11 +115,18 @@ function daysUntil(date: string | null): number | null {
 
 /* ------------------------------------------------------------- Participants */
 
-const STAFF_ROLE_LABELS: Record<UserRole, string> = {
-  administrator: "Administrator",
-  coordinator: "Coordinator",
-  teacher: "Teacher",
-  viewer: "Viewer",
+/*
+ * A participant's standing is recorded as a translation key, not as a word.
+ *
+ * The service has no language: it knows this person is an intern, not how to
+ * write "intern" for whoever is looking. The view translates it - see
+ * `i18n/vocabulary.ts`.
+ */
+const STAFF_ROLE_KEYS: Record<UserRole, string> = {
+  administrator: "projects.participantRole.administrator",
+  coordinator: "projects.participantRole.coordinator",
+  teacher: "projects.participantRole.teacher",
+  viewer: "projects.participantRole.viewer",
 };
 
 /**
@@ -97,7 +141,10 @@ function buildParticipants(): ProjectParticipant[] {
     id: member.id,
     name: member.fullName,
     source: "member",
-    role: member.internshipStatus === "not-assigned" ? "Team member" : "Intern",
+    role:
+      member.internshipStatus === "not-assigned"
+        ? "projects.participantRole.teamMember"
+        : "projects.participantRole.intern",
     isExternal: member.isExternal,
   }));
 
@@ -107,7 +154,7 @@ function buildParticipants(): ProjectParticipant[] {
       id: user.id,
       name: user.fullName,
       source: "user",
-      role: STAFF_ROLE_LABELS[user.role],
+      role: STAFF_ROLE_KEYS[user.role],
       isExternal: false,
     }));
 
@@ -128,12 +175,48 @@ export async function listProjectParticipants(): Promise<ProjectParticipant[]> {
 
 /* ---------------------------------------------------------------- Activity */
 
+/**
+ * Which project events also belong in the system-wide audit trail.
+ *
+ * The two records answer different questions and must not be collapsed into
+ * one. The per-project timeline is the story of a project and wants everything,
+ * including every drag across the board. The audit trail is what somebody is
+ * asked to produce when a decision is questioned, and a page of "Moved X to In
+ * progress" would bury the entries that matter — so status moves and field edits
+ * on a task stay in the timeline only.
+ *
+ * What reaches the audit log is the set of acts with consequences outside the
+ * board: a project existing, changing, being archived or restored, and work
+ * being created, assigned or taken off the board.
+ */
+const AUDITED_PROJECT_EVENTS = new Set<ProjectActivityKind>([
+  "project-created",
+  "project-updated",
+  "project-archived",
+  "project-restored",
+  "task-created",
+  "task-assigned",
+  "task-archived",
+  "member-assigned",
+  "member-removed",
+]);
+
+/**
+ * Append one event to a project's timeline.
+ *
+ * `summary` is the English sentence and is what a stored record or an export
+ * carries; `messageKey` plus `params` is the same sentence in a form the
+ * interface can render in whichever language is on screen. Both are written,
+ * because the feed is read for a whole school year and the language it is read
+ * in is not the language it was written in.
+ */
 function recordActivity(
   projectId: string,
   kind: ProjectActivityKind,
   summary: string,
   actor: ProjectActor,
   taskId: string | null = null,
+  message: { key: string; params: Record<string, string> } | null = null,
 ) {
   mockDatabase.projectActivity.push({
     id: nextId("pac", mockDatabase.projectActivity),
@@ -141,9 +224,29 @@ function recordActivity(
     taskId,
     kind,
     summary,
+    messageKey: message?.key ?? null,
+    messageParams: message?.params ?? null,
     actorId: actor.id,
     actorName: actor.name,
     createdAt: nowIso(),
+  });
+
+  if (!AUDITED_PROJECT_EVENTS.has(kind)) {
+    return;
+  }
+
+  const projectName = mockDatabase.projects.find((item) => item.id === projectId)?.name ?? projectId;
+
+  /*
+   * Reuses `appendAuditLog` rather than writing to `auditLogs` directly, so
+   * project entries are indistinguishable in shape from every other audited
+   * decision and the Audit page's filters pick them up with no special case.
+   */
+  appendAuditLog({
+    userName: actor.name,
+    action: kind.endsWith("-created") ? "CREATE" : kind.endsWith("-archived") ? "DELETE" : "UPDATE",
+    entity: kind.startsWith("task-") ? "project-task" : "project",
+    description: `${projectName}: ${summary}.`,
   });
 }
 
@@ -285,22 +388,49 @@ export async function saveProject(values: ProjectFormValues, actor: ProjectActor
       const addedMembers = values.memberIds.filter((id) => !existing.memberIds.includes(id));
       const removedMembers = existing.memberIds.filter((id) => !values.memberIds.includes(id));
 
+      const statusChanged = existing.status !== values.status;
+      const previousStatus = existing.status;
+
       Object.assign(existing, {
         ...values,
         owner: owner?.name ?? existing.owner,
         updatedAt: nowIso(),
       });
 
-      recordActivity(existing.id, "project-updated", "Updated the project details", actor);
+      /*
+       * A status change is the one project edit somebody asks about later, so it
+       * is named in the summary rather than folded into "updated the details".
+       */
+      recordActivity(
+        existing.id,
+        "project-updated",
+        statusChanged
+          ? `Status changed from ${EN_PROJECT_STATUS[previousStatus]} to ${EN_PROJECT_STATUS[values.status]}`
+          : "Updated the project details",
+        actor,
+        null,
+        statusChanged
+          ? {
+              key: "projects.activity.projectStatusChanged",
+              params: { fromStatus: previousStatus, toStatus: values.status },
+            }
+          : { key: "projects.activity.projectUpdated", params: {} },
+      );
 
       if (addedMembers.length > 0) {
         const names = addedMembers.map((id) => participantById(id)?.name ?? id).join(", ");
-        recordActivity(existing.id, "member-assigned", `Added ${names} to the project`, actor);
+        recordActivity(existing.id, "member-assigned", `Added ${names} to the project`, actor, null, {
+          key: "projects.activity.memberAssigned",
+          params: { names },
+        });
       }
 
       if (removedMembers.length > 0) {
         const names = removedMembers.map((id) => participantById(id)?.name ?? id).join(", ");
-        recordActivity(existing.id, "member-removed", `Removed ${names} from the project`, actor);
+        recordActivity(existing.id, "member-removed", `Removed ${names} from the project`, actor, null, {
+          key: "projects.activity.memberRemoved",
+          params: { names },
+        });
       }
 
       return cloneRecord(existing);
@@ -316,7 +446,10 @@ export async function saveProject(values: ProjectFormValues, actor: ProjectActor
     };
 
     mockDatabase.projects.push(created);
-    recordActivity(created.id, "project-created", "Created the project", actor);
+    recordActivity(created.id, "project-created", "Created the project", actor, null, {
+      key: "projects.activity.projectCreated",
+      params: {},
+    });
 
     return cloneRecord(created);
   });
@@ -337,7 +470,10 @@ export async function archiveProject(projectId: string, actor: ProjectActor): Pr
     project.status = "archived";
     project.archivedAt = nowIso();
     project.updatedAt = project.archivedAt;
-    recordActivity(project.id, "project-archived", "Archived the project", actor);
+    recordActivity(project.id, "project-archived", "Archived the project", actor, null, {
+      key: "projects.activity.projectArchived",
+      params: {},
+    });
 
     return cloneRecord(project);
   });
@@ -354,7 +490,10 @@ export async function restoreProject(projectId: string, actor: ProjectActor): Pr
     project.status = "active";
     project.archivedAt = null;
     project.updatedAt = nowIso();
-    recordActivity(project.id, "project-restored", "Restored the project from the archive", actor);
+    recordActivity(project.id, "project-restored", "Restored the project from the archive", actor, null, {
+      key: "projects.activity.projectRestored",
+      params: {},
+    });
 
     return cloneRecord(project);
   });
@@ -424,7 +563,6 @@ export async function getProjectBoard(projectId: string): Promise<ProjectBoardCo
 
     const columns = TASK_STATUS_ORDER.map((status) => ({
       status,
-      label: TASK_STATUS_LABELS[status],
       tasks: tasks.filter((task) => task.status === status).sort((first, second) => first.order - second.order),
     }));
 
@@ -449,12 +587,16 @@ export async function saveTask(values: TaskFormValues, actor: ProjectActor, task
         recordActivity(
           existing.projectId,
           "task-status-changed",
-          `Moved "${existing.title}" to ${TASK_STATUS_LABELS[existing.status]}`,
+          `Moved "${existing.title}" to ${EN_TASK_STATUS[existing.status]}`,
           actor,
           existing.id,
+          { key: "projects.activity.taskStatusChanged", params: { title: existing.title, status: existing.status } },
         );
       } else {
-        recordActivity(existing.projectId, "task-updated", `Updated "${existing.title}"`, actor, existing.id);
+        recordActivity(existing.projectId, "task-updated", `Updated "${existing.title}"`, actor, existing.id, {
+          key: "projects.activity.taskUpdated",
+          params: { title: existing.title },
+        });
       }
 
       if (assigneesChanged) {
@@ -465,6 +607,9 @@ export async function saveTask(values: TaskFormValues, actor: ProjectActor, task
           names ? `Assigned "${existing.title}" to ${names}` : `Unassigned "${existing.title}"`,
           actor,
           existing.id,
+          names
+            ? { key: "projects.activity.taskAssigned", params: { title: existing.title, names } }
+            : { key: "projects.activity.taskUnassigned", params: { title: existing.title } },
         );
       }
 
@@ -480,6 +625,7 @@ export async function saveTask(values: TaskFormValues, actor: ProjectActor, task
       ...values,
       createdAt: nowIso(),
       createdBy: actor.name,
+      createdById: actor.id,
       updatedAt: null,
       completedAt: values.status === "done" ? nowIso() : null,
       archivedAt: null,
@@ -487,7 +633,10 @@ export async function saveTask(values: TaskFormValues, actor: ProjectActor, task
     };
 
     mockDatabase.projectTasks.push(created);
-    recordActivity(created.projectId, "task-created", `Created "${created.title}"`, actor, created.id);
+    recordActivity(created.projectId, "task-created", `Created "${created.title}"`, actor, created.id, {
+      key: "projects.activity.taskCreated",
+      params: { title: created.title },
+    });
     touchProject(created.projectId);
 
     return cloneRecord(created);
@@ -521,9 +670,10 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus, actor
     recordActivity(
       task.projectId,
       "task-status-changed",
-      `Moved "${task.title}" to ${TASK_STATUS_LABELS[status]}`,
+      `Moved "${task.title}" to ${EN_TASK_STATUS[status]}`,
       actor,
       task.id,
+      { key: "projects.activity.taskStatusChanged", params: { title: task.title, status } },
     );
     touchProject(task.projectId);
 
@@ -549,6 +699,9 @@ export async function assignTask(taskId: string, assigneeIds: string[], actor: P
       names ? `Assigned "${task.title}" to ${names}` : `Unassigned "${task.title}"`,
       actor,
       task.id,
+      names
+        ? { key: "projects.activity.taskAssigned", params: { title: task.title, names } }
+        : { key: "projects.activity.taskUnassigned", params: { title: task.title } },
     );
     touchProject(task.projectId);
 
@@ -567,7 +720,10 @@ export async function archiveTask(taskId: string, actor: ProjectActor): Promise<
 
     task.archivedAt = nowIso();
     task.updatedAt = task.archivedAt;
-    recordActivity(task.projectId, "task-archived", `Archived "${task.title}"`, actor, task.id);
+    recordActivity(task.projectId, "task-archived", `Archived "${task.title}"`, actor, task.id, {
+      key: "projects.activity.taskArchived",
+      params: { title: task.title },
+    });
     touchProject(task.projectId);
   });
 }
@@ -658,7 +814,6 @@ export async function getProjectOverview(): Promise<ProjectOverview> {
       unassignedTasks: tasks.filter((task) => task.status !== "done" && task.assigneeIds.length === 0).length,
       statusBreakdown: TASK_STATUS_ORDER.map((status) => ({
         status,
-        label: TASK_STATUS_LABELS[status],
         count: tasks.filter((task) => task.status === status).length,
       })),
       recentActivity: [...mockDatabase.projectActivity]
@@ -683,3 +838,299 @@ export async function listTasksForParticipant(participantId: string): Promise<Pr
     ),
   );
 }
+
+/**
+ * Everything one member can see of the project workspace.
+ *
+ * The student side is not a smaller copy of the admin board: it is the same
+ * records narrowed to the person looking at them. `listProjects` already filters
+ * by participant, so this reuses it rather than re-implementing the membership
+ * rule — the two must agree about what "on a project" means or the Student
+ * Projects page and the admin Team page will disagree about the same person.
+ *
+ * Tasks include completed ones here, unlike `listTasksForParticipant`, because a
+ * project view that hides finished work cannot show progress.
+ *
+ * BACKEND CONTRACT: `memberId` comes from the client. The API must take it from
+ * the session and refuse a request for anybody else's workspace — filtering in
+ * the browser is presentation, not authorization.
+ */
+export async function getMemberProjectWorkspace(memberId: string): Promise<{
+  projects: ProjectSummary[];
+  tasks: ProjectTaskSummary[];
+  /** What the member may do on each project, keyed by project id. */
+  rights: Record<string, MemberProjectRights>;
+}> {
+  return mockRequest(() => {
+    const projects = mockDatabase.projects
+      .filter(
+        (project) =>
+          (project.ownerId === memberId || project.memberIds.includes(memberId)) &&
+          project.status !== "archived" &&
+          !project.archivedAt,
+      )
+      .map(toProjectSummary);
+
+    const projectIds = new Set(projects.map((project) => project.id));
+
+    /*
+     * A task assigned to the member counts even when its project does not list
+     * them as a participant — being given work is itself a relationship to the
+     * project, and hiding it would leave a task on their list with no context.
+     */
+    const tasks = liveTasks()
+      .filter((task) => task.assigneeIds.includes(memberId))
+      .map(toTaskSummary);
+
+    for (const task of tasks) {
+      if (!projectIds.has(task.projectId)) {
+        const project = mockDatabase.projects.find((item) => item.id === task.projectId);
+
+        if (project && !project.archivedAt) {
+          projects.push(toProjectSummary(project));
+          projectIds.add(project.id);
+        }
+      }
+    }
+
+    projects.sort((first, second) => (second.lastActivityAt ?? "").localeCompare(first.lastActivityAt ?? ""));
+    tasks.sort((first, second) => (first.dueDate ?? "9999").localeCompare(second.dueDate ?? "9999"));
+
+    /*
+     * Rights travel with the list, not just with the project page. My tasks
+     * renders an Edit button next to work on five different projects, and the
+     * answer differs per project - the member may lead one and merely take part
+     * in another.
+     */
+    const rights: Record<string, MemberProjectRights> = {};
+
+    for (const project of projects) {
+      rights[project.id] = getMemberProjectRights(memberId, project.id);
+    }
+
+    return cloneRecord({ projects, tasks, rights });
+  });
+}
+
+/* ------------------------------------------------- Member-scoped access */
+
+/**
+ * What one member may do on one project.
+ *
+ * `types/projectPermissions.ts` states the rules; this resolves the inputs they
+ * need out of the database. Everything member-facing below goes through it, so
+ * the rights the interface renders and the rights the writes enforce are the
+ * same object computed the same way.
+ */
+export function getMemberProjectRights(memberId: string, projectId: string): MemberProjectRights {
+  const project = mockDatabase.projects.find((item) => item.id === projectId);
+
+  if (!project || project.archivedAt || project.status === "archived") {
+    return memberProjectRights(memberId, null);
+  }
+
+  const holdsTask = liveTasks(projectId).some((task) => task.assigneeIds.includes(memberId));
+
+  return memberProjectRights(memberId, toAccessShape(project), holdsTask);
+}
+
+/**
+ * Whether one member is entitled to open one project.
+ *
+ * A member belongs to a project by being its owner, by being on its participant
+ * list, or by holding a task on its board - the same three relationships
+ * `getMemberProjectWorkspace` uses, stated once so the list a student sees and
+ * the project they may open cannot disagree.
+ *
+ * Archived projects are excluded: they are history, and the student workspace
+ * has no restore action to offer.
+ */
+export function memberCanAccessProject(memberId: string, projectId: string): boolean {
+  return getMemberProjectRights(memberId, projectId).canOpen;
+}
+
+/**
+ * One project as a member may see it: the record, its board, its people, its
+ * timeline, and what this member is allowed to do with them.
+ *
+ * This **refuses** rather than returning an empty board when the member is not
+ * on the project. Returning nothing would be indistinguishable from a project
+ * with no tasks, and the page would show an empty board for somebody else's work.
+ *
+ * BACKEND CONTRACT: the refusal below runs in the browser against a `memberId`
+ * the client supplies, which makes it a correctness guard, not authorization.
+ * The API must take the member from the session and apply the same rules
+ * server-side. See docs/ai/BACKEND_CONTRACTS.md - Student project access.
+ */
+export async function getMemberProjectDetail(
+  memberId: string,
+  projectId: string,
+): Promise<{
+  project: ProjectSummary;
+  board: ProjectBoardColumn[];
+  participants: ProjectParticipant[];
+  activity: ProjectActivityEvent[];
+  rights: MemberProjectRights;
+}> {
+  return mockRequest(() => {
+    const rights = getMemberProjectRights(memberId, projectId);
+
+    if (!rights.canOpen) {
+      throw new Error(t("errors.notOnProject"));
+    }
+
+    const project = mockDatabase.projects.find((item) => item.id === projectId)!;
+    const tasks = liveTasks(projectId).map(toTaskSummary);
+
+    const board = TASK_STATUS_ORDER.map((status) => ({
+      status,
+      tasks: tasks.filter((task) => task.status === status).sort((first, second) => first.order - second.order),
+    }));
+
+    /*
+     * Participants are narrowed to the project's own people. A student picking an
+     * assignee should not be shown the entire staff directory - and offering
+     * somebody who is not on the project would create work nobody agreed to.
+     *
+     * Note this is *who exists on the project*, not *who this member may assign*:
+     * a member without `canAssignOthers` is never shown a picker at all. The list
+     * is still needed to render who a task belongs to.
+     */
+    const participants = buildParticipants().filter(
+      (participant) => project.memberIds.includes(participant.id) || project.ownerId === participant.id,
+    );
+
+    return cloneRecord({
+      project: toProjectSummary(project),
+      board,
+      participants,
+      activity: activityFor(projectId).slice(0, RECENT_ACTIVITY_LIMIT),
+      rights,
+    });
+  });
+}
+
+/**
+ * A member creating or editing a task on a project they are on.
+ *
+ * Three separate checks, because they are three separate permissions:
+ *
+ * 1. the member must be on the project the task is going to;
+ * 2. an *edit* is only allowed on a task that is theirs, unless they lead the
+ *    project;
+ * 3. the assignee list is rewritten to what they are actually allowed to send -
+ *    a member who cannot assign others may only add or remove themselves, and
+ *    everybody else's assignment is carried across untouched.
+ *
+ * Step 3 rewrites rather than rejects on purpose. The form never offers the
+ * control, so a payload that touches other people is either a stale client or a
+ * hand-made request; silently preserving the truth is better than failing a save
+ * the member had no way to understand.
+ */
+export async function saveMemberTask(
+  memberId: string,
+  values: TaskFormValues,
+  actor: ProjectActor,
+  taskId?: string,
+): Promise<ProjectTask> {
+  const rights = getMemberProjectRights(memberId, values.projectId);
+
+  if (!rights.canOpen) {
+    throw new Error(t("errors.notOnProject"));
+  }
+
+  const existing = taskId ? mockDatabase.projectTasks.find((task) => task.id === taskId) : undefined;
+
+  if (taskId) {
+    if (!existing || !memberCanAccessProject(memberId, existing.projectId)) {
+      throw new Error(t("errors.taskNotYours"));
+    }
+
+    if (!memberCanEditTask(rights, memberId, toOwnershipShape(existing))) {
+      throw new Error(t("errors.taskEditOwnOnly"));
+    }
+  }
+
+  if (!rights.canCreateTask && !existing) {
+    throw new Error(t("errors.notOnProject"));
+  }
+
+  const assigneeIds = resolveAssigneeIds({
+    rights,
+    memberId,
+    requested: values.assigneeIds,
+    existing: existing?.assigneeIds ?? [],
+  });
+
+  return saveTask({ ...values, assigneeIds }, actor, taskId);
+}
+
+/**
+ * A member moving a task on a board they may see.
+ *
+ * Moving is open to everybody on the project, unlike editing. A board whose
+ * cards only their owner may drag is not a shared board, and a status change is
+ * both reversible and written to the timeline with the member's name on it.
+ */
+export async function moveMemberTaskStatus(
+  memberId: string,
+  taskId: string,
+  status: TaskStatus,
+  actor: ProjectActor,
+): Promise<ProjectTask | null> {
+  const task = mockDatabase.projectTasks.find((item) => item.id === taskId);
+
+  if (!task) {
+    throw new Error(t("errors.taskNotYours"));
+  }
+
+  const rights = getMemberProjectRights(memberId, task.projectId);
+
+  if (!rights.canMoveTasks) {
+    throw new Error(t("errors.taskNotYours"));
+  }
+
+  return updateTaskStatus(taskId, status, actor);
+}
+
+/**
+ * A member removing a task.
+ *
+ * Archived, not deleted - the same rule the admin workspace follows, so a task
+ * removed by a student is recoverable by staff rather than gone. Allowed on the
+ * member's own tasks; anybody else's needs the project owner or a task
+ * coordinator, because withdrawing work somebody is relying on is not a
+ * participant's decision to make.
+ */
+export async function archiveMemberTask(
+  memberId: string,
+  taskId: string,
+  actor: ProjectActor,
+): Promise<void> {
+  const task = mockDatabase.projectTasks.find((item) => item.id === taskId);
+
+  if (!task) {
+    throw new Error(t("errors.taskNotYours"));
+  }
+
+  const rights = getMemberProjectRights(memberId, task.projectId);
+
+  if (!rights.canOpen) {
+    throw new Error(t("errors.taskNotYours"));
+  }
+
+  if (!memberCanRemoveTask(rights, memberId, toOwnershipShape(task))) {
+    throw new Error(t("errors.taskRemoveOwnOnly"));
+  }
+
+  return archiveTask(taskId, actor);
+}
+
+/**
+ * Assignment guard for callers outside the board.
+ *
+ * Exported so the store can answer "would this change touch somebody else?"
+ * without duplicating the comparison. Re-exported from the permission module
+ * rather than reimplemented, for the usual reason.
+ */
+export { assignmentTouchesOthers };

@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type {
   MemberParticipationHours,
   ParticipationKind,
@@ -82,32 +83,32 @@ export function validatePeriod(
   candidate: ParticipationPeriod,
 ): string | null {
   if (!candidate.startDate) {
-    return "A participation period needs a start date.";
+    return t("errors.periodNeedsStart");
   }
 
   if (candidate.endDate !== null && candidate.endDate < candidate.startDate) {
-    return "The end date is before the start date.";
+    return t("errors.endBeforeStart");
   }
 
   if (candidate.kind === "internship" && !candidate.internshipId) {
-    return "An internship period has to name the internship it covers.";
+    return t("errors.periodNeedsInternship");
   }
 
   if (candidate.kind !== "internship" && candidate.internshipId) {
-    return "Only an internship period can reference an internship.";
+    return t("errors.onlyInternshipPeriodRefs");
   }
 
   const others = periods.filter((period) => period.id !== candidate.id);
 
   if (candidate.endDate === null && others.some((period) => period.endDate === null)) {
-    return "This member already has an open period. Close it before opening another.";
+    return t("errors.periodAlreadyOpen");
   }
 
   const clash = findOverlap(periods, candidate);
 
   if (clash) {
     const range = `${clash.startDate} to ${clash.endDate ?? "now"}`;
-    return `That overlaps an existing period (${range}). Periods cannot cover the same day twice.`;
+    return t("errors.periodOverlaps", { range });
   }
 
   return null;

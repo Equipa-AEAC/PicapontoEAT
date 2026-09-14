@@ -1,7 +1,49 @@
+import { t } from "../i18n";
+
 import type { Project, ProjectStatus } from "./projects";
 
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
 export type DailyLogStatus = "draft" | "submitted";
-export type ReportStatus = "draft" | "submitted" | "approved";
+
+/**
+ * The lifecycle of an internship report.
+ *
+ * Four states, and the rule that gives them meaning: **a draft is editable and
+ * nothing else is**. `rejected` exists so a reviewer can return work rather than
+ * only refuse it — a rejected report explains what to change and the student
+ * reopens it, which moves it back to `draft`. Without that state, "no" was
+ * terminal and the only way forward was to start again.
+ */
+export type ReportStatus = "draft" | "submitted" | "approved" | "rejected";
+
+export const REPORT_STATUS_TONES: Record<ReportStatus, "warning" | "info" | "success" | "danger"> = {
+  draft: "warning",
+  submitted: "info",
+  approved: "success",
+  rejected: "danger",
+};
+
+/** The one rule every report surface asks about. Stated once so it cannot drift. */
+export function reportIsEditable(status: ReportStatus): boolean {
+  return status === "draft";
+}
+
+/**
+ * Whether a student may reopen this report and work on it again.
+ *
+ * Only a returned report. An approved one is finished, and a submitted one is
+ * somebody else's turn — reopening it under a reviewer mid-decision is how two
+ * people end up editing the same document.
+ */
+export function reportCanBeReopened(status: ReportStatus): boolean {
+  return status === "rejected";
+}
 
 /*
  * `Project` used to be declared here as the minimal record a daily entry could be
@@ -116,6 +158,14 @@ export interface MonthlyReport {
   status: ReportStatus;
   generatedAt: string;
   submittedAt: string | null;
+  /**
+   * The reviewer's decision, kept alongside the report rather than in a separate
+   * queue: a student reading "Returned for revision" needs the reason in the same
+   * place, and a reviewer reopening the record needs to see what was said last time.
+   */
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewNote: string;
 }
 
 export interface MonthlyReportDraft {
@@ -135,6 +185,17 @@ export interface MonthlyReportDraft {
  */
 export interface FinalReport {
   studentId: string;
+  /**
+   * The stretch of the placement the report covers.
+   *
+   * A final report is a document about a period, and the FCT document set asks
+   * for that period on its cover. It was absent, which meant a report generated
+   * from the journal silently covered "everything ever written" — including
+   * volunteer entries from before the placement began. Defaults to the
+   * internship's own start and end dates and can be narrowed.
+   */
+  periodStart: string;
+  periodEnd: string;
   companyCharacterization: string;
   activitiesPerformed: string;
   difficulties: string;
@@ -144,9 +205,14 @@ export interface FinalReport {
   status: ReportStatus;
   updatedAt: string | null;
   submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewNote: string;
 }
 
 export interface FinalReportFormValues {
+  periodStart: string;
+  periodEnd: string;
   companyCharacterization: string;
   activitiesPerformed: string;
   difficulties: string;
@@ -206,7 +272,7 @@ export function journalCoverageState(
   const stale = daysSinceLastEntry === null || daysSinceLastEntry > JOURNAL_GAP_DAYS;
 
   if (!stale) {
-    return { obligation, isBehind: false, label: "Up to date", tone: "success" };
+    return { obligation, isBehind: false, label: t("admin.reports.coverageUpToDate"), tone: "success" };
   }
 
   if (obligation === "recommended") {
@@ -214,7 +280,10 @@ export function journalCoverageState(
     return {
       obligation,
       isBehind: false,
-      label: daysSinceLastEntry === null ? "Not writing" : "Quiet",
+      label:
+        daysSinceLastEntry === null
+          ? t("admin.reports.coverageNotWriting")
+          : t("admin.reports.coverageQuiet"),
       tone: "info",
     };
   }
@@ -222,7 +291,43 @@ export function journalCoverageState(
   return {
     obligation,
     isBehind: true,
-    label: daysSinceLastEntry === null ? "No journal" : "Behind",
+    label:
+      daysSinceLastEntry === null ? t("admin.reports.coverageNoJournal") : t("admin.reports.coverageBehind"),
     tone: daysSinceLastEntry === null ? "danger" : "warning",
   };
+}
+
+/* ----------------------------------------------------- Admin review views */
+
+/**
+ * A monthly report joined with the member who wrote it.
+ *
+ * The admin Reports page reviews work across the whole roster, and a report row
+ * without a name on it is not reviewable. The member is looked up at read time
+ * rather than copied onto the record, for the same reason
+ * `AttendanceCorrectionRequestSummary` does it: a renamed member must not leave
+ * an old name frozen in a queue.
+ */
+export interface MonthlyReportSummary extends MonthlyReport {
+  memberName: string;
+  memberIsExternal: boolean;
+  originSchool: string;
+}
+
+export interface FinalReportSummary extends FinalReport {
+  memberName: string;
+  memberIsExternal: boolean;
+  originSchool: string;
+}
+
+/** Narrowing for the reviewer's queues. */
+export interface ReportReviewFilters {
+  status: ReportStatus | "all";
+  memberId: string | "all";
+}
+
+/** What a reviewer decides. `rejected` returns the report to the student to redo. */
+export interface ReportReviewValues {
+  decision: "approved" | "rejected";
+  note: string;
 }

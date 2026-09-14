@@ -1,10 +1,11 @@
 import type { ReportExportFormat, ReportFilterValues, ReportPreview, ReportSummary } from "../types/reports";
-import { REPORT_TYPE_LABELS } from "../types/reports";
 
 import { mockDatabase } from "./mockDatabase";
 import { mockRequest } from "./mockTransport";
 import { computeParticipationHours } from "./participation.service";
 import { todayIsoDate } from "../utils/date";
+import { t } from "../i18n";
+import { reportTypeLabel } from "../i18n/vocabulary";
 
 /** Inclusive `YYYY-MM-DD` bounds; either end may be null. */
 type DateRange = [string | null, string | null];
@@ -104,8 +105,11 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
   return mockRequest(() => {
     const noRange = filters.dateRange[0] === null && filters.dateRange[1] === null;
     const rangeSubtitle = noRange
-      ? "All recorded data"
-      : `${filters.dateRange[0] ?? "start"} to ${filters.dateRange[1] ?? "end"}`;
+      ? t("admin.reportPreview.allData")
+      : t("admin.reportPreview.range", {
+          from: filters.dateRange[0] ?? t("admin.reportPreview.rangeStart"),
+          to: filters.dateRange[1] ?? t("admin.reportPreview.rangeEnd"),
+        });
 
     const scopedMembers =
       filters.studentId === "all"
@@ -114,11 +118,9 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
 
     if (filters.type === "team-hours") {
       return {
-        title: "Team hours (surplus) report",
+        title: t("admin.reportPreview.teamHoursTitle"),
         subtitle: rangeSubtitle,
-        summary:
-          "Hours that fell inside a Technical Team participation period, creditable to the surplus-hours certificate. " +
-          "Hours a member accrued while on an FCT placement are excluded, even for members who are interns now.",
+        summary: t("admin.reportPreview.teamHoursSummary"),
         chartData: scopedMembers.map((member) => ({
           label: member.fullName,
           value: computeParticipationHours(member.id, filters.dateRange).teamHours,
@@ -145,10 +147,9 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
       );
 
       return {
-        title: "Project delivery report",
+        title: t("admin.reportPreview.projectTitle"),
         subtitle: rangeSubtitle,
-        summary:
-          "Tasks completed per project, taken from the project boards. Journal hours are reported separately under team hours.",
+        summary: t("admin.reportPreview.projectSummary"),
         chartData: mockDatabase.projects
           .filter((project) => project.status !== "archived")
           .map((project) => ({
@@ -165,11 +166,9 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
           : mockDatabase.internships.filter((internship) => internship.studentId === filters.studentId);
 
       return {
-        title: "Internship (FCT) report",
+        title: t("admin.reportPreview.internshipTitle"),
         subtitle: rangeSubtitle,
-        summary:
-          "Hours that fell inside an FCT internship participation period. Volunteer hours the same member accrued " +
-          "before the placement began are reported separately and never counted here.",
+        summary: t("admin.reportPreview.internshipSummary"),
         chartData: scopedInternships.map((internship) => ({
           label: internship.studentName,
           value: computeParticipationHours(internship.studentId, filters.dateRange).internshipHours,
@@ -190,15 +189,15 @@ export async function previewReport(filters: ReportFilterValues): Promise<Report
     );
 
     return {
-      title: `${REPORT_TYPE_LABELS[filters.type]} report`,
+      title: t("admin.reportPreview.genericTitle", { type: reportTypeLabel(filters.type) }),
       subtitle: rangeSubtitle,
-      summary:
-        `Attendance is counted inside ${noRange ? "the full record" : "the selected period"}. ` +
-        "Members and devices are current totals and are not period-scoped.",
+      summary: t("admin.reportPreview.genericSummary", {
+        scope: noRange ? t("admin.reportPreview.scopeFull") : t("admin.reportPreview.scopeSelected"),
+      }),
       chartData: [
-        { label: "Attendance", value: scopedAttendance.length },
-        { label: "Members", value: scopedMembers.length },
-        { label: "Devices", value: mockDatabase.devices.length },
+        { label: t("admin.reportPreview.seriesAttendance"), value: scopedAttendance.length },
+        { label: t("admin.reportPreview.seriesMembers"), value: scopedMembers.length },
+        { label: t("admin.reportPreview.seriesDevices"), value: mockDatabase.devices.length },
       ],
     };
   });

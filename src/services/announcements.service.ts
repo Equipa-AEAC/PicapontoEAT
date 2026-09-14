@@ -4,12 +4,13 @@ import type { PlacementProgram } from "../types/placements";
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { todayIsoDate } from "../utils/date";
+import { t } from "../i18n";
 
 function findAnnouncement(announcementId: string): AnnouncementSummary {
   const announcement = mockDatabase.announcements.find((item) => item.id === announcementId);
 
   if (!announcement) {
-    throw new Error("Announcement not found.");
+    throw new Error(t("errors.announcementNotFound"));
   }
 
   return announcement;
@@ -152,7 +153,7 @@ export async function markAnnouncementRead(memberId: string, announcementId: str
     const announcement = mockDatabase.announcements.find((item) => item.id === announcementId);
 
     if (!announcement) {
-      throw new Error("That announcement no longer exists.");
+      throw new Error(t("errors.announcementGone"));
     }
 
     const existing = mockDatabase.announcementReads.find(readKey(memberId, announcementId));

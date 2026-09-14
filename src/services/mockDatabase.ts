@@ -1,6 +1,13 @@
 import type { AnnouncementRead, AnnouncementSummary } from "../types/announcements";
 import type { ApplicationSettings } from "../types/settings";
-import type { CertificateTemplate, IssuedCertificate } from "../types/certificates";
+import type {
+  CertificateRequest,
+  CertificateTemplate,
+  IssuedCertificate,
+  SchoolCertificateProfile,
+} from "../types/certificates";
+import type { CalendarEvent } from "../types/calendarEvents";
+import type { ProfileChangeRequest } from "../types/profileChangeRequests";
 import type { AuditLogEntry } from "../types/audit";
 import type { AttendanceSummary } from "../types/attendance";
 import type { DailyLogEntry, FinalReport, MonthlyReport } from "../types/internshipReports";
@@ -19,6 +26,99 @@ export const mockDatabase = {
   /** Blank/letterhead PDFs a certificate is generated from. Uploaded by an admin. */
   certificateTemplates: [] as CertificateTemplate[],
   issuedCertificates: [] as IssuedCertificate[],
+  /**
+   * FCT certificate profiles, one per school an intern can be enrolled at.
+   *
+   * Seeded with the host school so the workflow has something to run against
+   * before anybody configures a partner school. The template is null: a document
+   * has to be uploaded before an FCT certificate can be approved, which is the
+   * refusal `issueCertificate` produces rather than generating an unbranded PDF.
+   */
+  schoolCertificateProfiles: [
+    {
+      id: "scp-1",
+      schoolName: "Escola Secundária Augusto Cabrita",
+      template: null,
+      signatoryName: "Carla Menezes",
+      signatoryRole: "Coordenadora de Cursos Profissionais",
+      notes: "Host school. Also used for interns enrolled here.",
+      updatedAt: "2026-08-01T09:00:00.000Z",
+    },
+  ] as SchoolCertificateProfile[],
+  /** Members asking for a certificate they are eligible for. Approval generates it. */
+  certificateRequests: [] as CertificateRequest[],
+  /** Members asking for a controlled identity field to be changed. */
+  profileChangeRequests: [
+    {
+      id: "pcr-1",
+      memberId: "stu-1002",
+      memberName: "Bruno Carvalho Lima",
+      field: "phone",
+      currentValue: "+55 11 98888-1002",
+      requestedValue: "+351 912 004 118",
+      reason: "I changed carrier over the summer and the old number no longer reaches me.",
+      status: "pending",
+      createdAt: "2026-08-28T10:12:00.000Z",
+      resolvedAt: null,
+      resolvedBy: null,
+      resolutionNote: "",
+      appliedToRecord: false,
+    },
+  ] as ProfileChangeRequest[],
+  /**
+   * Calendar events.
+   *
+   * Deliberately spread across the three visibilities so the rules are visible in
+   * the fixture: one club-wide event everybody sees, one project event only the
+   * people on that project see, and one personal note only its author sees.
+   */
+  calendarEvents: [
+    {
+      id: "evt-1",
+      title: "Equipa Técnica monthly meeting",
+      description: "Progress round-up and workload for the coming month. Lab 3.",
+      date: "2026-09-04",
+      startTime: "14:30",
+      endTime: "16:00",
+      category: "meeting",
+      visibility: "team",
+      projectId: null,
+      authorId: "user-1",
+      authorName: "Carla Menezes",
+      createdAt: "2026-08-20T09:00:00.000Z",
+      updatedAt: null,
+    },
+    {
+      id: "evt-2",
+      title: "Terminal enclosure assembly session",
+      description: "Bring the printed brackets. Continues the work from last week.",
+      date: "2026-09-09",
+      startTime: "09:00",
+      endTime: "12:30",
+      category: "session",
+      visibility: "project",
+      projectId: "prj-1",
+      authorId: "user-2",
+      authorName: "Paulo Rios",
+      createdAt: "2026-08-24T11:20:00.000Z",
+      updatedAt: null,
+    },
+    {
+      id: "evt-3",
+      title: "Draft the monthly balance",
+      description: "Write up August before the review window closes.",
+      date: "2026-09-02",
+      startTime: null,
+      endTime: null,
+      category: "deadline",
+      visibility: "personal",
+      projectId: null,
+      authorId: "stu-1001",
+      authorName: "Ana Beatriz Souza",
+      createdAt: "2026-08-29T18:40:00.000Z",
+      updatedAt: null,
+    },
+  ] as CalendarEvent[],
   members: [
     {
       id: "stu-1001",
@@ -93,6 +193,9 @@ export const mockDatabase = {
       lastScanAt: "2026-07-27T08:54:00.000Z",
       assignedAt: "2026-02-01T08:00:00.000Z",
       replacedByUid: null,
+      registeredAtDeviceId: "dev-1",
+      registeredAtDeviceName: "Terminal A — Main Gate",
+      registeredAt: "2026-02-01T07:55:00.000Z",
     },
     {
       id: "card-2",
@@ -103,6 +206,9 @@ export const mockDatabase = {
       lastScanAt: null,
       assignedAt: null,
       replacedByUid: null,
+      registeredAtDeviceId: "dev-2",
+      registeredAtDeviceName: "Terminal B — Lab 3",
+      registeredAt: "2026-03-14T10:02:00.000Z",
     },
   ] as RfidCardSummary[],
   /*
@@ -2375,6 +2481,7 @@ export const mockDatabase = {
       startDate: "2026-02-17",
       deadline: "2026-09-30",
       memberIds: ["stu-1001", "stu-1003", "user-2"],
+      coordinatorIds: ["stu-1001"],
       createdAt: "2026-02-17T09:00:00.000Z",
       updatedAt: "2026-07-27T16:20:00.000Z",
       archivedAt: null,
@@ -2390,6 +2497,7 @@ export const mockDatabase = {
       startDate: "2026-03-02",
       deadline: null,
       memberIds: ["stu-1001"],
+      coordinatorIds: [],
       createdAt: "2026-03-02T10:00:00.000Z",
       updatedAt: "2026-07-26T12:40:00.000Z",
       archivedAt: null,
@@ -2405,6 +2513,7 @@ export const mockDatabase = {
       startDate: "2026-05-04",
       deadline: "2026-09-30",
       memberIds: ["stu-1002", "stu-1001"],
+      coordinatorIds: [],
       createdAt: "2026-05-04T08:30:00.000Z",
       updatedAt: "2026-07-20T11:05:00.000Z",
       archivedAt: null,
@@ -2420,6 +2529,7 @@ export const mockDatabase = {
       startDate: "2026-09-01",
       deadline: "2026-10-24",
       memberIds: ["stu-1002", "stu-1003"],
+      coordinatorIds: ["stu-1002"],
       createdAt: "2026-07-15T14:00:00.000Z",
       updatedAt: null,
       archivedAt: null,
@@ -2435,6 +2545,7 @@ export const mockDatabase = {
       startDate: "2026-01-12",
       deadline: "2026-03-20",
       memberIds: ["stu-1002"],
+      coordinatorIds: [],
       createdAt: "2026-01-12T09:15:00.000Z",
       updatedAt: "2026-03-18T16:00:00.000Z",
       archivedAt: null,
@@ -2459,6 +2570,7 @@ export const mockDatabase = {
       estimatedHours: 8,
       createdAt: "2026-07-14T09:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-07-27T12:35:00.000Z",
       completedAt: "2026-07-27T12:35:00.000Z",
       archivedAt: null,
@@ -2476,6 +2588,7 @@ export const mockDatabase = {
       estimatedHours: 6,
       createdAt: "2026-07-20T10:30:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-07-27T16:20:00.000Z",
       completedAt: null,
       archivedAt: null,
@@ -2493,6 +2606,7 @@ export const mockDatabase = {
       estimatedHours: 4,
       createdAt: "2026-07-24T15:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-07-26T09:10:00.000Z",
       completedAt: null,
       archivedAt: null,
@@ -2510,6 +2624,7 @@ export const mockDatabase = {
       estimatedHours: 3,
       createdAt: "2026-07-22T11:00:00.000Z",
       createdBy: "Carla Menezes",
+      createdById: "user-1",
       updatedAt: "2026-07-24T15:45:00.000Z",
       completedAt: null,
       archivedAt: null,
@@ -2527,6 +2642,7 @@ export const mockDatabase = {
       estimatedHours: 5,
       createdAt: "2026-07-26T08:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: null,
       completedAt: null,
       archivedAt: null,
@@ -2544,6 +2660,7 @@ export const mockDatabase = {
       estimatedHours: 6,
       createdAt: "2026-06-08T09:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-06-18T16:10:00.000Z",
       completedAt: "2026-06-18T16:10:00.000Z",
       archivedAt: null,
@@ -2561,6 +2678,7 @@ export const mockDatabase = {
       estimatedHours: 10,
       createdAt: "2026-06-22T10:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-07-20T11:05:00.000Z",
       completedAt: null,
       archivedAt: null,
@@ -2578,6 +2696,7 @@ export const mockDatabase = {
       estimatedHours: 4,
       createdAt: "2026-06-22T10:05:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: null,
       completedAt: null,
       archivedAt: null,
@@ -2595,6 +2714,7 @@ export const mockDatabase = {
       estimatedHours: 12,
       createdAt: "2026-07-01T09:30:00.000Z",
       createdBy: "Carla Menezes",
+      createdById: "user-1",
       updatedAt: "2026-07-26T12:40:00.000Z",
       completedAt: null,
       archivedAt: null,
@@ -2612,6 +2732,7 @@ export const mockDatabase = {
       estimatedHours: 3,
       createdAt: "2026-07-05T14:00:00.000Z",
       createdBy: "Carla Menezes",
+      createdById: "user-1",
       updatedAt: null,
       completedAt: null,
       archivedAt: null,
@@ -2629,6 +2750,7 @@ export const mockDatabase = {
       estimatedHours: 4,
       createdAt: "2026-07-15T14:10:00.000Z",
       createdBy: "Carla Menezes",
+      createdById: "user-1",
       updatedAt: null,
       completedAt: null,
       archivedAt: null,
@@ -2646,6 +2768,7 @@ export const mockDatabase = {
       estimatedHours: 2,
       createdAt: "2026-07-15T14:15:00.000Z",
       createdBy: "Carla Menezes",
+      createdById: "user-1",
       updatedAt: null,
       completedAt: null,
       archivedAt: null,
@@ -2663,6 +2786,7 @@ export const mockDatabase = {
       estimatedHours: 6,
       createdAt: "2026-01-20T09:00:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-03-12T15:20:00.000Z",
       completedAt: "2026-03-12T15:20:00.000Z",
       archivedAt: null,
@@ -2680,6 +2804,7 @@ export const mockDatabase = {
       estimatedHours: 1,
       createdAt: "2026-01-20T09:05:00.000Z",
       createdBy: "Paulo Rios",
+      createdById: "user-2",
       updatedAt: "2026-03-18T16:00:00.000Z",
       completedAt: "2026-03-18T16:00:00.000Z",
       archivedAt: null,
@@ -2695,6 +2820,8 @@ export const mockDatabase = {
       taskId: "tsk-1",
       kind: "task-status-changed",
       summary: "Moved \"Assemble the gate terminal enclosures\" to Done",
+      messageKey: "projects.activity.taskStatusChanged",
+      messageParams: { title: "Assemble the gate terminal enclosures", status: "done" },
       actorId: "stu-1001",
       actorName: "Ana Beatriz Souza",
       createdAt: "2026-07-27T12:35:00.000Z",
@@ -2705,6 +2832,8 @@ export const mockDatabase = {
       taskId: "tsk-2",
       kind: "task-updated",
       summary: "Updated \"Flash firmware 1.4.2 onto the lab terminals\"",
+      messageKey: "projects.activity.taskUpdated",
+      messageParams: { title: "Flash firmware 1.4.2 onto the lab terminals" },
       actorId: "stu-1003",
       actorName: "Carolina Mendes Rocha",
       createdAt: "2026-07-27T16:20:00.000Z",
@@ -2715,6 +2844,8 @@ export const mockDatabase = {
       taskId: "tsk-3",
       kind: "task-status-changed",
       summary: "Moved \"Investigate Terminal B dropping off the network mid-flash\" to Blocked",
+      messageKey: "projects.activity.taskStatusChanged",
+      messageParams: { title: "Investigate Terminal B dropping off the network mid-flash", status: "blocked" },
       actorId: "user-2",
       actorName: "Paulo Rios",
       createdAt: "2026-07-26T09:10:00.000Z",
@@ -2725,6 +2856,8 @@ export const mockDatabase = {
       taskId: "tsk-9",
       kind: "task-updated",
       summary: "Updated \"Photograph and tag the lab 3 hardware\"",
+      messageKey: "projects.activity.taskUpdated",
+      messageParams: { title: "Photograph and tag the lab 3 hardware" },
       actorId: "stu-1001",
       actorName: "Ana Beatriz Souza",
       createdAt: "2026-07-26T12:40:00.000Z",
@@ -2735,6 +2868,8 @@ export const mockDatabase = {
       taskId: "tsk-7",
       kind: "task-assigned",
       summary: "Assigned \"Swap the block B floor switch\" to Ana Beatriz Souza, Paulo Rios",
+      messageKey: "projects.activity.taskAssigned",
+      messageParams: { title: "Swap the block B floor switch", names: "Ana Beatriz Souza, Paulo Rios" },
       actorId: "user-2",
       actorName: "Paulo Rios",
       createdAt: "2026-07-20T11:05:00.000Z",
@@ -2745,6 +2880,8 @@ export const mockDatabase = {
       taskId: null,
       kind: "project-created",
       summary: "Created the project",
+      messageKey: "projects.activity.projectCreated",
+      messageParams: {},
       actorId: "user-1",
       actorName: "Carla Menezes",
       createdAt: "2026-07-15T14:00:00.000Z",
@@ -2755,6 +2892,8 @@ export const mockDatabase = {
       taskId: "tsk-14",
       kind: "task-status-changed",
       summary: "Moved \"Retire the old print queues\" to Done",
+      messageKey: "projects.activity.taskStatusChanged",
+      messageParams: { title: "Retire the old print queues", status: "done" },
       actorId: "stu-1002",
       actorName: "Bruno Henrique Costa",
       createdAt: "2026-03-18T16:00:00.000Z",
@@ -2862,11 +3001,42 @@ export const mockDatabase = {
       status: "submitted",
       generatedAt: "2026-07-01T09:00:00.000Z",
       submittedAt: "2026-07-01T10:15:00.000Z",
+      reviewedAt: null,
+      reviewedBy: null,
+      reviewNote: "",
+    },
+    /*
+     * A draft, so the history list has something the student can still open and
+     * finish. Draft monthly reports were unreachable once created — the table
+     * offered only "Submit" — which is what made "Draft" a label rather than a state.
+     */
+    {
+      id: "mr-2",
+      studentId: "stu-1001",
+      month: "2026-07",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-07-31",
+      totalHours: 6,
+      entriesCount: 2,
+      activitiesCompleted: [
+        "Assembled two terminal enclosures and fitted the readers.",
+        "Traced the intermittent fault on the Lab 3 terminal to a loose ribbon cable.",
+      ],
+      activitiesPlanned: ["Finish the terminal enclosure assembly.", "Start the internship dossier."],
+      mainDifficulties: "The replacement ribbon cables did not arrive until the end of the month.",
+      status: "draft",
+      generatedAt: "2026-08-02T08:40:00.000Z",
+      submittedAt: null,
+      reviewedAt: null,
+      reviewedBy: null,
+      reviewNote: "",
     },
   ] as MonthlyReport[],
   finalReports: {
     "stu-1001": {
       studentId: "stu-1001",
+      periodStart: "2026-07-15",
+      periodEnd: "2026-11-30",
       companyCharacterization: "",
       activitiesPerformed: "",
       difficulties: "",
@@ -2876,6 +3046,9 @@ export const mockDatabase = {
       status: "draft",
       updatedAt: null,
       submittedAt: null,
+      reviewedAt: null,
+      reviewedBy: null,
+      reviewNote: "",
     },
   } as Record<string, FinalReport>,
   users: [
@@ -2887,6 +3060,7 @@ export const mockDatabase = {
       status: "active",
       lastLoginAt: "2026-07-27T08:05:00.000Z",
       memberId: null,
+      permissions: null,
     },
     {
       id: "user-2",
@@ -2896,6 +3070,9 @@ export const mockDatabase = {
       status: "active",
       lastLoginAt: "2026-07-26T19:40:00.000Z",
       memberId: null,
+      // An explicit grant on top of the coordinator preset, so the override path
+      // has something real behind it rather than only ever being null.
+      permissions: ["users:update", "users:reset-password", "members:grant-access", "users:create"],
     },
     {
       // Created from a member record, so the roster shows this member as having access.
@@ -2906,6 +3083,7 @@ export const mockDatabase = {
       status: "active",
       lastLoginAt: "2026-07-25T09:12:00.000Z",
       memberId: "stu-1001",
+      permissions: null,
     },
   ] as UserSummary[],
   /*
@@ -3076,7 +3254,7 @@ export const mockDatabase = {
       assignedOrientador: "Prof. L. Santos",
       assignedMonitor: "Eng. R. Ferreira",
     },
-    attendanceToday: "Present",
+    attendanceToday: "present",
     /*
      * `attendanceCalendar` was here: seven fixed July dates with `absent` and
      * `holiday` statuses that are not in `AttendanceStatus`. It was a third copy

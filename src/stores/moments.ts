@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type {
@@ -67,7 +68,7 @@ export const useMomentsStore = defineStore("moments", () => {
   async function loadGallery() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load team moments.", async () => {
+    await withErrorHandling(t("errors.loadMoments"), async () => {
       const [loadedMoments, loadedGroups, loadedSummary] = await Promise.all([
         listMoments(),
         listMomentsByAuthor(),
@@ -84,7 +85,7 @@ export const useMomentsStore = defineStore("moments", () => {
   async function loadModerationQueue() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load the moderation queue.", async () => {
+    await withErrorHandling(t("errors.loadModeration"), async () => {
       const [queue, loadedSummary] = await Promise.all([listMomentsForModeration(), getMomentSummary()]);
       moderationQueue.value = queue;
       summary.value = loadedSummary;
@@ -95,13 +96,13 @@ export const useMomentsStore = defineStore("moments", () => {
 
   /** Downscales and encodes a chosen photo so the form can preview it before posting. */
   async function prepareImage(file: File) {
-    return withErrorHandling("Unable to process that photo.", () => prepareMomentImage(file));
+    return withErrorHandling(t("errors.processPhoto"), () => prepareMomentImage(file));
   }
 
   async function publish(values: MomentFormValues) {
     publishing.value = true;
 
-    const result = await withErrorHandling("Unable to post the moment.", async () => {
+    const result = await withErrorHandling(t("errors.postMoment"), async () => {
       const moment = await publishMoment(values, currentAuthor.value);
       await loadGallery();
       return moment;
@@ -112,28 +113,28 @@ export const useMomentsStore = defineStore("moments", () => {
   }
 
   async function report(momentId: string, reason: MomentReportReason, note: string) {
-    await withErrorHandling("Unable to report the moment.", async () => {
+    await withErrorHandling(t("errors.reportMoment"), async () => {
       await reportMoment(momentId, reason, note, currentAuthor.value);
       await loadGallery();
     });
   }
 
   async function hide(momentId: string) {
-    await withErrorHandling("Unable to hide the moment.", async () => {
+    await withErrorHandling(t("errors.hideMoment"), async () => {
       await setMomentStatus(momentId, "hidden", currentAuthor.value.name);
       await Promise.all([loadModerationQueue(), loadGallery()]);
     });
   }
 
   async function restore(momentId: string) {
-    await withErrorHandling("Unable to restore the moment.", async () => {
+    await withErrorHandling(t("errors.restoreMoment"), async () => {
       await setMomentStatus(momentId, "visible", currentAuthor.value.name);
       await Promise.all([loadModerationQueue(), loadGallery()]);
     });
   }
 
   async function remove(momentId: string) {
-    await withErrorHandling("Unable to remove the moment.", async () => {
+    await withErrorHandling(t("errors.removeMoment"), async () => {
       await deleteMoment(momentId);
       await Promise.all([loadModerationQueue(), loadGallery()]);
     });

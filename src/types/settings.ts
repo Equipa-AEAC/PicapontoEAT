@@ -1,3 +1,11 @@
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
+
 export interface AttendanceSettings {
   duplicateScanTimeoutMinutes: number;
   workingDayStart: string;
@@ -47,16 +55,6 @@ export interface SecuritySettings {
 export type Weekday = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 
 export const WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-export const WEEKDAY_LABELS: Record<Weekday, string> = {
-  monday: "Monday",
-  tuesday: "Tuesday",
-  wednesday: "Wednesday",
-  thursday: "Thursday",
-  friday: "Friday",
-  saturday: "Saturday",
-  sunday: "Sunday",
-};
 
 export interface WorkDaySchedule {
   weekday: Weekday;

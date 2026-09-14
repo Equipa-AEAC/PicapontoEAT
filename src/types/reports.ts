@@ -1,3 +1,11 @@
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
+
 /**
  * `team-hours` reports the volunteer hours members are registered for as Equipa Técnica
  * team members (credited to the surplus-hours certificate). `internship` reports FCT
@@ -6,20 +14,6 @@
  */
 export type ReportType = "attendance" | "team-hours" | "internship" | "project" | "student" | "device";
 export type ReportExportFormat = "pdf" | "excel" | "csv";
-
-export const REPORT_TYPE_LABELS: Record<ReportType, string> = {
-  attendance: "Attendance",
-  "team-hours": "Team hours (surplus)",
-  internship: "Internship (FCT)",
-  project: "Project delivery",
-  student: "Member",
-  device: "Device",
-};
-
-export const REPORT_TYPE_OPTIONS = (Object.keys(REPORT_TYPE_LABELS) as ReportType[]).map((value) => ({
-  label: REPORT_TYPE_LABELS[value],
-  value,
-}));
 
 export interface ReportFilterValues {
   type: ReportType;

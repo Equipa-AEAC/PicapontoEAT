@@ -64,6 +64,29 @@
   --space-9: 48px;
   --space-10: 64px;
 
+  /*
+   * Layout rhythm.
+   *
+   * The raw steps above say *how far*; these say *what for*. Before them the
+   * page frame used four different values with no rule behind them — 24px
+   * between sections, 16px between cards in a grid, 20px inside a card, 16px
+   * under a card header — so nothing lined up and every new page picked one at
+   * random. Naming the four decisions is what makes them consistent, and what
+   * lets the whole product be tightened or loosened in one place.
+   *
+   * They are deliberately close together: this is a dense institutional tool,
+   * and the separation between a card and the next comes mostly from its border,
+   * not from the air around it.
+   */
+  --layout-gap-section: var(--space-5); /* between the sections of a page */
+  --layout-gap-grid: var(--space-4); /* between cards inside one grid */
+  --layout-pad-card: var(--space-5); /* inside a card */
+  --layout-gap-card: var(--space-4); /* header to body, body to footer */
+
+  /* The narrowest a metric or summary card may be before a column is dropped. */
+  --layout-metric-min: 200px;
+  --layout-card-min: 300px;
+
   /* -------------------------------------------------------------- Geometry */
 
   /*
@@ -100,6 +123,8 @@
   --sidebar-width: 264px;
   --sidebar-width-collapsed: 68px;
   --topbar-height: 56px;
+  /* Every interactive control in the topbar is this tall. See layout.css. */
+  --topbar-control-height: 34px;
   --content-max-width: 1600px;
 
   /* ---------------------------------------------------------------- Colour */

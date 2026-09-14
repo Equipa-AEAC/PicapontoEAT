@@ -2,6 +2,7 @@ import { computed, ref, shallowRef } from "vue";
 import { defineStore } from "pinia";
 
 import { getDashboardActivity, getDashboardMetrics } from "../services/dashboard.service";
+import { t } from "../i18n";
 
 export const useDashboardStore = defineStore("dashboard", () => {
   /**
@@ -25,7 +26,7 @@ export const useDashboardStore = defineStore("dashboard", () => {
       metrics.value = metricData;
       activity.value = activityData;
     } catch (loadError) {
-      error.value = loadError instanceof Error ? loadError.message : "Unable to load dashboard data.";
+      error.value = loadError instanceof Error ? loadError.message : t("common.feedback.loadDashboard");
     } finally {
       loading.value = false;
     }

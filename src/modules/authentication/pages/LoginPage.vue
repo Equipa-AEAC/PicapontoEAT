@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 
 import LoginForm from "../components/LoginForm.vue";
 import { useAuthStore } from "../stores/auth";
+import { t } from "../../../i18n";
 import type { LoginPayload } from "../types/auth";
 
 const APP_VERSION = "0.1.0";
@@ -24,7 +25,7 @@ async function handleLogin(payload: LoginPayload) {
 
     router.push({ name: "student-dashboard" });
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Unable to sign in.";
+    errorMessage.value = error instanceof Error ? error.message : t("auth.failed");
   }
 }
 </script>

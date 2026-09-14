@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PhMagnifyingGlass } from "@phosphor-icons/vue";
 import BaseTextInput from "./BaseTextInput.vue";
+import { t } from "../../i18n";
 
 defineProps<{
   modelValue: string;
@@ -17,7 +18,7 @@ const emit = defineEmits<{
     <PhMagnifyingGlass weight="bold" class="base-search-bar__icon" />
     <BaseTextInput
       :modelValue="modelValue"
-      :placeholder="placeholder ?? 'Search'"
+      :placeholder="placeholder ?? t('common.actions.search')"
       class="base-search-bar__input"
       @update:modelValue="emit('update:modelValue', $event)"
     />

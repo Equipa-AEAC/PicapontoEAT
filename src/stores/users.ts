@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import type { PermissionMatrixRow, UserFormValues, UserSummary } from "../types/users";
+import { t } from "../i18n";
 import {
   deactivateUser,
   getPermissionsMatrix,
@@ -50,7 +51,7 @@ export const useUsersStore = defineStore("users", () => {
       await loadUsers();
       return true;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Unable to save the account.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.saveAccount");
       return false;
     } finally {
       saving.value = false;

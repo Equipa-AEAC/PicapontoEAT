@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { t } from "../../i18n";
 
 import {
   BaseFormDialog,
@@ -9,13 +10,9 @@ import {
 } from "../../shared/components/base";
 import type { AttendanceSummary } from "../../shared/types";
 import type { CorrectionRequestFormValues, CorrectionRequestKind } from "../../shared/types";
-import {
-  CORRECTION_KIND_OPTIONS,
-  KINDS_WITH_TIMES,
-  MAX_CORRECTION_REASON_LENGTH,
-  MIN_CORRECTION_REASON_LENGTH,
-} from "../../shared/types";
+import { KINDS_WITH_TIMES, MAX_CORRECTION_REASON_LENGTH, MIN_CORRECTION_REASON_LENGTH } from "../../shared/types";
 import { formatIsoDate } from "../../shared/utils/date";
+import { correctionKindOptions } from "../../i18n/vocabulary";
 
 /**
  * How a member asks for an attendance record to be fixed.
@@ -53,11 +50,11 @@ const localError = computed(() => {
   }
 
   if (needsTimes.value && !suggestedEntry.value && !suggestedExit.value) {
-    return "Give at least one of the times you think are correct.";
+    return t("errors.correctionNeedsATime");
   }
 
   if (suggestedEntry.value && suggestedExit.value && suggestedExit.value <= suggestedEntry.value) {
-    return "The check-out time has to be after the check-in time.";
+    return t("errors.exitBeforeEntry");
   }
 
   return null;
@@ -100,8 +97,9 @@ function submit() {
 <template>
   <BaseFormDialog
     :visible="visible"
-    title="Report an incorrect record"
-    confirm-label="Send request"
+    :title="$t('components.correctionRequest.title')"
+    :confirm-label="$t('components.correctionRequest.confirm')"
+    :cancel-label="$t('common.actions.cancel')"
     :loading="loading"
     :confirm-disabled="!canSubmit"
     @update:visible="emit('update:visible', $event)"
@@ -109,45 +107,52 @@ function submit() {
     @cancel="emit('update:visible', false)"
   >
     <p v-if="record" class="record-recap">
-      You are asking about
-      <strong>{{ formatIsoDate(record.date) }}</strong>, currently recorded as
-      <strong>{{ record.entry ?? 'no check-in' }}</strong> to
-      <strong>{{ record.exit ?? 'no check-out' }}</strong>
+      <i18n-t keypath="components.correctionRequest.recapAbout" tag="span">
+        <template #date>
+          <strong>{{ formatIsoDate(record.date) }}</strong>
+        </template>
+        <template #entry>
+          <strong>{{ record.entry ?? $t("components.correctionRequest.noCheckIn") }}</strong>
+        </template>
+        <template #exit>
+          <strong>{{ record.exit ?? $t("components.correctionRequest.noCheckOut") }}</strong>
+        </template>
+      </i18n-t>
       <template v-if="record.deviceName"> at {{ record.deviceName }}</template>.
     </p>
 
     <label class="field">
-      <span class="field__label type-label">What is wrong?</span>
+      <span class="field__label type-label">{{ $t("components.correctionRequest.whatIsWrong") }}</span>
       <BaseSelect
         :model-value="kind"
-        :options="CORRECTION_KIND_OPTIONS"
+        :options="correctionKindOptions()"
         @update:model-value="kind = $event as CorrectionRequestKind"
       />
     </label>
 
     <div v-if="needsTimes" class="field-row">
       <label class="field">
-        <span class="field__label type-label">Check-in should be</span>
+        <span class="field__label type-label">{{ $t("components.correctionRequest.checkInShouldBe") }}</span>
         <BaseTextInput v-model="suggestedEntry" type="time" />
       </label>
       <label class="field">
-        <span class="field__label type-label">Check-out should be</span>
+        <span class="field__label type-label">{{ $t("components.correctionRequest.checkOutShouldBe") }}</span>
         <BaseTextInput v-model="suggestedExit" type="time" />
       </label>
     </div>
 
     <label class="field">
-      <span class="field__label type-label">What happened?</span>
+      <span class="field__label type-label">{{ $t("components.correctionRequest.whatHappened") }}</span>
       <BaseTextarea
         v-model="reason"
         :rows="4"
-        placeholder="For example: I left at 12:10 but the terminal in Lab 3 did not read my card on the way out."
+        :placeholder="$t('components.correctionRequest.reasonPlaceholder')"
       />
       <span class="field__hint type-meta">
         <template v-if="tooShort">
-          At least {{ MIN_CORRECTION_REASON_LENGTH }} characters — say what actually happened so it can be checked.
+          {{ $t("components.correctionRequest.minimumHint", { count: MIN_CORRECTION_REASON_LENGTH }) }}
         </template>
-        <template v-else>{{ remaining }} characters left</template>
+        <template v-else>{{ $t("common.units.charactersLeft", { count: remaining }) }}</template>
       </span>
     </label>
 
@@ -155,8 +160,7 @@ function submit() {
     <p v-if="errorMessage" class="form-error-banner">{{ errorMessage }}</p>
 
     <p class="type-meta dialog-footnote">
-      Someone from the coordination team reviews this. You will see their answer on this page,
-      whether or not the record is changed.
+      {{ $t("components.correctionRequest.footnote") }}
     </p>
   </BaseFormDialog>
 </template>

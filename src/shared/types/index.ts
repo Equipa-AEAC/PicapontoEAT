@@ -18,4 +18,8 @@ export * from "../../types/theme";
 export * from "../../types/members";
 export * from "../../types/users";
 export * from "../../types/attendanceCorrections";
+export * from "../../types/calendarEvents";
+export * from "../../types/certificates";
+export * from "../../types/profileChangeRequests";
+export * from "../../types/studentPreferences";
 export * from "../../types/participation";

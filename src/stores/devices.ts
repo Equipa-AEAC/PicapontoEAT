@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type { DeviceDetails, DeviceFilters } from "../types/devices";
@@ -22,7 +23,7 @@ export const useDevicesStore = defineStore("devices", () => {
     try {
       items.value = await listDevices(filters.value);
     } catch (error) {
-      errorMessage.value = describeError(error, "Devices could not be loaded.");
+      errorMessage.value = describeError(error, t("errors.loadDevices"));
     } finally {
       loading.value = false;
     }
@@ -37,11 +38,24 @@ export const useDevicesStore = defineStore("devices", () => {
     selectedDevice.value = await getDeviceById(deviceId);
   }
 
+  /**
+   * Returns true when the write succeeded, so the caller can close its dialog.
+   *
+   * The device form validates an IP address and the service refuses a duplicate,
+   * both of which throw. Swallowing that left the dialog closing on a failed save
+   * with nothing written and nothing said.
+   */
   async function persistDevice(values: Parameters<typeof saveDevice>[0], deviceId?: string) {
     saving.value = true;
+    errorMessage.value = null;
+
     try {
       await saveDevice(values, deviceId);
       await loadDevices();
+      return true;
+    } catch (error) {
+      errorMessage.value = describeError(error, t("errors.saveDevice"));
+      return false;
     } finally {
       saving.value = false;
     }

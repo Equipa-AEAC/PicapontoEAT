@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type { AttendanceCorrectionFormValues, AttendanceDetails, AttendanceFilters, AttendanceSummary, ManualAttendanceFormValues } from "../types/attendance";
@@ -29,7 +30,7 @@ export const useAttendanceStore = defineStore("attendance", () => {
     try {
       items.value = await listAttendance(filters.value);
     } catch (error) {
-      errorMessage.value = describe(error, "Attendance could not be loaded.");
+      errorMessage.value = describe(error, t("errors.loadAttendance"));
     } finally {
       loading.value = false;
     }
@@ -41,7 +42,7 @@ export const useAttendanceStore = defineStore("attendance", () => {
     try {
       selectedAttendance.value = await getAttendanceDetails(attendanceId);
     } catch (error) {
-      errorMessage.value = describe(error, "That attendance record could not be loaded.");
+      errorMessage.value = describe(error, t("errors.loadAttendanceRecord"));
     } finally {
       loadingDetails.value = false;
     }
@@ -53,7 +54,7 @@ export const useAttendanceStore = defineStore("attendance", () => {
       await createManualAttendance(values);
       await loadAttendance();
     } catch (error) {
-      errorMessage.value = describe(error, "The attendance record could not be saved.");
+      errorMessage.value = describe(error, t("errors.saveAttendance"));
       throw error;
     } finally {
       saving.value = false;
@@ -67,7 +68,7 @@ export const useAttendanceStore = defineStore("attendance", () => {
       await loadAttendance();
       await loadAttendanceDetails(attendanceId);
     } catch (error) {
-      errorMessage.value = describe(error, "The correction could not be applied.");
+      errorMessage.value = describe(error, t("errors.applyCorrection"));
       throw error;
     } finally {
       saving.value = false;
@@ -80,7 +81,7 @@ export const useAttendanceStore = defineStore("attendance", () => {
       await deleteAttendance(attendanceId);
       await loadAttendance();
     } catch (error) {
-      errorMessage.value = describe(error, "The attendance record could not be removed.");
+      errorMessage.value = describe(error, t("errors.removeAttendance"));
     }
   }
 

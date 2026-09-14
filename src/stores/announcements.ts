@@ -14,6 +14,7 @@ import {
 } from "../services/announcements.service";
 import { countUnreadAnnouncements, listAnnouncementsForMember, markAnnouncementRead } from "../services/announcements.service";
 import type { MemberAnnouncement } from "../types/announcements";
+import { t } from "../i18n";
 
 export const useAnnouncementsStore = defineStore("announcements", () => {
   const items = ref<AnnouncementSummary[]>([]);
@@ -54,7 +55,7 @@ export const useAnnouncementsStore = defineStore("announcements", () => {
       await loadAnnouncements();
       return true;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Unexpected error.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.unexpected");
       return false;
     } finally {
       saving.value = false;
@@ -90,7 +91,7 @@ export const useAnnouncementsStore = defineStore("announcements", () => {
       mine.value = await listAnnouncementsForMember(memberId, program);
       unreadCount.value = mine.value.filter((item) => item.readAt === null).length;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Announcements could not be loaded.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.loadAnnouncements");
     } finally {
       loading.value = false;
     }
@@ -114,7 +115,7 @@ export const useAnnouncementsStore = defineStore("announcements", () => {
       target.readAt = updated.readAt;
       unreadCount.value = mine.value.filter((item) => item.readAt === null).length;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Could not mark that as read.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.markReadFailed");
     }
   }
 

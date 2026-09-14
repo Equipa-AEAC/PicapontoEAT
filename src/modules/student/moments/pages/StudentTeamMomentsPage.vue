@@ -17,7 +17,8 @@ import MomentCard from "../../../../components/moments/MomentCard.vue";
 import MomentComposer from "../../../../components/moments/MomentComposer.vue";
 import { useMomentsStore, useProjectsStore } from "../../../../shared/stores";
 import type { MomentFormValues, MomentReportReason, TeamMomentSummary } from "../../../../shared/types";
-import { MOMENT_LIFETIME_HOURS, MOMENT_REPORT_REASON_OPTIONS } from "../../../../shared/types";
+import { MOMENT_LIFETIME_HOURS } from "../../../../shared/types";
+import { momentReportReasonOptions } from "../../../../i18n/vocabulary";
 
 /**
  * Team moments, member view.
@@ -79,13 +80,13 @@ onMounted(async () => {
 <template>
   <div class="page-stack">
     <BasePageHeader
-      title="Team moments"
-      :description="`What the team is working on today. Photos disappear ${MOMENT_LIFETIME_HOURS} hours after they are posted.`"
+      :title="$t('student.moments.title')"
+      :description="$t('student.moments.galleryDescription', { hours: MOMENT_LIFETIME_HOURS })"
     >
       <template #actions>
         <BaseButton :disabled="momentsStore.remainingQuota === 0" @click="showComposer = true">
           <PhCamera weight="regular" />
-          Post a moment
+          {{ $t("components.moment.composeTitle") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -97,9 +98,9 @@ onMounted(async () => {
     <BaseCard v-else>
       <BaseEmptyState
         v-if="momentsStore.groups.length === 0"
-        title="Nothing posted yet today"
-        description="Show what you are working on — the workshop, a repair, a project coming together."
-        action-label="Post the first moment"
+        :title="$t('student.moments.emptyTitle')"
+        :description="$t('student.moments.emptyDescription')"
+        :action-label="$t('student.moments.emptyAction')"
         @action="showComposer = true"
       />
 
@@ -142,9 +143,10 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="removeTarget !== null"
-      title="Remove your moment"
-      message="This photo will be removed from the gallery immediately."
-      confirm-label="Remove"
+      :title="$t('student.moments.removeTitle')"
+      :message="$t('student.moments.removeMessage')"
+      :confirm-label="$t('common.actions.remove')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="removeTarget = null"
       @confirm="confirmRemove"
       @cancel="removeTarget = null"
@@ -152,9 +154,10 @@ onMounted(async () => {
 
     <BaseFormDialog
       :visible="reportTarget !== null"
-      title="Report this moment"
-      subtitle="An administrator will review it. The photo stays visible until they decide."
-      confirm-label="Send report"
+      :title="$t('student.moments.reportTitle')"
+      :subtitle="$t('student.moments.reportSubtitle')"
+      :confirm-label="$t('student.moments.reportConfirm')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="reportTarget = null"
       @cancel="reportTarget = null"
       @confirm="confirmReport"
@@ -162,17 +165,21 @@ onMounted(async () => {
       <div class="student-form">
         <div class="student-form__grid">
           <div class="student-form__full-width">
-            <span class="student-form__label">Reason</span>
+            <span class="student-form__label">{{ $t("student.moments.reportReason") }}</span>
             <BaseSelect
               :model-value="reportReason"
-              :options="MOMENT_REPORT_REASON_OPTIONS"
+              :options="momentReportReasonOptions()"
               @update:model-value="reportReason = $event as MomentReportReason"
             />
           </div>
 
           <div class="student-form__full-width">
-            <span class="student-form__label">Anything else the administrator should know</span>
-            <BaseTextarea v-model="reportNote" :rows="3" placeholder="Optional" />
+            <span class="student-form__label">{{ $t("student.moments.reportNote") }}</span>
+            <BaseTextarea
+              v-model="reportNote"
+              :rows="3"
+              :placeholder="$t('student.moments.reportNotePlaceholder')"
+            />
           </div>
         </div>
       </div>

@@ -10,6 +10,13 @@
  * A label an author already wrote out is returned untouched, which is why this is
  * a formatter and not a `text-transform: capitalize` rule — that mangled
  * "In review" into "In Review".
+ *
+ * Since the interface became bilingual this is a **safety net, not the
+ * mechanism**. A raw enum member reaching a pill is a missing
+ * `src/i18n/vocabulary.ts` labeller: capitalising `online` produces "Online" in
+ * both languages, which reads as a translation and is not one. It stays because
+ * an English word is more useful to a reader than `in-progress`, and it warns in
+ * development so the next one gets fixed rather than hidden.
  */
 export function toDisplayLabel(value: string): string {
   if (!value) {
@@ -20,6 +27,13 @@ export function toDisplayLabel(value: string): string {
 
   if (!isRawEnumMember) {
     return value;
+  }
+
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[label] "${value}" reached a status pill as a raw enum member. ` +
+        "Route it through a labeller in src/i18n/vocabulary.ts — capitalising it here is not a translation.",
+    );
   }
 
   const spaced = value.replace(/-/g, " ");

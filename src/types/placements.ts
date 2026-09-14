@@ -17,16 +17,8 @@
  */
 export type PlacementProgram = "equipa-hours" | "official-internship";
 
-export const PLACEMENT_PROGRAM_LABELS: Record<PlacementProgram, string> = {
-  "equipa-hours": "Equipa Técnica — surplus hours",
-  "official-internship": "Official internship (FCT)",
-};
-
-function toOptions<T extends string>(labels: Record<T, string>) {
-  return (Object.keys(labels) as T[]).map((value) => ({ label: labels[value], value }));
-}
-
-export const PLACEMENT_PROGRAM_OPTIONS = toOptions(PLACEMENT_PROGRAM_LABELS);
+/* The names live in `i18n/vocabulary.ts` — see `programLabel`. */
+export const PLACEMENT_PROGRAMS: PlacementProgram[] = ["equipa-hours", "official-internship"];
 
 /**
  * Only the FCT internship track produces the regulated document set

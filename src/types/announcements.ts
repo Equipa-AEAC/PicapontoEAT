@@ -1,5 +1,12 @@
 import type { PlacementProgram } from "./placements";
 
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
 export type AnnouncementStatus = "draft" | "published" | "archived";
 export type AnnouncementPriority = "normal" | "important" | "urgent";
 
@@ -60,29 +67,3 @@ export interface AnnouncementFilters {
   audience: AnnouncementAudience | "all-audiences";
   status: AnnouncementStatus | "all";
 }
-
-export const ANNOUNCEMENT_AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
-  all: "Everyone",
-  "equipa-hours": "Surplus-hours members",
-  "official-internship": "Official interns",
-};
-
-export const ANNOUNCEMENT_STATUS_LABELS: Record<AnnouncementStatus, string> = {
-  draft: "Draft",
-  published: "Published",
-  archived: "Archived",
-};
-
-export const ANNOUNCEMENT_PRIORITY_LABELS: Record<AnnouncementPriority, string> = {
-  normal: "Normal",
-  important: "Important",
-  urgent: "Urgent",
-};
-
-function toOptions<T extends string>(labels: Record<T, string>) {
-  return (Object.keys(labels) as T[]).map((value) => ({ label: labels[value], value }));
-}
-
-export const ANNOUNCEMENT_AUDIENCE_OPTIONS = toOptions(ANNOUNCEMENT_AUDIENCE_LABELS);
-export const ANNOUNCEMENT_STATUS_OPTIONS = toOptions(ANNOUNCEMENT_STATUS_LABELS);
-export const ANNOUNCEMENT_PRIORITY_OPTIONS = toOptions(ANNOUNCEMENT_PRIORITY_LABELS);

@@ -5,6 +5,7 @@ import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { isExternalSchool, SCHOOL_NAME } from "../shared/constants";
 import { computeParticipationHours } from "./participation.service";
+import { t } from "../i18n";
 
 /**
  * Fill in a member's derived figures.
@@ -70,7 +71,7 @@ export async function saveMember(values: MemberFormValues, memberId?: string): P
       const currentMember = mockDatabase.members.find((member) => member.id === memberId);
 
       if (!currentMember) {
-        throw new Error("Member not found.");
+        throw new Error(t("errors.memberNotFound"));
       }
 
       const originSchool = values.originSchool || SCHOOL_NAME;
@@ -141,7 +142,7 @@ export async function assignMemberCard(memberId: string, cardUid: string): Promi
     const member = mockDatabase.members.find((item) => item.id === memberId);
 
     if (!member) {
-      throw new Error("Member not found.");
+      throw new Error(t("errors.memberNotFound"));
     }
 
     member.assignedCardUid = cardUid;

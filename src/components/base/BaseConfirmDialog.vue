@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BaseDialog from "./BaseDialog.vue";
 import BaseButton from "./BaseButton.vue";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -9,7 +10,14 @@ const props = withDefaults(
     message: string;
     severity?: "primary" | "danger";
     loading?: boolean;
-    /** Defaults to "Delete" for the danger severity and "Confirm" otherwise. */
+    /**
+     * Defaults to "Delete" for the danger severity and "Confirm" otherwise.
+     *
+     * Both defaults are weak: a confirmation whose button says what will happen
+     * ("Remove task", "Sign out") is always better than one that says "Confirm",
+     * so callers are expected to pass this. The default exists so a missing one
+     * is harmless, not so it can be relied on.
+     */
     confirmLabel?: string;
     cancelLabel?: string;
   }>(),
@@ -17,7 +25,7 @@ const props = withDefaults(
     severity: "danger",
     loading: false,
     confirmLabel: undefined,
-    cancelLabel: "Cancel",
+    cancelLabel: undefined,
   },
 );
 
@@ -40,9 +48,18 @@ const emit = defineEmits<{
 
     <template #footer>
       <div class="base-confirm-dialog__footer">
-        <BaseButton :label="props.cancelLabel" severity="secondary" text :disabled="props.loading" @click="emit('cancel')" />
         <BaseButton
-          :label="props.confirmLabel ?? (props.severity === 'danger' ? 'Delete' : 'Confirm')"
+          :label="props.cancelLabel ?? t('common.actions.cancel')"
+          severity="secondary"
+          text
+          :disabled="props.loading"
+          @click="emit('cancel')"
+        />
+        <BaseButton
+          :label="
+            props.confirmLabel ??
+            (props.severity === 'danger' ? t('common.actions.delete') : t('common.actions.confirm'))
+          "
           :severity="props.severity === 'danger' ? 'danger' : 'primary'"
           :loading="props.loading"
           @click="emit('confirm')"

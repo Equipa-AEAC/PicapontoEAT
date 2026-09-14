@@ -3,6 +3,8 @@ import type { AttendanceScanPayload } from "../types/dashboard";
 
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
+import { t } from "../i18n";
+import { hoursBetween } from "../utils/date";
 
 export async function listAttendance(filters: Partial<AttendanceFilters> = {}): Promise<AttendanceSummary[]> {
   return mockRequest(() => {
@@ -97,11 +99,25 @@ export async function applyAttendanceCorrection(attendanceId: string, values: At
     const currentRecord = mockDatabase.attendance.find((item) => item.id === attendanceId);
 
     if (!currentRecord) {
-      throw new Error("Attendance record not found.");
+      throw new Error(t("errors.attendanceNotFound"));
     }
 
-    currentRecord.entry = values.entryTime;
-    currentRecord.exit = values.exitTime;
+    const entry = values.entryTime || null;
+    const exit = values.exitTime || null;
+
+    if (entry && exit && exit <= entry) {
+      throw new Error(t("errors.exitBeforeEntry"));
+    }
+
+    currentRecord.entry = entry;
+    currentRecord.exit = exit;
+    /*
+     * Recomputed, not left at whatever it was before the correction — every
+     * participation total downstream sums this field directly, keyed off the
+     * record's own (unchanged) `date`, so a stale `hours` here is a wrong total
+     * for as long as the record exists, not just a display glitch.
+     */
+    currentRecord.hours = entry && exit ? Number(hoursBetween(entry, exit).toFixed(2)) : currentRecord.hours;
     currentRecord.status = "corrected";
     currentRecord.corrections += 1;
     currentRecord.notes = values.administratorNotes;
