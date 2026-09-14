@@ -3,6 +3,7 @@ import { computed, getCurrentInstance } from "vue";
 import { PhWarningCircle } from "@phosphor-icons/vue";
 
 import BaseButton from "./BaseButton.vue";
+import { t } from "../../i18n";
 
 /**
  * What a page shows when a request failed.
@@ -20,8 +21,8 @@ withDefaults(
     retrying?: boolean;
   }>(),
   {
-    title: "Could not load this",
-    retryLabel: "Try again",
+    title: undefined,
+    retryLabel: undefined,
     retrying: false,
   },
 );
@@ -45,13 +46,13 @@ const canRetry = computed(() => Boolean(instance?.vnode.props?.onRetry));
     <PhWarningCircle weight="fill" class="base-error-state__icon" />
 
     <div class="base-error-state__copy">
-      <p class="base-error-state__title">{{ title }}</p>
+      <p class="base-error-state__title">{{ title ?? t("common.error.title") }}</p>
       <p class="base-error-state__message">{{ message }}</p>
     </div>
 
     <BaseButton
       v-if="canRetry"
-      :label="retryLabel"
+      :label="retryLabel ?? t('common.actions.retry')"
       severity="secondary"
       outlined
       size="small"

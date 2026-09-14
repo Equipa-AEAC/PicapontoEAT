@@ -1,4 +1,5 @@
 import axios from "axios";
+import { t } from "../i18n";
 
 import type { ApiErrorResponse } from "../types/api";
 
@@ -10,7 +11,7 @@ export const httpClient = axios.create({
   },
 });
 
-export function getApiErrorMessage(error: unknown, fallbackMessage = "Unable to complete the request.") {
+export function getApiErrorMessage(error: unknown, fallbackMessage = t("errors.requestFailed")) {
   if (!axios.isAxiosError<ApiErrorResponse>(error)) {
     return fallbackMessage;
   }

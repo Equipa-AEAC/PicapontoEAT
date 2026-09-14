@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { PhCreditCard, PhBriefcase, PhTimer, PhUsersThree } from "@phosphor-icons/vue";
+import { PhCheckCircle, PhCreditCard, PhBriefcase, PhTimer, PhUsersThree } from "@phosphor-icons/vue";
 
 import BaseAvatar from "../../../../components/base/BaseAvatar.vue";
 import BaseBadge from "../../../../components/base/BaseBadge.vue";
@@ -12,7 +12,10 @@ import BaseFilterPanel from "../../../../components/base/BaseFilterPanel.vue";
 import BaseMenu from "../../../../components/base/BaseMenu.vue";
 import BasePageHeader from "../../../../components/base/BasePageHeader.vue";
 import BaseSearchBar from "../../../../components/base/BaseSearchBar.vue";
+import BaseCard from "../../../../components/base/BaseCard.vue";
+import BaseFormDialog from "../../../../components/base/BaseFormDialog.vue";
 import BaseSection from "../../../../components/base/BaseSection.vue";
+import BaseTextarea from "../../../../components/base/BaseTextarea.vue";
 import BaseSelect from "../../../../components/base/BaseSelect.vue";
 import BaseStatsCard from "../../../../components/base/BaseStatsCard.vue";
 import BaseTable from "../../../../components/base/BaseTable.vue";
@@ -22,6 +25,16 @@ import StudentFormDialog from "../../../../components/students/StudentFormDialog
 import { useCardsStore } from "../../../../stores/cards";
 import { useInternshipsStore } from "../../../../stores/internships";
 import { useMembersStore } from "../../../../stores/members";
+import { useProfileChangeRequestsStore } from "../../../../stores/profileChangeRequests";
+import type { ProfileChangeRequest } from "../../../../types/profileChangeRequests";
+import {
+  memberInternshipStatusLabel,
+  memberStatusLabel,
+  profileFieldLabel,
+} from "../../../../i18n/vocabulary";
+import { t } from "../../../../i18n";
+import { memberStatusOptions } from "../../../../i18n/vocabulary";
+import { formatRelativeTime } from "../../../../shared/utils/date";
 import type { InternshipFormValues } from "../../../../types/internships";
 import type { MemberDetails, MemberFormValues } from "../../../../types/members";
 
@@ -29,7 +42,49 @@ const router = useRouter();
 const membersStore = useMembersStore();
 const cardsStore = useCardsStore();
 const internshipsStore = useInternshipsStore();
+const profileRequestsStore = useProfileChangeRequestsStore();
 const actionsMenu = ref();
+
+/*
+ * Profile change requests are reviewed here, not on a page of their own.
+ *
+ * The request is about a member's record, and the reviewer's first question is
+ * "who is this and what does their record say" — which is the roster. A separate
+ * page would mean holding a name in your head while you walked to it. It renders
+ * only when something is waiting, so the roster is not permanently topped by an
+ * empty panel.
+ */
+const reviewDialogVisible = ref(false);
+const reviewRequest = ref<ProfileChangeRequest | null>(null);
+const reviewDecision = ref<"approved" | "rejected">("approved");
+const reviewNote = ref("");
+
+function openReview(request: ProfileChangeRequest, decision: "approved" | "rejected") {
+  profileRequestsStore.clearMessages();
+  reviewRequest.value = request;
+  reviewDecision.value = decision;
+  reviewNote.value = "";
+  reviewDialogVisible.value = true;
+}
+
+async function submitReview() {
+  if (!reviewRequest.value) {
+    return;
+  }
+
+  const resolved = await profileRequestsStore.resolve(
+    reviewRequest.value.id,
+    reviewDecision.value,
+    reviewNote.value,
+  );
+
+  if (resolved) {
+    reviewDialogVisible.value = false;
+    reviewRequest.value = null;
+    // Approving rewrites the member record, so the roster has to be re-read.
+    await Promise.all([membersStore.loadMembers(), membersStore.loadAllMembers()]);
+  }
+}
 const activeStudentId = ref<string | null>(null);
 const isStudentFormVisible = ref(false);
 const isDeleteVisible = ref(false);
@@ -42,31 +97,28 @@ const internshipDialogVisible = ref(false);
 const createdMemberId = ref<string | null>(null);
 const createdMemberName = ref("");
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-  { label: "Pending", value: "pending" },
-  { label: "Graduated", value: "graduated" },
-];
+const statusOptions = computed(() => [
+  { label: t("common.filters.allStatuses"), value: "all" },
+  ...memberStatusOptions(),
+]);
 
-const originOptions = [
-  { label: "All schools", value: "all" },
-  { label: "This school", value: "internal" },
-  { label: "Other schools", value: "external" },
-];
+const originOptions = computed(() => [
+  { label: t("common.filters.allSchools"), value: "all" },
+  { label: t("common.filters.thisSchool"), value: "internal" },
+  { label: t("common.filters.otherSchools"), value: "external" },
+]);
 
 // Built from the *unfiltered* roster — deriving these from the filtered rows would
 // make every other option disappear as soon as one filter was applied.
 const courseOptions = computed(() => [
-  { label: "All courses", value: "all" },
+  { label: t("common.filters.allCourses"), value: "all" },
   ...Array.from(new Set(membersStore.allMembers.map((member) => member.course)))
     .filter((value) => String(value).trim().length > 0)
     .map((value) => ({ label: String(value), value: String(value) })),
 ]);
 
 const yearOptions = computed(() => [
-  { label: "All years", value: "all" },
+  { label: t("common.filters.allYears"), value: "all" },
   ...Array.from(new Set(membersStore.allMembers.map((member) => member.academicYear)))
     .filter((value) => String(value).trim().length > 0)
     .map((value) => ({ label: String(value), value: String(value) })),
@@ -208,14 +260,31 @@ function openMenu(event: Event, memberId: string) {
   actionsMenu.value?.toggle(event);
 }
 
-const memberActions = [
-  { label: "View", command: () => activeStudentId.value && goToMemberDetails(activeStudentId.value) },
-  { label: "Edit", command: () => activeStudentId.value && openMemberForm(activeStudentId.value) },
-  { label: "Delete", command: () => activeStudentId.value && openDeleteConfirm(activeStudentId.value) },
-  { label: "Assign Card", command: () => activeStudentId.value && openMemberForm(activeStudentId.value) },
-  { label: "Attendance History", command: () => activeStudentId.value && goToMemberAttendanceHistory(activeStudentId.value) },
-  { label: "Internship", command: () => activeStudentId.value && goToMemberDetails(activeStudentId.value) },
-];
+/**
+ * The roster's total volunteer hours.
+ *
+ * Rounded to one decimal on the way out. Summing floats produced
+ * `210.70000000000002`, which overflowed the metric card and made a tidy figure
+ * look like a system error. The stored hours are quarter-hours, so one decimal
+ * loses nothing real.
+ */
+const totalTeamHours = computed(() =>
+  String(
+    Math.round(membersStore.allMembers.reduce((total, member) => total + member.teamHours, 0) * 10) / 10,
+  ),
+);
+
+const memberActions = computed(() => [
+  { label: t("admin.members.view"), command: () => activeStudentId.value && goToMemberDetails(activeStudentId.value) },
+  { label: t("common.actions.edit"), command: () => activeStudentId.value && openMemberForm(activeStudentId.value) },
+  { label: t("common.actions.delete"), command: () => activeStudentId.value && openDeleteConfirm(activeStudentId.value) },
+  { label: t("admin.members.assignCard"), command: () => activeStudentId.value && openMemberForm(activeStudentId.value) },
+  {
+    label: t("admin.members.attendanceHistory"),
+    command: () => activeStudentId.value && goToMemberAttendanceHistory(activeStudentId.value),
+  },
+  { label: t("admin.members.internship"), command: () => activeStudentId.value && goToMemberDetails(activeStudentId.value) },
+]);
 
 onMounted(async () => {
   membersStore.filters.query = searchQuery.value;
@@ -224,6 +293,7 @@ onMounted(async () => {
     membersStore.loadAllMembers(),
     cardsStore.loadCards(),
     internshipsStore.loadInternships(),
+    profileRequestsStore.loadQueue(),
   ]);
 });
 </script>
@@ -231,53 +301,119 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Members"
-      description="Everyone on the Equipa Técnica roster. Members accumulate volunteer team hours; those who also carry out an FCT internship track those hours separately."
+      :title="$t('admin.members.title')"
+      :description="$t('admin.members.description')"
     >
       <template #actions>
-        <BaseButton label="Create member" @click="openMemberForm()" />
+        <BaseButton :label="$t('admin.members.create')" @click="openMemberForm()" />
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
       <BaseStatsCard
-        label="Total members"
+        :label="$t('admin.members.metricTotal')"
         :value="String(membersStore.memberCount)"
-        caption="Visible in the current filter set"
+        :caption="$t('admin.members.metricTotalCaption')"
         :icon="PhUsersThree"
       />
       <BaseStatsCard
-        label="Team hours"
-        :value="String(membersStore.allMembers.reduce((total, member) => total + member.teamHours, 0))"
-        caption="Volunteer hours towards surplus certificates"
+        :label="$t('admin.members.metricTeamHours')"
+        :value="totalTeamHours"
+        :caption="$t('admin.members.metricTeamHoursCaption')"
         :icon="PhTimer"
       />
       <BaseStatsCard
-        label="Also interns"
+        :label="$t('admin.members.metricInterns')"
         :value="String(membersStore.allMembers.filter((member) => member.internshipStatus !== 'not-assigned').length)"
-        caption="Members additionally doing an FCT internship"
+        :caption="$t('admin.members.metricInternsCaption')"
         :icon="PhBriefcase"
       />
       <BaseStatsCard
-        label="With card assigned"
+        :label="$t('admin.members.metricCards')"
         :value="String(membersStore.allMembers.filter((member) => Boolean(member.assignedCardUid)).length)"
-        caption="Members linked to an RFID card"
+        :caption="$t('admin.members.metricCardsCaption')"
         :icon="PhCreditCard"
       />
     </section>
 
-    <BaseFilterPanel title="Search and filters" description="Filters apply as you type — no Apply step.">
+    <p v-if="profileRequestsStore.successMessage" class="form-success-banner">
+      <PhCheckCircle weight="fill" />
+      {{ profileRequestsStore.successMessage }}
+    </p>
+    <p v-if="profileRequestsStore.errorMessage && !reviewDialogVisible" class="form-error-banner">
+      {{ profileRequestsStore.errorMessage }}
+    </p>
+
+    <!--
+      Only when something is waiting. A permanently present empty panel above the
+      roster would cost every reader a scroll to discover there was nothing in it.
+    -->
+    <BaseCard
+      v-if="profileRequestsStore.requests.length > 0"
+      :title="$t('admin.members.requestsTitle')"
+      :description="$t('admin.members.requestsDescription')"
+    >
+      <ul class="request-queue">
+        <li v-for="request in profileRequestsStore.requests" :key="request.id" class="request-queue__row">
+          <div class="request-queue__main">
+            <span class="request-queue__title">
+              {{ request.memberName }} · {{ profileFieldLabel(request.field) }}
+            </span>
+
+            <!-- Current and requested side by side: this is the whole decision. -->
+            <span class="request-queue__change type-meta">
+              <template v-if="request.field !== 'photo'">
+                {{ request.currentValue || $t("admin.members.nothingRecordedInline") }} →
+                <strong>{{ request.requestedValue }}</strong>
+              </template>
+              <template v-else>{{ $t("admin.members.newProfilePicture") }}</template>
+            </span>
+
+            <span class="type-meta">{{ request.reason }}</span>
+            <span class="type-meta">
+              {{ $t("student.attendance.sent", { time: formatRelativeTime(request.createdAt) }) }}
+            </span>
+          </div>
+
+          <img
+            v-if="request.field === 'photo' && request.requestedValue"
+            :src="request.requestedValue"
+            :alt="$t('admin.members.requestedPhotoAlt')"
+            class="request-queue__photo"
+          />
+
+          <div class="request-queue__actions">
+            <BaseButton
+              :label="$t('common.actions.approve')"
+              text
+              size="small"
+              :loading="profileRequestsStore.saving"
+              @click="openReview(request, 'approved')"
+            />
+            <BaseButton
+              :label="$t('common.actions.reject')"
+              text
+              size="small"
+              severity="danger"
+              @click="openReview(request, 'rejected')"
+            />
+          </div>
+        </li>
+      </ul>
+    </BaseCard>
+
+    <BaseFilterPanel :title="$t('admin.members.filtersTitle')" :description="$t('admin.members.filtersDescription')">
       <div class="student-filter-bar">
-        <BaseSearchBar v-model="searchQuery" placeholder="Search by name, number, course, class or school" />
+        <BaseSearchBar v-model="searchQuery" :placeholder="$t('admin.members.search')" />
         <BaseSelect v-model="membersStore.filters.status" :options="statusOptions" />
         <BaseSelect v-model="membersStore.filters.origin" :options="originOptions" />
         <BaseSelect v-model="membersStore.filters.course" :options="courseOptions" />
         <BaseSelect v-model="membersStore.filters.academicYear" :options="yearOptions" />
-        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
+        <BaseButton :label="$t('common.actions.clearFilters')" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
       </div>
     </BaseFilterPanel>
 
-    <BaseSection title="Member table" description="Select a row to open the member, or use the row actions to edit, assign a card or remove.">
+    <BaseSection :title="$t('admin.members.tableTitle')" :description="$t('admin.members.tableDescription')">
       <BaseTable
         :value="membersStore.items"
         dataKey="id"
@@ -287,17 +423,17 @@ onMounted(async () => {
         scrollHeight="flex"
       >
         <template #empty>
-          <BaseEmptyState title="No members found" description="Adjust the filters or create a new member record." action-label="Create member" @action="openMemberForm()" />
+          <BaseEmptyState :title="$t('admin.members.emptyTitle')" :description="$t('admin.members.emptyDescription')" :action-label="$t('admin.members.create')" @action="openMemberForm()" />
         </template>
 
-        <TableColumn header="Photo" width="88px">
+        <TableColumn :header="$t('admin.members.colPhoto')" width="88px">
           <template #body="slotProps">
             <BaseAvatar :image="slotProps.data.photoUrl" :label="slotProps.data.fullName" />
           </template>
         </TableColumn>
 
-        <TableColumn field="memberNumber" header="Member Number" sortable />
-        <TableColumn header="Full Name" field="fullName" sortable>
+        <TableColumn field="memberNumber" :header="$t('admin.members.colNumber')" sortable />
+        <TableColumn :header="$t('admin.members.colName')" field="fullName" sortable>
           <template #body="slotProps">
             <div class="cell-stack">
               <strong>{{ slotProps.data.fullName }}</strong>
@@ -305,15 +441,15 @@ onMounted(async () => {
             </div>
           </template>
         </TableColumn>
-        <TableColumn header="School" field="originSchool" sortable>
+        <TableColumn :header="$t('admin.members.colSchool')" field="originSchool" sortable>
           <template #body="slotProps">
             <BaseBadge
-              :label="slotProps.data.isExternal ? slotProps.data.originSchool : 'This school'"
+              :label="slotProps.data.isExternal ? slotProps.data.originSchool : $t('common.filters.thisSchool')"
               :tone="slotProps.data.isExternal ? 'warning' : 'neutral'"
             />
           </template>
         </TableColumn>
-        <TableColumn header="Course / Class">
+        <TableColumn :header="$t('admin.members.colCourseClass')">
           <template #body="slotProps">
             <div class="cell-stack">
               <span>{{ slotProps.data.course || '—' }}</span>
@@ -321,28 +457,46 @@ onMounted(async () => {
             </div>
           </template>
         </TableColumn>
-        <TableColumn header="Status">
+        <TableColumn :header="$t('common.fields.status')">
           <template #body="slotProps">
-            <BaseBadge :label="slotProps.data.status" :tone="slotProps.data.status === 'active' ? 'success' : slotProps.data.status === 'pending' ? 'warning' : 'neutral'" />
+            <BaseBadge
+              :label="memberStatusLabel(slotProps.data.status)"
+              :tone="
+                slotProps.data.status === 'active'
+                  ? 'success'
+                  : slotProps.data.status === 'pending'
+                    ? 'warning'
+                    : 'neutral'
+              "
+            />
           </template>
         </TableColumn>
-        <TableColumn header="Assigned RFID Card">
+        <TableColumn :header="$t('admin.members.colCard')">
           <template #body="slotProps">
-            <span>{{ slotProps.data.assignedCardUid ?? 'Unassigned' }}</span>
+            <span>{{ slotProps.data.assignedCardUid ?? $t('admin.members.unassigned') }}</span>
           </template>
         </TableColumn>
-        <TableColumn header="Internship Status">
+        <TableColumn :header="$t('admin.members.colInternship')">
           <template #body="slotProps">
-            <BaseBadge :label="slotProps.data.internshipStatus" :tone="slotProps.data.internshipStatus === 'in-progress' ? 'info' : slotProps.data.internshipStatus === 'complete' ? 'success' : 'neutral'" />
+            <BaseBadge
+              :label="memberInternshipStatusLabel(slotProps.data.internshipStatus)"
+              :tone="
+                slotProps.data.internshipStatus === 'in-progress'
+                  ? 'info'
+                  : slotProps.data.internshipStatus === 'complete'
+                    ? 'success'
+                    : 'neutral'
+              "
+            />
           </template>
         </TableColumn>
-        <TableColumn field="teamHours" header="Team Hours" sortable />
-        <TableColumn header="Actions" width="220px">
+        <TableColumn field="teamHours" :header="$t('admin.members.colTeamHours')" sortable />
+        <TableColumn :header="$t('common.fields.actions')" width="220px">
           <template #body="slotProps">
             <div class="table-actions">
-              <BaseButton label="View" text size="small" @click="goToMemberDetails(slotProps.data.id)" />
-              <BaseButton label="Edit" text size="small" @click="openMemberForm(slotProps.data.id)" />
-              <BaseButton label="More" text size="small" @click="openMenu($event, slotProps.data.id)" />
+              <BaseButton :label="$t('admin.members.view')" text size="small" @click="goToMemberDetails(slotProps.data.id)" />
+              <BaseButton :label="$t('common.actions.edit')" text size="small" @click="openMemberForm(slotProps.data.id)" />
+              <BaseButton :label="$t('admin.members.more')" text size="small" @click="openMenu($event, slotProps.data.id)" />
             </div>
           </template>
         </TableColumn>
@@ -363,10 +517,10 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="internAskVisible"
-      title="Is this member also an FCT intern?"
-      :message="`${createdMemberName} was added to the roster and will start accruing volunteer team hours. If they are also carrying out an FCT internship here, we can set that up now — otherwise you can always assign one later from the Internships page.`"
-      confirm-label="Yes, set up the internship"
-      cancel-label="No, team member only"
+      :title="$t('admin.members.internQuestion')"
+      :message="$t('admin.members.internQuestionMessage', { name: createdMemberName })"
+      :confirm-label="$t('admin.members.internYes')"
+      :cancel-label="$t('admin.members.internNo')"
       severity="primary"
       @update:visible="internAskVisible = $event"
       @confirm="confirmInternHandoff"
@@ -384,10 +538,83 @@ onMounted(async () => {
       @cancel="internshipDialogVisible = false"
     />
 
+    <BaseFormDialog
+      :visible="reviewDialogVisible"
+      :title="
+        reviewDecision === 'approved'
+          ? $t('admin.members.approveChange')
+          : $t('admin.members.rejectChange')
+      "
+      :subtitle="
+        reviewDecision === 'approved'
+          ? $t('admin.members.approveChangeHint')
+          : $t('admin.members.rejectChangeHint')
+      "
+      :confirm-label="
+        reviewDecision === 'approved'
+          ? $t('admin.members.approveAndApply')
+          : $t('common.actions.reject')
+      "
+      :cancel-label="$t('common.actions.cancel')"
+      :loading="profileRequestsStore.saving"
+      @update:visible="reviewDialogVisible = $event"
+      @confirm="submitReview"
+      @cancel="reviewDialogVisible = false"
+    >
+      <p v-if="profileRequestsStore.errorMessage" class="form-error-banner">
+        {{ profileRequestsStore.errorMessage }}
+      </p>
+
+      <p v-if="reviewRequest" class="type-body-secondary">
+        {{
+          $t("admin.members.reviewSummary", {
+            member: reviewRequest.memberName,
+            field: profileFieldLabel(reviewRequest.field).toLowerCase(),
+          })
+        }}
+      </p>
+
+      <div v-if="reviewRequest" class="review-compare">
+        <div>
+          <p class="type-label">{{ $t("admin.members.currentlyRecorded") }}</p>
+          <img
+            v-if="reviewRequest.field === 'photo' && reviewRequest.currentValue"
+            :src="reviewRequest.currentValue"
+            :alt="$t('admin.members.currentPhotoAlt')"
+            class="request-queue__photo"
+          />
+          <p v-else class="review-compare__value">{{ reviewRequest.currentValue || $t("admin.members.nothingRecorded") }}</p>
+        </div>
+        <div>
+          <p class="type-label">{{ $t("admin.members.requested") }}</p>
+          <img
+            v-if="reviewRequest.field === 'photo' && reviewRequest.requestedValue"
+            :src="reviewRequest.requestedValue"
+            :alt="$t('admin.members.requestedPhotoAlt')"
+            class="request-queue__photo"
+          />
+          <p v-else class="review-compare__value review-compare__value--new">{{ reviewRequest.requestedValue }}</p>
+        </div>
+      </div>
+
+      <label class="review-field">
+        <span>
+          {{
+            reviewDecision === "rejected"
+              ? $t("admin.members.reviewNoteRequired")
+              : $t("admin.members.reviewNoteOptional")
+          }}
+        </span>
+        <BaseTextarea v-model="reviewNote" rows="3" auto-resize />
+      </label>
+    </BaseFormDialog>
+
     <BaseConfirmDialog
       :visible="isDeleteVisible"
-      title="Delete member"
-      message="The member record, along with their card assignment and attendance links, will be removed. This cannot be undone."
+      :title="$t('admin.members.deleteTitle')"
+      :message="$t('admin.members.deleteMessage')"
+      :confirm-label="$t('common.actions.delete')"
+      :cancel-label="$t('common.actions.cancel')"
       :loading="membersStore.saving"
       @update:visible="isDeleteVisible = $event"
       @confirm="handleDeleteMember"
@@ -395,3 +622,92 @@ onMounted(async () => {
     />
   </section>
 </template>
+
+<style scoped>
+.request-queue {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-queue__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+}
+
+.request-queue__row:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.request-queue__main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.request-queue__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--foreground);
+}
+
+.request-queue__change {
+  overflow-wrap: anywhere;
+}
+
+.request-queue__photo {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: var(--border-width) solid var(--border);
+}
+
+.request-queue__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.review-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.review-compare p {
+  margin: 0;
+}
+
+.review-compare__value {
+  font-size: var(--text-sm);
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.review-compare__value--new {
+  font-weight: var(--weight-medium);
+  color: var(--primary);
+}
+
+.review-field {
+  display: block;
+}
+
+.review-field > span {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--foreground-secondary);
+}
+</style>

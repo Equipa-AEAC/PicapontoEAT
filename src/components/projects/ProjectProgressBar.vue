@@ -30,7 +30,7 @@ const tone = computed(() => {
     <div class="project-progress__head">
       <span class="project-progress__value type-numeric">{{ progress.percent }}%</span>
       <span v-if="!compact" class="project-progress__counts type-meta">
-        {{ progress.done }} of {{ progress.total }} tasks
+        {{ $t("projects.progress.barCounts", { done: progress.done, total: progress.total }) }}
       </span>
     </div>
 
@@ -50,10 +50,10 @@ const tone = computed(() => {
 
     <p v-if="!compact && (progress.overdue > 0 || progress.blocked > 0)" class="project-progress__flags type-meta">
       <span v-if="progress.overdue > 0" class="project-progress__flag project-progress__flag--danger">
-        {{ progress.overdue }} overdue
+        {{ $t("projects.progress.overdueCount", { count: progress.overdue }) }}
       </span>
       <span v-if="progress.blocked > 0" class="project-progress__flag project-progress__flag--warning">
-        {{ progress.blocked }} blocked
+        {{ $t("projects.progress.blockedCount", { count: progress.blocked }) }}
       </span>
     </p>
   </div>

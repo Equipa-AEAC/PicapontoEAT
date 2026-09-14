@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { PhCalendarCheck, PhClipboardText, PhDownloadSimple, PhFolders, PhNotePencil, PhTimer, PhUsersThree, PhWarning } from "@phosphor-icons/vue";
+import {
+  PhCalendarCheck,
+  PhCheckCircle,
+  PhClipboardText,
+  PhDownloadSimple,
+  PhFolders,
+  PhNotePencil,
+  PhSealCheck,
+  PhTimer,
+  PhTray,
+  PhUsersThree,
+  PhWarning,
+} from "@phosphor-icons/vue";
 
 import {
   BaseButton,
@@ -20,54 +32,167 @@ import {
   BaseTable,
   BaseTableColumn,
   BaseTabs,
+  BaseTextarea,
   BaseTextInput,
   BaseToolbar,
 } from "../../../../shared/components/base";
+import BaseFormDialog from "../../../../components/base/BaseFormDialog.vue";
 import type { BaseTabItem } from "../../../../shared/components/base";
 import ProjectProgressBar from "../../../../components/projects/ProjectProgressBar.vue";
-import { useAdminJournalStore, useDevicesStore, useMembersStore, useProjectsStore } from "../../../../shared/stores";
+import {
+  useAdminJournalStore,
+  useDevicesStore,
+  useInternshipReportsStore,
+  useMembersStore,
+  useProjectsStore,
+} from "../../../../shared/stores";
 import { exportReport, getReportSummary, previewReport } from "../../../../services/reports.service";
-import { REPORT_TYPE_OPTIONS } from "../../../../types/reports";
 import type { ReportExportFormat, ReportFilterValues, ReportPreview, ReportSummary } from "../../../../types/reports";
-import type { TeamJournalEntry } from "../../../../types/internshipReports";
+import type {
+  FinalReportSummary,
+  MonthlyReportSummary,
+  TeamJournalEntry,
+} from "../../../../types/internshipReports";
+import { REPORT_STATUS_TONES } from "../../../../types/internshipReports";
 import { journalCoverageState } from "../../../../shared/types";
+import { formatIsoDate, formatTimestamp } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import {
+  DAILY_LOG_STATUS_ORDER,
+  dailyLogStatusLabel,
+  reportStatusLabel,
+  reportStatusOptions,
+  reportTypeOptions,
+} from "../../../../i18n/vocabulary";
 
 const journalStore = useAdminJournalStore();
+const reportsStore = useInternshipReportsStore();
 const membersStore = useMembersStore();
 const devicesStore = useDevicesStore();
 const projectsStore = useProjectsStore();
 const router = useRouter();
 
-const activeTab = ref("activity");
+/**
+ * Reports is first and foremost the desk internship reports arrive at.
+ *
+ * Monthly balances and the final Relatório de Estágio could be submitted and
+ * nothing anywhere read them: `status` reached "submitted" and stopped, because
+ * no surface could take it further. The journal feed, coverage and the exports
+ * are still here — they are the operational reporting this page already did —
+ * but they now sit behind the two queues somebody actually has to work through.
+ */
+const activeTab = ref("monthly-reports");
 const selectedEntry = ref<TeamJournalEntry | null>(null);
 
 const tabs = computed<BaseTabItem[]>(() => [
-  { value: "activity", label: "Activity feed", icon: PhNotePencil, badge: journalStore.entries.length },
-  { value: "coverage", label: "Coverage", icon: PhCalendarCheck, badge: journalStore.staleContributors.length },
-  { value: "delivery", label: "Delivery", icon: PhFolders, badge: deliveryRows.value.length },
-  { value: "exports", label: "Exports", icon: PhDownloadSimple },
+  {
+    value: "monthly-reports",
+    label: t("admin.reports.tabMonthly"),
+    icon: PhTray,
+    badge: reportsStore.monthlyAwaitingReview.length,
+  },
+  {
+    value: "final-reports",
+    label: t("admin.reports.tabFinal"),
+    icon: PhSealCheck,
+    badge: reportsStore.finalAwaitingReview.length,
+  },
+  { value: "activity", label: t("admin.reports.tabJournal"), icon: PhNotePencil, badge: journalStore.entries.length },
+  { value: "coverage", label: t("admin.reports.tabCoverage"), icon: PhCalendarCheck, badge: journalStore.staleContributors.length },
+  { value: "delivery", label: t("admin.reports.tabDelivery"), icon: PhFolders, badge: deliveryRows.value.length },
+  { value: "exports", label: t("admin.reports.tabExports"), icon: PhDownloadSimple },
 ]);
+
+/* --------------------------------------------------- Internship reports */
+
+const reviewDialogVisible = ref(false);
+const reviewDecision = ref<"approved" | "rejected">("approved");
+const reviewNote = ref("");
+const reviewMonthly = ref<MonthlyReportSummary | null>(null);
+const reviewFinal = ref<FinalReportSummary | null>(null);
+
+const statusFilterOptions = computed(() => [
+  { label: t("common.state.all"), value: "all" },
+  ...reportStatusOptions(),
+]);
+
+const reportMemberOptions = computed(() => [
+  { label: t("common.filters.allMembers"), value: "all" },
+  ...membersStore.allMembers.map((member) => ({ label: member.fullName, value: member.id })),
+]);
+
+function openMonthlyReview(report: MonthlyReportSummary, decision: "approved" | "rejected") {
+  reportsStore.clearMessages();
+  reviewMonthly.value = report;
+  reviewFinal.value = null;
+  reviewDecision.value = decision;
+  reviewNote.value = "";
+  reviewDialogVisible.value = true;
+}
+
+function openFinalReview(report: FinalReportSummary, decision: "approved" | "rejected") {
+  reportsStore.clearMessages();
+  reviewFinal.value = report;
+  reviewMonthly.value = null;
+  reviewDecision.value = decision;
+  reviewNote.value = "";
+  reviewDialogVisible.value = true;
+}
+
+const reviewSubject = computed(() => {
+  if (reviewMonthly.value) {
+    return t("admin.reports.reviewMonthlyTitle", {
+      name: reviewMonthly.value.memberName,
+      month: reviewMonthly.value.month,
+    });
+  }
+
+  if (reviewFinal.value) {
+    return t("admin.reports.reviewFinalTitle", { name: reviewFinal.value.memberName });
+  }
+
+  return "";
+});
+
+async function submitReview() {
+  const values = { decision: reviewDecision.value, note: reviewNote.value };
+
+  const resolved = reviewMonthly.value
+    ? await reportsStore.reviewMonthly(reviewMonthly.value.id, values)
+    : reviewFinal.value
+      ? await reportsStore.reviewFinal(reviewFinal.value.studentId, values)
+      : false;
+
+  if (resolved) {
+    reviewDialogVisible.value = false;
+    reviewMonthly.value = null;
+    reviewFinal.value = null;
+  }
+}
+
+async function reloadReviewQueues() {
+  await reportsStore.loadReviewQueues();
+}
 
 /* ---------------------------------------------------------------- Activity */
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Draft", value: "draft" },
-  { label: "Submitted", value: "submitted" },
-];
+const statusOptions = computed(() => [
+  { label: t("common.filters.allStatuses"), value: "all" },
+  ...DAILY_LOG_STATUS_ORDER.map((status) => ({ label: dailyLogStatusLabel(status), value: status })),
+]);
 
 const memberFilterOptions = computed(() => [
-  { label: "All members", value: "all" },
+  { label: t("common.filters.allMembers"), value: "all" },
   ...membersStore.allMembers.map((member) => ({ label: member.fullName, value: member.id })),
 ]);
 
 const projectFilterOptions = computed(() => [
-  { label: "All projects", value: "all" },
+  { label: t("common.filters.allProjects"), value: "all" },
   ...journalStore.projects.map((project) => ({ label: project.name, value: project.id })),
 ]);
 
 const monthFilterOptions = computed(() => [
-  { label: "All months", value: "all" },
+  { label: t("common.filters.allMonths"), value: "all" },
   ...journalStore.availableMonths.map((month) => ({ label: month, value: month })),
 ]);
 
@@ -109,7 +234,7 @@ function openEntry(entry: TeamJournalEntry) {
 function coverageLabel(daysSinceLastEntry: number | null) {
   if (daysSinceLastEntry === null) return "Never written";
   if (daysSinceLastEntry === 0) return "Today";
-  return `${daysSinceLastEntry}d ago`;
+  return t("common.time.daysAgoShort", { count: daysSinceLastEntry });
 }
 
 /* --------------------------------------------------------------- Delivery */
@@ -180,7 +305,7 @@ const exporting = ref(false);
 const loadError = ref<string | null>(null);
 
 const deviceOptions = computed(() => [
-  { label: "All devices", value: "all" },
+  { label: t("common.filters.allDevices"), value: "all" },
   ...devicesStore.items.map((device) => ({ label: device.name, value: device.id })),
 ]);
 
@@ -196,7 +321,7 @@ async function loadPreview() {
     summary.value = await getReportSummary(currentDateRange());
     preview.value = await previewReport({ ...form, dateRange: currentDateRange() });
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : "Unable to load the report preview.";
+    loadError.value = error instanceof Error ? error.message : t("admin.reports.previewFailed");
   } finally {
     exportLoading.value = false;
   }
@@ -225,6 +350,7 @@ onMounted(async () => {
     devicesStore.loadDevices(),
     journalStore.loadJournal(),
     projectsStore.loadProjects(),
+    reportsStore.loadReviewQueues(),
   ]);
   await loadPreview();
 });
@@ -233,74 +359,289 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Reports"
-      description="The work journal every member keeps — what was done, on which project, and by whom — plus the exports handed over at the end of a period."
+      :title="$t('admin.reports.title')"
+      :description="$t('admin.reports.description')"
     >
       <template #actions>
-        <BaseButton label="Project management" severity="secondary" @click="router.push({ name: 'projects-overview' })" />
-        <BaseButton label="Refresh" severity="secondary" :loading="journalStore.loading" @click="journalStore.loadJournal()" />
+        <BaseButton :label="$t('admin.reports.projectManagement')" severity="secondary" @click="router.push({ name: 'projects-overview' })" />
+        <BaseButton :label="$t('common.actions.refresh')" severity="secondary" :loading="journalStore.loading" @click="journalStore.loadJournal()" />
       </template>
     </BasePageHeader>
 
     <section class="metric-grid">
-      <BaseStatsCard label="Journal entries" :value="String(journalStore.summary?.totalEntries ?? 0)" caption="Days registered across the roster" :icon="PhClipboardText" />
-      <BaseStatsCard label="Hours described" :value="`${journalStore.summary?.totalHours ?? 0}h`" caption="Work accounted for in writing" :icon="PhTimer" />
-      <BaseStatsCard label="Contributors" :value="String(journalStore.summary?.contributors ?? 0)" caption="Members who have written at least once" :icon="PhUsersThree" />
+      <BaseStatsCard :label="$t('admin.reports.metricEntries')" :value="String(journalStore.summary?.totalEntries ?? 0)" :caption="$t('admin.reports.metricEntriesCaption')" :icon="PhClipboardText" />
+      <BaseStatsCard :label="$t('admin.reports.metricHours')" :value="`${journalStore.summary?.totalHours ?? 0}h`" :caption="$t('admin.reports.metricHoursCaption')" :icon="PhTimer" />
+      <BaseStatsCard :label="$t('admin.reports.metricContributors')" :value="String(journalStore.summary?.contributors ?? 0)" :caption="$t('admin.reports.metricContributorsCaption')" :icon="PhUsersThree" />
       <!-- The count is only useful if it leads to the names behind it. -->
       <BaseStatsCard
-        label="Interns behind"
+        :label="$t('admin.reports.metricBehind')"
         :value="String(journalStore.staleContributors.length)"
-        caption="Required journal, no entry in two weeks — open the coverage list"
+        :caption="$t('admin.reports.metricBehindCaption')"
         :icon="PhWarning"
         interactive
-        action-hint="Show the interns who are behind on their journal"
+        :action-hint="$t('admin.reports.showBehindInterns')"
         @action="activeTab = 'coverage'"
       />
     </section>
 
+    <p v-if="reportsStore.successMessage" class="form-success-banner">
+      <PhCheckCircle weight="fill" />
+      {{ reportsStore.successMessage }}
+    </p>
+
     <p v-if="journalStore.errorMessage" class="form-error-banner">{{ journalStore.errorMessage }}</p>
 
     <BaseTabs v-model="activeTab" :tabs="tabs">
+      <!-- ------------------------------------------------ Monthly reports -->
+      <template #monthly-reports>
+        <BaseToolbar>
+          <template #left>
+            <div class="filter-strip">
+              <BaseSelect
+                v-model="reportsStore.reviewFilters.status"
+                :options="statusFilterOptions"
+                @update:model-value="reloadReviewQueues"
+              />
+              <BaseSelect
+                v-model="reportsStore.reviewFilters.memberId"
+                :options="reportMemberOptions"
+                @update:model-value="reloadReviewQueues"
+              />
+            </div>
+          </template>
+          <template #right>
+            <BaseStatusPill
+              :label="
+            $t('admin.reports.waitingForReview', { count: reportsStore.monthlyAwaitingReview.length })
+          "
+              :tone="reportsStore.monthlyAwaitingReview.length > 0 ? 'warning' : 'success'"
+            />
+          </template>
+        </BaseToolbar>
+
+        <BaseSection
+          :title="$t('admin.reports.monthlyTitle')"
+          :description="$t('admin.reports.monthlyDescription')"
+        >
+          <BaseCard>
+            <BaseTable :value="reportsStore.allMonthlyReports" dataKey="id" paginator :rows="8">
+              <template #empty>
+                <BaseEmptyState
+                  :title="$t('admin.reports.monthlyEmptyTitle')"
+                  :description="$t('admin.reports.monthlyEmptyDescription')"
+                />
+              </template>
+
+              <BaseTableColumn :header="$t('admin.reports.colMember')" field="memberName" sortable>
+                <template #body="{ data }">
+                  <div class="cell-stack">
+                    <strong>{{ (data as MonthlyReportSummary).memberName }}</strong>
+                    <small>{{ (data as MonthlyReportSummary).originSchool }}</small>
+                  </div>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('admin.reports.colPeriod')" field="month" sortable>
+                <template #body="{ data }">
+                  <div class="cell-stack">
+                    <span>{{ (data as MonthlyReportSummary).month }}</span>
+                    <small>
+                      {{ formatIsoDate((data as MonthlyReportSummary).periodStart) }} to
+                      {{ formatIsoDate((data as MonthlyReportSummary).periodEnd) }}
+                    </small>
+                  </div>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('admin.reports.colContent')" width="150px">
+                <template #body="{ data }">
+                  <span class="cell-stack">
+                    <span class="type-numeric">{{ (data as MonthlyReportSummary).totalHours }}h</span>
+                    <small>
+                      {{ $t("admin.reports.entriesCount", { count: (data as MonthlyReportSummary).entriesCount }) }}
+                    </small>
+                  </span>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('common.fields.status')" width="170px">
+                <template #body="{ data }">
+                  <div class="cell-stack">
+                    <BaseStatusPill
+                      :label="reportStatusLabel((data as MonthlyReportSummary).status)"
+                      :tone="REPORT_STATUS_TONES[(data as MonthlyReportSummary).status]"
+                    />
+                    <small v-if="(data as MonthlyReportSummary).reviewNote">
+                      {{ (data as MonthlyReportSummary).reviewNote }}
+                    </small>
+                  </div>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('admin.reports.colSubmitted')" field="submittedAt" sortable>
+                <template #body="{ data }">
+                  {{ formatTimestamp((data as MonthlyReportSummary).submittedAt) }}
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('common.fields.actions')">
+                <template #body="{ data }">
+                  <div class="inline-actions">
+                    <!-- Only a submitted report is reviewable; a draft is still the student's. -->
+                    <template v-if="(data as MonthlyReportSummary).status === 'submitted'">
+                      <BaseButton
+                        :label="$t('common.actions.approve')"
+                        text
+                        size="small"
+                        @click="openMonthlyReview(data as MonthlyReportSummary, 'approved')"
+                      />
+                      <BaseButton
+                        :label="$t('admin.reports.returnForRevision')"
+                        text
+                        size="small"
+                        severity="danger"
+                        @click="openMonthlyReview(data as MonthlyReportSummary, 'rejected')"
+                      />
+                    </template>
+                    <span v-else-if="(data as MonthlyReportSummary).status === 'draft'" class="type-meta">
+                      {{ $t("admin.reports.stillDraft") }}
+                    </span>
+                    <span v-else class="type-meta">
+                      {{ (data as MonthlyReportSummary).reviewedBy ?? $t('admin.reports.reviewed') }}
+                    </span>
+                  </div>
+                </template>
+              </BaseTableColumn>
+            </BaseTable>
+          </BaseCard>
+        </BaseSection>
+      </template>
+
+      <!-- -------------------------------------------------- Final reports -->
+      <template #final-reports>
+        <BaseSection
+          :title="$t('admin.reports.finalTitle')"
+          :description="$t('admin.reports.finalDescription')"
+        >
+          <BaseCard>
+            <BaseTable :value="reportsStore.allFinalReports" dataKey="studentId" paginator :rows="8">
+              <template #empty>
+                <BaseEmptyState
+                  :title="$t('admin.reports.finalEmptyTitle')"
+                  :description="$t('admin.reports.finalEmptyDescription')"
+                />
+              </template>
+
+              <BaseTableColumn :header="$t('admin.reports.colMember')" field="memberName" sortable>
+                <template #body="{ data }">
+                  <div class="cell-stack">
+                    <strong>{{ (data as FinalReportSummary).memberName }}</strong>
+                    <small>{{ (data as FinalReportSummary).originSchool }}</small>
+                  </div>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('admin.reports.colPeriod')">
+                <template #body="{ data }">
+                  <span class="type-meta">
+                    {{ formatIsoDate((data as FinalReportSummary).periodStart) }} to
+                    {{ formatIsoDate((data as FinalReportSummary).periodEnd) }}
+                  </span>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('common.fields.status')" width="170px">
+                <template #body="{ data }">
+                  <div class="cell-stack">
+                    <BaseStatusPill
+                      :label="reportStatusLabel((data as FinalReportSummary).status)"
+                      :tone="REPORT_STATUS_TONES[(data as FinalReportSummary).status]"
+                    />
+                    <small v-if="(data as FinalReportSummary).reviewNote">
+                      {{ (data as FinalReportSummary).reviewNote }}
+                    </small>
+                  </div>
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('admin.reports.colSubmitted')" field="submittedAt" sortable>
+                <template #body="{ data }">
+                  {{ formatTimestamp((data as FinalReportSummary).submittedAt) }}
+                </template>
+              </BaseTableColumn>
+
+              <BaseTableColumn :header="$t('common.fields.actions')">
+                <template #body="{ data }">
+                  <div class="inline-actions">
+                    <template v-if="(data as FinalReportSummary).status === 'submitted'">
+                      <BaseButton
+                        :label="$t('common.actions.approve')"
+                        text
+                        size="small"
+                        @click="openFinalReview(data as FinalReportSummary, 'approved')"
+                      />
+                      <BaseButton
+                        :label="$t('admin.reports.returnForRevision')"
+                        text
+                        size="small"
+                        severity="danger"
+                        @click="openFinalReview(data as FinalReportSummary, 'rejected')"
+                      />
+                    </template>
+                    <span v-else-if="(data as FinalReportSummary).status === 'draft'" class="type-meta">
+                      {{ $t("admin.reports.stillDraft") }}
+                    </span>
+                    <span v-else class="type-meta">
+                      {{ (data as FinalReportSummary).reviewedBy ?? $t('admin.reports.reviewed') }}
+                    </span>
+                  </div>
+                </template>
+              </BaseTableColumn>
+            </BaseTable>
+          </BaseCard>
+        </BaseSection>
+      </template>
+
       <!-- ------------------------------------------------------- Activity -->
       <template #activity>
-        <BaseFilterPanel title="Filter the journal" description="Narrow by member, project, month or status.">
+        <BaseFilterPanel :title="$t('admin.reports.journalFiltersTitle')" :description="$t('admin.reports.journalFiltersDescription')">
           <div class="filter-strip">
-            <BaseSearchBar v-model="journalStore.filters.query" placeholder="Search activities, learnings or difficulties" />
+            <BaseSearchBar v-model="journalStore.filters.query" :placeholder="$t('admin.reports.journalSearch')" />
             <BaseSelect v-model="journalStore.filters.memberId" :options="memberFilterOptions" />
             <BaseSelect v-model="journalStore.filters.projectId" :options="projectFilterOptions" />
             <BaseSelect v-model="journalStore.filters.month" :options="monthFilterOptions" />
             <BaseSelect v-model="journalStore.filters.status" :options="statusOptions" />
-            <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasJournalFilters" @click="clearJournalFilters" />
+            <BaseButton :label="$t('common.actions.clearFilters')" severity="secondary" outlined :disabled="!hasJournalFilters" @click="clearJournalFilters" />
           </div>
         </BaseFilterPanel>
 
         <BaseLoading v-if="journalStore.loading" />
 
-        <BaseSection v-else title="What has been done" description="Newest first. Click an entry to read the full write-up.">
+        <BaseSection v-else :title="$t('admin.reports.journalTitle')" :description="$t('admin.reports.journalDescription')">
           <BaseCard>
             <BaseTable :value="journalStore.entries" dataKey="id" paginator :rows="10" @rowClick="openEntry($event.data)">
               <template #empty>
                 <BaseEmptyState
-                  title="No journal entries"
-                  description="Nobody has written a daily entry matching these filters yet. Logging a day is optional but recommended — it is what the monthly and final internship reports are built from."
-                  action-label="Clear filters"
+                  :title="$t('admin.reports.journalEmptyTitle')"
+                  :description="$t('admin.reports.journalEmptyDescription')"
+                  :action-label="$t('common.actions.clearFilters')"
                   @action="clearJournalFilters"
                 />
               </template>
 
-              <BaseTableColumn header="Member" field="memberName" sortable width="200px">
+              <BaseTableColumn :header="$t('admin.reports.colMember')" field="memberName" sortable width="200px">
                 <template #body="slotProps">
                   <div class="cell-stack">
                     <strong>{{ slotProps.data.memberName }}</strong>
-                    <small v-if="slotProps.data.memberIsExternal">External intern</small>
+                    <small v-if="slotProps.data.memberIsExternal">{{ $t("admin.reports.externalIntern") }}</small>
                   </div>
                 </template>
               </BaseTableColumn>
-              <BaseTableColumn field="date" header="Date" sortable width="120px" />
-              <BaseTableColumn header="Hours" field="hours" sortable width="90px">
+              <BaseTableColumn field="date" :header="$t('common.time.date')" sortable width="120px" />
+              <BaseTableColumn :header="$t('common.fields.hours')" field="hours" sortable width="90px">
                 <template #body="slotProps">{{ slotProps.data.hours }}h</template>
               </BaseTableColumn>
-              <BaseTableColumn header="Project" width="180px">
+              <BaseTableColumn :header="$t('admin.reports.colProject')" width="180px">
                 <template #body="slotProps">
                   <!-- The entry already carries the project id; only the link was missing. -->
                   <button
@@ -311,17 +652,20 @@ onMounted(async () => {
                   >
                     {{ slotProps.data.projectName }}
                   </button>
-                  <span v-else class="journal-muted">No project</span>
+                  <span v-else class="journal-muted">{{ $t("admin.reports.noProject") }}</span>
                 </template>
               </BaseTableColumn>
-              <BaseTableColumn header="Activities">
+              <BaseTableColumn :header="$t('admin.reports.colActivities')">
                 <template #body="slotProps">
                   <span class="journal-excerpt">{{ slotProps.data.activities }}</span>
                 </template>
               </BaseTableColumn>
-              <BaseTableColumn header="Status" width="120px">
+              <BaseTableColumn :header="$t('common.fields.status')" width="120px">
                 <template #body="slotProps">
-                  <BaseStatusPill :label="slotProps.data.status" :tone="slotProps.data.status === 'submitted' ? 'success' : 'warning'" />
+                  <BaseStatusPill
+                    :label="dailyLogStatusLabel(slotProps.data.status)"
+                    :tone="slotProps.data.status === 'submitted' ? 'success' : 'warning'"
+                  />
                 </template>
               </BaseTableColumn>
             </BaseTable>
@@ -332,34 +676,38 @@ onMounted(async () => {
       <!-- ------------------------------------------------------- Coverage -->
       <template #coverage>
         <BaseSection
-          title="Who is still writing"
-          description="Interns must keep the journal — their monthly balance and final report are assembled from it. For everyone else it is recommended, and a quiet week is not a fault."
+          :title="$t('admin.reports.coverageTitle')"
+          :description="$t('admin.reports.coverageDescription')"
         >
           <BaseCard>
             <BaseTable :value="journalStore.summary?.coverage ?? []" dataKey="memberId" paginator :rows="10">
               <template #empty>
-                <BaseEmptyState title="No members loaded" description="The roster returned no members to report on." />
+                <BaseEmptyState :title="$t('admin.reports.coverageEmptyTitle')" :description="$t('admin.reports.coverageEmptyDescription')" />
               </template>
 
-              <BaseTableColumn header="Member" field="memberName" sortable>
+              <BaseTableColumn :header="$t('admin.reports.colMember')" field="memberName" sortable>
                 <template #body="slotProps">
                   <div class="cell-stack">
                     <strong>{{ slotProps.data.memberName }}</strong>
                     <small>
-                      {{ slotProps.data.isIntern ? 'FCT intern · journal required' : 'Team member · journal optional' }}
+                      {{
+                        slotProps.data.isIntern
+                          ? $t('admin.reports.internJournalRequired')
+                          : $t('admin.reports.memberJournalOptional')
+                      }}
                     </small>
                   </div>
                 </template>
               </BaseTableColumn>
-              <BaseTableColumn field="entriesThisMonth" header="Entries this month" sortable />
-              <BaseTableColumn header="Hours this month" field="hoursThisMonth" sortable>
+              <BaseTableColumn field="entriesThisMonth" :header="$t('admin.reports.colEntriesMonth')" sortable />
+              <BaseTableColumn :header="$t('admin.reports.colHoursMonth')" field="hoursThisMonth" sortable>
                 <template #body="slotProps">{{ slotProps.data.hoursThisMonth }}h</template>
               </BaseTableColumn>
-              <BaseTableColumn field="totalEntries" header="Total entries" sortable />
-              <BaseTableColumn header="Total hours" field="totalHours" sortable>
+              <BaseTableColumn field="totalEntries" :header="$t('admin.reports.colTotalEntries')" sortable />
+              <BaseTableColumn :header="$t('admin.reports.colTotalHours')" field="totalHours" sortable>
                 <template #body="slotProps">{{ slotProps.data.totalHours }}h</template>
               </BaseTableColumn>
-              <BaseTableColumn header="Last entry" field="lastEntryDate" sortable>
+              <BaseTableColumn :header="$t('admin.reports.colLastEntry')" field="lastEntryDate" sortable>
                 <template #body="slotProps">
                   <div class="cell-stack">
                     <span>{{ slotProps.data.lastEntryDate ?? '—' }}</span>
@@ -367,7 +715,7 @@ onMounted(async () => {
                   </div>
                 </template>
               </BaseTableColumn>
-              <BaseTableColumn header="Status" width="140px">
+              <BaseTableColumn :header="$t('common.fields.status')" width="140px">
                 <template #body="slotProps">
                   <BaseStatusPill
                     :label="journalCoverageState(slotProps.data.isIntern, slotProps.data.daysSinceLastEntry).label"
@@ -383,20 +731,20 @@ onMounted(async () => {
       <!-- ------------------------------------------------------- Delivery -->
       <template #delivery>
         <BaseSection
-          title="Delivery by project"
-          description="Hours booked through the daily journal alongside the task progress from the project boards."
+          :title="$t('admin.reports.deliveryTitle')"
+          :description="$t('admin.reports.deliveryDescription')"
         >
           <BaseCard>
             <BaseEmptyState
               v-if="deliveryRows.length === 0"
-              title="No active projects"
-              description="Create a project in the Project management workspace and it will be reported here."
-              action-label="Open project management"
+              :title="$t('admin.reports.deliveryEmptyTitle')"
+              :description="$t('admin.reports.deliveryEmptyDescription')"
+              :action-label="$t('admin.reports.deliveryEmptyAction')"
               @action="router.push({ name: 'projects-overview' })"
             />
 
             <BaseTable v-else :value="deliveryRows" data-key="id">
-              <BaseTableColumn header="Project">
+              <BaseTableColumn :header="$t('admin.reports.colProject')">
                 <template #body="{ data }">
                   <button type="button" class="delivery-link" @click="openProject((data as any).id)">
                     <span class="delivery-link__name">{{ (data as any).name }}</span>
@@ -405,13 +753,13 @@ onMounted(async () => {
                 </template>
               </BaseTableColumn>
 
-              <BaseTableColumn header="Progress" width="170px">
+              <BaseTableColumn :header="$t('admin.reports.colProgress')" width="170px">
                 <template #body="{ data }">
                   <ProjectProgressBar :progress="(data as any).progress" />
                 </template>
               </BaseTableColumn>
 
-              <BaseTableColumn header="Tasks done" width="110px">
+              <BaseTableColumn :header="$t('admin.reports.colTasksDone')" width="110px">
                 <template #body="{ data }">
                   <span class="type-numeric">
                     {{ (data as any).progress.done }} / {{ (data as any).progress.total }}
@@ -419,7 +767,7 @@ onMounted(async () => {
                 </template>
               </BaseTableColumn>
 
-              <BaseTableColumn header="Overdue" width="100px">
+              <BaseTableColumn :header="$t('admin.reports.colOverdue')" width="100px">
                 <template #body="{ data }">
                   <BaseStatusPill
                     v-if="(data as any).progress.overdue > 0"
@@ -430,7 +778,7 @@ onMounted(async () => {
                 </template>
               </BaseTableColumn>
 
-              <BaseTableColumn header="Journal hours" width="130px">
+              <BaseTableColumn :header="$t('admin.reports.colJournalHours')" width="130px">
                 <template #body="{ data }">
                   <span class="cell-stack">
                     <span class="type-numeric">{{ (data as any).hours }}</span>
@@ -439,10 +787,10 @@ onMounted(async () => {
                 </template>
               </BaseTableColumn>
 
-              <BaseTableColumn header="Contributors">
+              <BaseTableColumn :header="$t('admin.reports.colContributors')">
                 <template #body="{ data }">
                   <span v-if="(data as any).contributors.length">{{ (data as any).contributors.join(', ') }}</span>
-                  <span v-else class="journal-muted">Nobody yet</span>
+                  <span v-else class="journal-muted">{{ $t("admin.reports.nobodyYet") }}</span>
                 </template>
               </BaseTableColumn>
             </BaseTable>
@@ -454,62 +802,62 @@ onMounted(async () => {
       <template #exports>
         <BaseToolbar>
           <template #left>
-            <BaseStatusPill :label="downloadUrl ? 'Export ready' : 'No export yet'" :tone="downloadUrl ? 'success' : 'info'" />
+            <BaseStatusPill :label="downloadUrl ? $t('admin.reports.exportReady') : $t('admin.reports.noExportYet')" :tone="downloadUrl ? 'success' : 'info'" />
           </template>
           <template #right>
             <div class="inline-actions">
-              <BaseButton label="Preview report" severity="secondary" outlined :loading="exportLoading" @click="loadPreview" />
-              <BaseButton label="Export report" :loading="exporting" @click="exportCurrentReport" />
-              <BaseButton v-if="downloadUrl" label="Open file" severity="secondary" outlined @click="openDownload" />
+              <BaseButton :label="$t('admin.reports.previewReport')" severity="secondary" outlined :loading="exportLoading" @click="loadPreview" />
+              <BaseButton :label="$t('admin.reports.exportReport')" :loading="exporting" @click="exportCurrentReport" />
+              <BaseButton v-if="downloadUrl" :label="$t('admin.reports.openFile')" severity="secondary" outlined @click="openDownload" />
             </div>
           </template>
         </BaseToolbar>
 
         <BaseEmptyState
           v-if="loadError"
-          title="Reports unavailable"
+          :title="$t('admin.reports.unavailable')"
           :description="loadError"
-          action-label="Retry"
+          :action-label="$t('common.actions.retry')"
           @action="loadPreview()"
         />
 
         <BaseLoading v-else-if="exportLoading" />
 
         <div v-else class="dashboard-grid">
-          <BaseCard title="Report filters" description="Scope the generated report before previewing or exporting.">
+          <BaseCard :title="$t('admin.reports.reportFiltersTitle')" :description="$t('admin.reports.reportFiltersDescription')">
             <div class="settings-grid">
               <label>
                 <span>Type</span>
-                <BaseSelect v-model="form.type" :options="REPORT_TYPE_OPTIONS" />
+                <BaseSelect v-model="form.type" :options="reportTypeOptions()" />
               </label>
               <label>
-                <span>Format</span>
+                <span>{{ $t("admin.reports.fieldFormat") }}</span>
                 <BaseSelect v-model="form.format" :options="reportFormats" />
               </label>
               <label>
-                <span>Scope</span>
+                <span>{{ $t("admin.reports.fieldScope") }}</span>
                 <BaseTextInput v-model="form.scope" />
               </label>
               <label>
-                <span>From</span>
+                <span>{{ $t("common.time.from") }}</span>
                 <BaseDatePicker v-model="rangeStart" />
               </label>
               <label>
-                <span>To</span>
+                <span>{{ $t("common.time.to") }}</span>
                 <BaseDatePicker v-model="rangeEnd" />
               </label>
               <label>
-                <span>Member</span>
+                <span>{{ $t("admin.reports.fieldMember") }}</span>
                 <BaseSelect v-model="form.studentId" :options="memberFilterOptions" />
               </label>
               <label>
-                <span>Device</span>
+                <span>{{ $t("admin.reports.fieldDevice") }}</span>
                 <BaseSelect v-model="form.deviceId" :options="deviceOptions" />
               </label>
             </div>
           </BaseCard>
 
-          <BaseCard title="Report preview" description="Mocked output returned by the service layer.">
+          <BaseCard :title="$t('admin.reports.previewTitle')" :description="$t('admin.reports.previewDescription')">
             <div v-if="preview" class="report-preview">
               <h3>{{ preview.title }}</h3>
               <p>{{ preview.subtitle }}</p>
@@ -521,48 +869,106 @@ onMounted(async () => {
                 </li>
               </ul>
             </div>
-            <BaseEmptyState v-else title="No preview yet" description="Choose a report type and period, then run a preview to see what will be exported." action-label="Preview report" @action="loadPreview()" />
+            <BaseEmptyState v-else :title="$t('admin.reports.previewEmptyTitle')" :description="$t('admin.reports.previewEmptyDescription')" :action-label="$t('admin.reports.previewReport')" @action="loadPreview()" />
           </BaseCard>
 
-          <BaseCard v-if="summary" title="Period snapshot" description="What the export will cover.">
+          <BaseCard v-if="summary" :title="$t('admin.reports.snapshotTitle')" :description="$t('admin.reports.snapshotDescription')">
             <div class="module-summary">
-              <BaseStatusPill label="Audit safe" tone="success" />
+              <BaseStatusPill :label="$t('admin.reports.auditSafe')" tone="success" />
               <!--
                 Says which figures the period actually narrowed. Attendance and the
                 two hour buckets are dated; the roster count is not, and pretending
                 otherwise is what made this card misleading before.
               -->
               <p>
-                {{ summary.attendanceTotal }} attendance entries
-                {{ summary.rangeApplied ? 'in the selected period' : 'in the full record' }}:
-                {{ summary.teamHours }}h of volunteer team hours and
-                {{ summary.internshipHours }}h of FCT internship hours, tracked separately.
+                {{
+                  $t("admin.reports.summaryAttendance", {
+                    entries: summary.attendanceTotal,
+                    scope: summary.rangeApplied
+                      ? $t("admin.reports.scopeSelectedPeriod")
+                      : $t("admin.reports.scopeFullRecord"),
+                    team: summary.teamHours,
+                    internship: summary.internshipHours,
+                  })
+                }}
               </p>
-              <p class="type-meta">{{ summary.activeStudents }} active members on the roster today (not period-scoped).</p>
-              <p>{{ journalStore.summary?.entriesThisMonth ?? 0 }} journal entries were written this month.</p>
+              <p class="type-meta">
+                {{ $t("admin.reports.summaryRoster", { count: summary.activeStudents }) }}
+              </p>
+              <p>
+                {{ $t("admin.reports.summaryJournal", { count: journalStore.summary?.entriesThisMonth ?? 0 }) }}
+              </p>
             </div>
           </BaseCard>
         </div>
       </template>
     </BaseTabs>
 
-    <BaseDialog :visible="Boolean(selectedEntry)" header="Daily entry" @update:visible="selectedEntry = null">
+    <BaseFormDialog
+      :visible="reviewDialogVisible"
+      :title="
+        reviewDecision === 'approved'
+          ? $t('admin.reports.approveReport')
+          : $t('admin.reports.returnForRevision')
+      "
+      :subtitle="
+        reviewDecision === 'approved'
+          ? $t('admin.reports.approveApprovedHint')
+          : $t('admin.reports.approveReturnHint')
+      "
+      :confirm-label="
+        reviewDecision === 'approved'
+          ? $t('common.actions.approve')
+          : $t('admin.reports.returnForRevision')
+      "
+      :cancel-label="$t('common.actions.cancel')"
+      :loading="reportsStore.saving"
+      @update:visible="reviewDialogVisible = $event"
+      @confirm="submitReview"
+      @cancel="reviewDialogVisible = false"
+    >
+      <p v-if="reportsStore.errorMessage" class="form-error-banner">{{ reportsStore.errorMessage }}</p>
+
+      <p class="type-body-secondary">{{ reviewSubject }}</p>
+
+      <label class="review-field">
+        <span>
+          {{
+            reviewDecision === "rejected"
+              ? $t("admin.reports.reviewNoteRequired")
+              : $t("admin.reports.reviewNoteOptional")
+          }}
+        </span>
+        <BaseTextarea v-model="reviewNote" rows="4" auto-resize />
+      </label>
+    </BaseFormDialog>
+
+    <BaseDialog :visible="Boolean(selectedEntry)" :header="$t('admin.reports.entryHeader')" @update:visible="selectedEntry = null">
       <div v-if="selectedEntry" class="module-summary">
-        <BaseStatusPill :label="selectedEntry.status" :tone="selectedEntry.status === 'submitted' ? 'success' : 'warning'" />
-        <p><strong>Member:</strong> {{ selectedEntry.memberName }}</p>
-        <p><strong>Date:</strong> {{ selectedEntry.date }} • <strong>Hours:</strong> {{ selectedEntry.hours }}h</p>
-        <p><strong>Project:</strong> {{ selectedEntry.projectName ?? 'Unassigned' }}</p>
-        <p><strong>Activities carried out</strong></p>
+        <BaseStatusPill
+          :label="dailyLogStatusLabel(selectedEntry.status)"
+          :tone="selectedEntry.status === 'submitted' ? 'success' : 'warning'"
+        />
+        <p><strong>{{ $t("admin.reports.entryMemberLabel") }}</strong> {{ selectedEntry.memberName }}</p>
+        <p>
+          <strong>{{ $t("admin.reports.entryDateLabel") }}</strong> {{ selectedEntry.date }} •
+          <strong>{{ $t("admin.reports.entryHoursLabel") }}</strong> {{ selectedEntry.hours }}h
+        </p>
+        <p>
+          <strong>{{ $t('admin.reports.entryProject') }}</strong>
+          {{ selectedEntry.projectName ?? $t('admin.reports.noProject') }}
+        </p>
+        <p><strong>{{ $t("admin.reports.activitiesDone") }}</strong></p>
         <p>{{ selectedEntry.activities }}</p>
-        <p><strong>New learnings</strong></p>
+        <p><strong>{{ $t("admin.reports.learnings") }}</strong></p>
         <p>{{ selectedEntry.learnings || '—' }}</p>
-        <p><strong>Difficulties felt</strong></p>
+        <p><strong>{{ $t("admin.reports.difficulties") }}</strong></p>
         <p>{{ selectedEntry.difficulties || '—' }}</p>
       </div>
 
       <template #footer>
         <div class="inline-actions inline-actions--end">
-          <BaseButton label="Close" severity="secondary" text @click="selectedEntry = null" />
+          <BaseButton :label="$t('common.actions.close')" severity="secondary" text @click="selectedEntry = null" />
         </div>
       </template>
     </BaseDialog>

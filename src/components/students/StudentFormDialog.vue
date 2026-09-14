@@ -7,8 +7,10 @@ import BaseImageUpload from "../base/BaseImageUpload.vue";
 import BaseSelect from "../base/BaseSelect.vue";
 import BaseTextarea from "../base/BaseTextarea.vue";
 import BaseTextInput from "../base/BaseTextInput.vue";
-import { isExternalSchool, OTHER_SCHOOL_VALUE, SCHOOL_NAME, SCHOOL_OPTIONS } from "../../shared/constants";
+import { isExternalSchool, OTHER_SCHOOL_VALUE, SCHOOL_NAME, schoolOptions } from "../../shared/constants";
 import type { MemberFormValues } from "../../types/members";
+import { t } from "../../i18n";
+import { memberStatusOptions } from "../../i18n/vocabulary";
 
 interface MemberFormOption {
   label: string;
@@ -43,7 +45,7 @@ const props = withDefaults(
   {
     student: null,
     busy: false,
-    title: "Member form",
+    title: t("components.memberForm.title"),
     cardOptions: () => [],
   },
 );
@@ -57,12 +59,7 @@ const emit = defineEmits<{
 const form = reactive<MemberFormValues>({ ...defaultMember });
 const errors = reactive<Partial<Record<keyof MemberFormValues, string>>>({});
 
-const statusOptions: MemberFormOption[] = [
-  { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-  { label: "Pending", value: "pending" },
-  { label: "Graduated", value: "graduated" },
-];
+const statusOptions = computed<MemberFormOption[]>(() => memberStatusOptions());
 
 const yearOptions: MemberFormOption[] = [
   { label: "2024", value: "2024" },
@@ -72,7 +69,7 @@ const yearOptions: MemberFormOption[] = [
 ];
 
 const cardDropdownOptions = computed(() => [
-  { label: "Unassigned", value: "" },
+  { label: t("common.state.notAssigned"), value: "" },
   ...props.cardOptions.map((uid) => ({ label: uid, value: uid })),
 ]);
 
@@ -98,7 +95,7 @@ function resetForm() {
     delete errors[key as keyof MemberFormValues];
   });
 
-  const known = SCHOOL_OPTIONS.some((option) => option.value === form.originSchool);
+  const known = schoolOptions().some((option) => option.value === form.originSchool);
   schoolSelection.value = known ? form.originSchool : OTHER_SCHOOL_VALUE;
   customSchool.value = known ? "" : form.originSchool;
 }
@@ -121,7 +118,7 @@ function validate() {
 
   for (const field of requiredFields) {
     if (!String(form[field]).trim()) {
-      errors[field] = field === "originSchool" ? "Select or type the school this member is enrolled at." : "This field is required.";
+      errors[field] = field === "originSchool" ? t("errors.schoolRequired") : t("common.validation.required");
       isValid = false;
     } else {
       delete errors[field];
@@ -129,7 +126,7 @@ function validate() {
   }
 
   if (form.email && !emailPattern.test(form.email)) {
-    errors.email = "Enter a valid email address.";
+    errors.email = t("common.validation.invalidEmail");
     isValid = false;
   }
 
@@ -168,9 +165,10 @@ watch(
 <template>
   <BaseFormDialog
     :visible="visible"
-    :title="title ?? 'Member form'"
-    subtitle="Capture member identity, the school they are enrolled at, contact details and RFID assignment."
-    confirm-label="Save"
+    :title="title ?? $t('components.memberForm.title')"
+    :subtitle="$t('components.memberForm.subtitle')"
+    :confirm-label="$t('common.actions.save')"
+    :cancel-label="$t('common.actions.cancel')"
     :loading="busy"
     @update:visible="emit('update:visible', $event)"
     @confirm="submit"
@@ -181,86 +179,96 @@ watch(
 
       <div class="student-form__grid">
         <div>
-          <label class="student-form__label">Member Number</label>
+          <label class="student-form__label">{{ $t("components.memberForm.memberNumber") }}</label>
           <BaseTextInput v-model="form.memberNumber" />
           <small v-if="errors.memberNumber" class="student-form__error">{{ errors.memberNumber }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Full Name</label>
+          <label class="student-form__label">{{ $t("components.memberForm.fullName") }}</label>
           <BaseTextInput v-model="form.fullName" />
           <small v-if="errors.fullName" class="student-form__error">{{ errors.fullName }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Email</label>
+          <label class="student-form__label">{{ $t("common.fields.email") }}</label>
           <BaseTextInput v-model="form.email" type="email" />
           <small v-if="errors.email" class="student-form__error">{{ errors.email }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Phone</label>
+          <label class="student-form__label">{{ $t("common.fields.phone") }}</label>
           <BaseTextInput v-model="form.phone" />
           <small v-if="errors.phone" class="student-form__error">{{ errors.phone }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">School</label>
-          <BaseSelect v-model="schoolSelection" :options="SCHOOL_OPTIONS" />
+          <label class="student-form__label">{{ $t("components.memberForm.school") }}</label>
+          <BaseSelect v-model="schoolSelection" :options="schoolOptions()" />
           <small v-if="isExternal" class="student-form__hint">
-            Enrolled elsewhere — an FCT intern hosted by Equipa Técnica. Their orientador belongs to that school.
+            {{ $t("components.memberForm.externalHint") }}
           </small>
           <small v-if="errors.originSchool && !usesCustomSchool" class="student-form__error">{{ errors.originSchool }}</small>
         </div>
 
         <div v-if="usesCustomSchool">
-          <label class="student-form__label">School name</label>
-          <BaseTextInput v-model="customSchool" placeholder="Escola Secundária de…" />
+          <label class="student-form__label">{{ $t("components.memberForm.schoolName") }}</label>
+          <BaseTextInput v-model="customSchool" :placeholder="$t('components.memberForm.schoolPlaceholder')" />
           <small v-if="errors.originSchool" class="student-form__error">{{ errors.originSchool }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Course{{ isExternal ? " (optional)" : "" }}</label>
+          <label class="student-form__label">
+            {{ isExternal ? $t("components.memberForm.courseOptional") : $t("common.fields.course") }}
+          </label>
           <BaseTextInput v-model="form.course" />
           <small v-if="errors.course" class="student-form__error">{{ errors.course }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Class{{ isExternal ? " (optional)" : "" }}</label>
+          <label class="student-form__label">
+            {{ isExternal ? $t("components.memberForm.classOptional") : $t("common.fields.className") }}
+          </label>
           <BaseTextInput v-model="form.className" />
           <small v-if="errors.className" class="student-form__error">{{ errors.className }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Academic Year{{ isExternal ? " (optional)" : "" }}</label>
+          <label class="student-form__label">
+            {{
+              isExternal
+                ? $t("components.memberForm.academicYearOptional")
+                : $t("components.memberForm.academicYear")
+            }}
+          </label>
           <BaseSelect v-model="form.academicYear" :options="yearOptions" />
           <small v-if="errors.academicYear" class="student-form__error">{{ errors.academicYear }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Birth Date</label>
+          <label class="student-form__label">{{ $t("components.memberForm.birthDate") }}</label>
           <BaseDatePicker v-model="form.birthDate" />
           <small v-if="errors.birthDate" class="student-form__error">{{ errors.birthDate }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Emergency Contact</label>
+          <label class="student-form__label">{{ $t("components.memberForm.emergencyContact") }}</label>
           <BaseTextInput v-model="form.emergencyContact" />
           <small v-if="errors.emergencyContact" class="student-form__error">{{ errors.emergencyContact }}</small>
         </div>
 
         <div>
-          <label class="student-form__label">Assigned Card</label>
+          <label class="student-form__label">{{ $t("components.memberForm.assignedCard") }}</label>
           <BaseSelect v-model="form.assignedCardUid" :options="cardDropdownOptions" />
         </div>
 
         <div>
-          <label class="student-form__label">Status</label>
+          <label class="student-form__label">{{ $t("common.fields.status") }}</label>
           <BaseSelect v-model="form.status" :options="statusOptions" />
         </div>
 
         <div class="student-form__full-width">
-          <label class="student-form__label">Notes</label>
+          <label class="student-form__label">{{ $t("common.fields.notes") }}</label>
           <BaseTextarea v-model="form.notes" rows="4" auto-resize />
         </div>
       </div>

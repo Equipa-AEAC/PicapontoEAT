@@ -64,6 +64,40 @@ only the main region scrolls.
 - Primary navigation sits at the root of the sidebar; a sub-area (Project management)
   renders as a titled group with indented children.
 
+### The spacing system
+
+Four tokens in `src/styles/tokens.css` set the page rhythm. Use them; do not
+invent a margin:
+
+| Token | Where |
+| --- | --- |
+| `--layout-gap-section` | Between the blocks of a `.page-stack`. |
+| `--layout-gap-grid` | Between cards inside a grid. |
+| `--layout-pad-card` | A card's own padding. |
+| `--layout-gap-card` | Between the parts inside one card. |
+
+`--layout-metric-min` and `--layout-card-min` set the point at which a grid drops
+a column.
+
+### Responsive: container queries, not viewport queries
+
+`.app-shell__main` is a **container** (`container-type: inline-size`). Grids
+respond to `@container page (…)` and to `repeat(auto-fit, minmax(…, 1fr))`, never
+to `@media (max-width: …)`.
+
+The reason is arithmetic. The content area is the window minus a 264px sidebar,
+so a viewport rule fires at the wrong moment: `@media (max-width: 1280px)`
+collapsing the metric row to two columns meant a 1280px laptop — the most common
+size in the building — drew four cards 471px wide each holding one short caption.
+A container query measures the space the cards are actually in.
+
+### Dialogs
+
+The dialog is the scroll **container**; `.base-dialog__body` is the scroller.
+Header and footer are `flex: none`. Scrolling the whole box takes the confirm
+button with it, and on a twelve-field form at a laptop height "Save" ends up
+below the fold.
+
 ## Icons
 
 Phosphor (`@phosphor-icons/vue`), `weight="regular"` for navigation and controls,
@@ -97,6 +131,22 @@ taste, so they carry more weight than anything above.
 - **A count leads to its rows.** `BaseStatsCard` takes `interactive` + `@action`
   for this: if a number is worth showing, the reader should be able to reach what
   it counts.
+- **Permission decides between absent and disabled, and the two workspaces
+  answer differently on purpose.**
+  - In the **student** workspace a capability the member does not hold is
+    **absent**. A disabled assignment picker still announces a feature that is
+    not theirs and still asks them to work out why it is grey. The task dialog
+    shows the participant picker to an owner or task coordinator, and an "assign
+    this to me" checkbox to everybody else — two controls, never one disabled
+    one.
+  - In the **admin** workspace a staff control gated by an account permission
+    stays **visible and disabled, with the reason in its tooltip**
+    (`authStore.denialReason`). A coordinator already knows the feature exists;
+    a button that silently vanishes reads as a broken console rather than a
+    locked one.
+  - A control disabled for a reason the reader can act on (no terminal
+    registered, no filters to clear) always keeps that reason in its tooltip or
+    beside it, in either workspace.
 
 ## Filters
 
@@ -133,8 +183,13 @@ next.
 
 - Never interpolate a stored value straight into a template. Dates go through
   `formatIsoDate` (a `YYYY-MM-DD` day) or `formatTimestamp` (anything with a
-  time); statuses go through `BaseStatusPill` / `BaseBadge`, which run
-  `toDisplayLabel` so a raw enum member (`submitted`) reads as "Submitted"
-  without disturbing a label an author already wrote ("In review").
+  time) — both format in the active language. Statuses, roles, kinds, priorities
+  and every other enum go through a labeller in `src/i18n/vocabulary.ts`
+  (`attendanceStatusLabel`, `deviceStatusLabel`, …).
+- `BaseStatusPill` / `BaseBadge` still run `toDisplayLabel`, but that is a safety
+  net, not the mechanism: it turns `submitted` into "Submitted" in **both**
+  languages, which reads as a translation and is not one. It warns in
+  development. If you see the warning, the fix is a labeller, not a nicer
+  capitalisation.
 - `.status-pill` hugs its content. It sets `align-self: flex-start` because most
   of its parents are flex columns and would otherwise stretch it to full width.

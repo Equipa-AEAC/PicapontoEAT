@@ -16,6 +16,8 @@ import {
 import TaskAssignRow from "../../../../components/projects/TaskAssignRow.vue";
 import { useProjectsStore } from "../../../../shared/stores";
 import type { ProjectWorkloadRow } from "../../../../shared/types";
+import { t } from "../../../../i18n";
+import { participantRoleLabel } from "../../../../i18n/vocabulary";
 
 /**
  * Team and assignments.
@@ -67,7 +69,9 @@ async function reassign(taskId: string, projectId: string, assigneeIds: string[]
   if (!projectsStore.errorMessage) {
     await projectsStore.refreshTeamViews();
     savedMessage.value = assigneeIds.length
-      ? `Reassigned to ${assigneeIds.map((id) => projectsStore.participantName(id)).join(", ")}.`
+      ? t("projects.admin.team.reassignedTo", {
+          names: assigneeIds.map((id) => projectsStore.participantName(id)).join(", "),
+        })
       : "Task left unassigned.";
   }
 }
@@ -84,8 +88,8 @@ onMounted(async () => {
 <template>
   <div class="page-stack">
     <BasePageHeader
-      title="Team and assignments"
-      description="Who is on which project, and how much open work each person is carrying."
+      :title="$t('projects.admin.team.title')"
+      :description="$t('projects.admin.team.description')"
     />
 
     <p v-if="savedMessage" class="form-success-banner">
@@ -98,15 +102,18 @@ onMounted(async () => {
     <BaseLoading v-if="projectsStore.loading && workload.length === 0" />
 
     <template v-else>
-      <BaseCard title="Workload" description="Open tasks per person. Overdue work is called out separately.">
+      <BaseCard
+        :title="$t('projects.admin.team.workloadTitle')"
+        :description="$t('projects.admin.team.workloadDescription')"
+      >
         <BaseEmptyState
           v-if="workload.length === 0"
-          title="Nobody on the roster"
-          description="Add members or staff accounts and they become assignable here."
+          :title="$t('projects.admin.team.emptyRosterTitle')"
+          :description="$t('projects.admin.team.emptyRosterDescription')"
         />
 
         <BaseTable v-else :value="workload" data-key="participant.id">
-          <BaseTableColumn header="Person">
+          <BaseTableColumn :header="$t('projects.admin.team.colPerson')">
             <template #body="{ data }">
               <button
                 type="button"
@@ -120,14 +127,16 @@ onMounted(async () => {
               >
                 <span class="person-cell__name">{{ (data as ProjectWorkloadRow).participant.name }}</span>
                 <small>
-                  {{ (data as ProjectWorkloadRow).participant.role }}
-                  <template v-if="(data as ProjectWorkloadRow).participant.isExternal"> · External</template>
+                  {{ participantRoleLabel((data as ProjectWorkloadRow).participant.role) }}
+                  <template v-if="(data as ProjectWorkloadRow).participant.isExternal">
+                    · {{ $t("projects.admin.team.external") }}
+                  </template>
                 </small>
               </button>
             </template>
           </BaseTableColumn>
 
-          <BaseTableColumn header="Load" width="200px">
+          <BaseTableColumn :header="$t('projects.admin.team.colLoad')" width="200px">
             <template #body="{ data }">
               <div class="workload-bar">
                 <span class="progress-bar workload-bar__track">
@@ -142,19 +151,19 @@ onMounted(async () => {
             </template>
           </BaseTableColumn>
 
-          <BaseTableColumn header="Projects" width="90px">
+          <BaseTableColumn :header="$t('projects.admin.team.colProjects')" width="90px">
             <template #body="{ data }">
               <span class="type-numeric">{{ (data as ProjectWorkloadRow).projects }}</span>
             </template>
           </BaseTableColumn>
 
-          <BaseTableColumn header="Done" width="80px">
+          <BaseTableColumn :header="$t('projects.admin.team.colDone')" width="80px">
             <template #body="{ data }">
               <span class="type-numeric">{{ (data as ProjectWorkloadRow).done }}</span>
             </template>
           </BaseTableColumn>
 
-          <BaseTableColumn header="Overdue" width="100px">
+          <BaseTableColumn :header="$t('projects.admin.team.colOverdue')" width="100px">
             <template #body="{ data }">
               <BaseBadge
                 v-if="(data as ProjectWorkloadRow).overdue > 0"
@@ -165,7 +174,7 @@ onMounted(async () => {
             </template>
           </BaseTableColumn>
 
-          <BaseTableColumn header="Journal hours" width="130px">
+          <BaseTableColumn :header="$t('projects.admin.team.colJournalHours')" width="130px">
             <template #body="{ data }">
               <span class="type-numeric">{{ (data as ProjectWorkloadRow).hours || '—' }}</span>
             </template>
@@ -177,19 +186,32 @@ onMounted(async () => {
         The panel the workload table opens into. It exists so "who is overloaded"
         and "move some of it" are the same interaction, not two pages.
       -->
-      <BaseCard v-if="focused" :title="`${focused.participant.name}'s open work`">
+      <BaseCard
+        v-if="focused"
+        :title="$t('projects.admin.team.openWorkTitle', { name: focused.participant.name })"
+      >
         <template #header>
           <div class="focus-head">
             <div>
-              <h2 class="type-card-title focus-head__title">{{ focused.participant.name }}&rsquo;s open work</h2>
+              <h2 class="type-card-title focus-head__title">
+                {{ $t("projects.admin.team.openWorkHeading", { name: focused.participant.name }) }}
+              </h2>
               <p class="type-meta focus-head__meta">
-                {{ focused.open }} open · {{ focused.done }} done · {{ focused.projects }} projects
-                <template v-if="focused.overdue > 0"> · {{ focused.overdue }} overdue</template>
+                {{
+                  $t("projects.admin.team.workloadLine", {
+                    open: focused.open,
+                    done: focused.done,
+                    projects: focused.projects,
+                  })
+                }}
+                <template v-if="focused.overdue > 0">
+                  · {{ $t("projects.admin.team.overdueSuffix", { count: focused.overdue }) }}
+                </template>
               </p>
             </div>
             <BaseButton severity="secondary" text size="small" @click="projectsStore.focusOnParticipant(null)">
               <PhX weight="bold" />
-              Close
+              {{ $t("common.actions.close") }}
             </BaseButton>
           </div>
         </template>
@@ -198,8 +220,8 @@ onMounted(async () => {
 
         <BaseEmptyState
           v-else-if="projectsStore.focusTasks.length === 0"
-          title="Nothing open"
-          :description="`${focused.participant.name} has no open tasks right now.`"
+          :title="$t('projects.admin.team.nothingOpenTitle')"
+          :description="$t('projects.admin.team.nothingOpenDescription', { name: focused.participant.name })"
         />
 
         <ul v-else class="task-rows">
@@ -221,13 +243,13 @@ onMounted(async () => {
         was hiding exactly the tasks most likely to slip.
       -->
       <BaseCard
-        title="Unassigned work"
-        description="Open tasks with nobody responsible. These are the ones that slip."
+        :title="$t('projects.admin.team.unassignedTitle')"
+        :description="$t('projects.admin.team.unassignedDescription')"
       >
         <BaseEmptyState
           v-if="projectsStore.unassignedTasks.length === 0"
-          title="Everything has an owner"
-          description="Every open task across every project is assigned to somebody."
+          :title="$t('projects.admin.team.unassignedEmptyTitle')"
+          :description="$t('projects.admin.team.unassignedEmptyDescription')"
         />
 
         <ul v-else class="task-rows">
@@ -245,13 +267,13 @@ onMounted(async () => {
       </BaseCard>
 
       <BaseCard
-        title="Project assignments"
-        description="Who is on each active project. A project with nobody on it is flagged."
+        :title="$t('projects.admin.team.assignmentsTitle')"
+        :description="$t('projects.admin.team.assignmentsDescription')"
       >
         <BaseEmptyState
           v-if="activeProjects.length === 0"
-          title="No active projects"
-          description="Create a project and assign people to it."
+          :title="$t('projects.admin.team.assignmentsEmptyTitle')"
+          :description="$t('projects.admin.team.assignmentsEmptyDescription')"
         />
 
         <ul v-else class="assignment-list">
@@ -267,15 +289,24 @@ onMounted(async () => {
                 :label="participant.name"
                 :tone="participant.source === 'user' ? 'info' : 'neutral'"
               />
-              <BaseBadge v-if="project.participants.length === 0" label="Nobody assigned" tone="warning" />
+              <BaseBadge
+                v-if="project.participants.length === 0"
+                :label="$t('projects.task.nobodyAssigned')"
+                tone="warning"
+              />
             </div>
           </li>
         </ul>
 
         <template v-if="unassignedProjects.length > 0" #footer>
           <p class="type-meta">
-            {{ unassignedProjects.length }}
-            {{ unassignedProjects.length === 1 ? 'project has' : 'projects have' }} nobody assigned.
+            {{
+              $t(
+                "projects.admin.team.unassignedFooter",
+                { count: unassignedProjects.length },
+                unassignedProjects.length,
+              )
+            }}
           </p>
         </template>
       </BaseCard>

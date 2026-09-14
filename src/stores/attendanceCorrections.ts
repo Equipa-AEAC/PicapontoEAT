@@ -18,6 +18,7 @@ import type {
   CorrectionResolutionValues,
 } from "../types/attendanceCorrections";
 import { hasOpenRequest } from "../types/attendanceCorrections";
+import { t } from "../i18n";
 
 /**
  * Both sides of the correction workflow.
@@ -83,7 +84,7 @@ export const useAttendanceCorrectionsStore = defineStore("attendanceCorrections"
     try {
       return await operation();
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      errorMessage.value = error instanceof Error ? error.message : t("common.feedback.unexpected");
       return null;
     } finally {
       flag.value = false;
@@ -124,7 +125,7 @@ export const useAttendanceCorrectionsStore = defineStore("attendanceCorrections"
 
     if (created) {
       await loadMyRequests();
-      successMessage.value = "Your request was sent. You will see the outcome on this page.";
+      successMessage.value = t("common.feedback.requestSent");
     }
 
     return created;
@@ -137,7 +138,7 @@ export const useAttendanceCorrectionsStore = defineStore("attendanceCorrections"
 
     if (updated) {
       await loadMyRequests();
-      successMessage.value = "Request withdrawn.";
+      successMessage.value = t("common.feedback.requestWithdrawn");
     }
 
     return updated;
@@ -153,10 +154,10 @@ export const useAttendanceCorrectionsStore = defineStore("attendanceCorrections"
     if (updated) {
       await loadQueue();
       successMessage.value = updated.appliedToRecord
-        ? "Approved and the attendance record was corrected."
+        ? t("common.feedback.correctionApprovedAndApplied")
         : approve
-          ? "Approved. The record was left as it is."
-          : "Request closed without changing the record.";
+          ? t("common.feedback.correctionApprovedOnly")
+          : t("common.feedback.correctionClosed");
     }
 
     return updated;

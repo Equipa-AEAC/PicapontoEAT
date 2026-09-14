@@ -8,11 +8,12 @@ import { useAttendanceStore, usePortalStore } from "../../../../shared/stores";
 import { useParticipationStore } from "../../../../stores/participation";
 import ParticipationTimeline from "../../../../components/participation/ParticipationTimeline.vue";
 import { formatHours } from "../../../../utils/participation";
-import { PARTICIPATION_KIND_LABELS } from "../../../../types/participation";
 import { useChartTheme } from "../../../../composables/useChartTheme";
 import { useAuthStore } from "../../../../modules/authentication";
-import { hoursByWeekday, mostRecent } from "../../../../shared/utils/attendanceStats";
+import { hoursByCalendarWeek, mostRecent } from "../../../../shared/utils/attendanceStats";
 import { formatIsoDate } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import { attendanceStatusLabel, participationKindLabel } from "../../../../i18n/vocabulary";
 
 const portalStore = usePortalStore();
 const attendanceStore = useAttendanceStore();
@@ -39,14 +40,25 @@ const memberId = computed(() => authStore.currentMemberId ?? "");
  */
 const myAttendance = computed(() => attendanceStore.items.filter((row) => row.studentId === memberId.value));
 const attendance = computed(() => mostRecent(myAttendance.value, 20));
-const weekdayHours = computed(() => hoursByWeekday(myAttendance.value));
+
+/**
+ * Hours per calendar week, oldest first.
+ *
+ * This was `hoursByWeekday`, which stacked every Monday in the member's whole
+ * record into one column — producing totals like "51 hours on Monday" that no
+ * day ever held, and answering a question ("which weekday do I tend to work?")
+ * that nobody looking at their placement progress is asking. Each bar is now a
+ * real, consecutive week, labelled by the Monday it starts on, so the shape of
+ * the chart is the shape of the work.
+ */
+const weeklyHours = computed(() => hoursByCalendarWeek(myAttendance.value, 10));
 
 const weeklyChart = computed<ChartData<'bar'>>(() => ({
-  labels: weekdayHours.value.map((item) => item.label),
+  labels: weeklyHours.value.map((item) => item.label),
   datasets: [
     {
-      label: 'Hours',
-      data: weekdayHours.value.map((item) => item.value),
+      label: t("student.workedHours.weeklySeries"),
+      data: weeklyHours.value.map((item) => item.value),
       backgroundColor: palette.value.series[0],
       borderRadius: 2,
       borderSkipped: false,
@@ -56,7 +68,7 @@ const weeklyChart = computed<ChartData<'bar'>>(() => ({
 }));
 
 const progressChart = computed<ChartData<'doughnut'>>(() => ({
-  labels: ['Completed', 'Remaining'],
+  labels: [t("student.workedHours.chartCompleted"), t("student.workedHours.chartRemaining")],
   datasets: [
     {
       data: [portalStore.summary?.completedHours ?? 0, portalStore.summary?.remainingHours ?? 0],
@@ -107,7 +119,9 @@ const currentParticipation = computed(() => {
 });
 
 const currentLabel = computed(() =>
-  currentParticipation.value ? PARTICIPATION_KIND_LABELS[currentParticipation.value.period.kind] : "Not recorded",
+  currentParticipation.value
+    ? participationKindLabel(currentParticipation.value.period.kind)
+    : t("student.workedHours.notRecorded"),
 );
 
 async function load() {
@@ -125,11 +139,17 @@ onMounted(load);
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Worked Hours"
-      description="Your internship progress: hours completed, hours left, and the milestones you have reached."
+      :title="$t('student.workedHours.title')"
+      :description="$t('student.workedHours.description')"
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="portalStore.loading" @click="load" />
+        <BaseButton
+          :label="$t('common.actions.refresh')"
+          severity="secondary"
+          outlined
+          :loading="portalStore.loading"
+          @click="load"
+        />
       </template>
     </BasePageHeader>
 
@@ -147,24 +167,32 @@ onMounted(load);
     -->
     <section class="metric-grid">
       <BaseDataCard
-        title="Internship hours"
+        :title="$t('student.workedHours.internshipHours')"
         :value="formatHours(portalStore.summary?.internshipHours ?? 0)"
-        description="Counted towards your FCT requirement"
+        :description="$t('student.workedHours.internshipHoursCaption')"
       />
       <BaseDataCard
-        title="Technical Team hours"
+        :title="$t('student.workedHours.teamHours')"
         :value="formatHours(portalStore.summary?.teamHours ?? 0)"
-        description="Volunteer time — does not count towards the internship"
+        :description="$t('student.workedHours.teamHoursCaption')"
       />
       <BaseDataCard
-        title="Still required"
+        :title="$t('student.workedHours.stillRequired')"
         :value="formatHours(portalStore.summary?.remainingHours ?? 0)"
-        description="Internship hours left before the placement is complete"
+        :description="$t('student.workedHours.stillRequiredCaption')"
       />
       <BaseDataCard
-        title="Internship progress"
+        :title="$t('student.workedHours.progress')"
         :value="`${completionProgress}%`"
-        :description="`${formatHours(portalStore.summary?.internshipHours ?? 0)} of ${portalStore.summary?.completedHours !== undefined ? formatHours((portalStore.summary?.internshipHours ?? 0) + (portalStore.summary?.remainingHours ?? 0)) : '—'} required`"
+        :description="
+          $t('student.workedHours.progressCaption', {
+            done: formatHours(portalStore.summary?.internshipHours ?? 0),
+            required:
+              portalStore.summary?.completedHours !== undefined
+                ? formatHours((portalStore.summary?.internshipHours ?? 0) + (portalStore.summary?.remainingHours ?? 0))
+                : '—',
+          })
+        "
       />
     </section>
 
@@ -172,15 +200,15 @@ onMounted(load);
 
     <template v-else>
       <BaseSection
-        title="Your participation"
-        description="What you are doing now, and what you did before. Each period keeps the hours you earned during it."
+        :title="$t('student.workedHours.participationTitle')"
+        :description="$t('student.workedHours.participationDescription')"
       >
         <BaseCard>
           <p class="participation-current">
-            <span class="type-label">Currently</span>
+            <span class="type-label">{{ $t("student.workedHours.currently") }}</span>
             <strong>{{ currentLabel }}</strong>
             <span v-if="currentParticipation" class="type-meta">
-              since {{ formatIsoDate(currentParticipation.period.startDate) }}
+              {{ $t("student.workedHours.since", { date: formatIsoDate(currentParticipation.period.startDate) }) }}
             </span>
           </p>
 
@@ -189,13 +217,24 @@ onMounted(load);
       </BaseSection>
 
       <section class="dashboard-grid">
-        <BaseCard title="Hours by weekday" description="Which days you work, totalled across your recorded days.">
-          <div style="height: 260px;">
+        <BaseCard
+          :title="$t('student.workedHours.weeklyTitle')"
+          :description="$t('student.workedHours.weeklyDescription')"
+        >
+          <BaseEmptyState
+            v-if="weeklyHours.length === 0"
+            :title="$t('student.workedHours.weeklyEmptyTitle')"
+            :description="$t('student.workedHours.weeklyEmptyDescription')"
+          />
+          <div v-else style="height: 260px;">
             <BaseChart type="bar" :data="weeklyChart" :options="barOptions" />
           </div>
         </BaseCard>
 
-        <BaseCard title="Internship progress split" description="Internship hours against the requirement. Volunteer hours are not part of this.">
+        <BaseCard
+          :title="$t('student.workedHours.splitTitle')"
+          :description="$t('student.workedHours.splitDescription')"
+        >
           <div style="height: 260px;">
             <BaseChart type="doughnut" :data="progressChart" :options="doughnutOptions" />
           </div>
@@ -206,12 +245,15 @@ onMounted(load);
         Milestones moved here from the Internship page, which showed the same
         three numbers this page already leads with and nothing else.
       -->
-      <BaseSection title="Milestones" description="Achievements earned as your placement progresses.">
+      <BaseSection
+        :title="$t('student.workedHours.milestonesTitle')"
+        :description="$t('student.workedHours.milestonesDescription')"
+      >
         <BaseCard>
           <BaseEmptyState
             v-if="(portalStore.summary?.achievements ?? []).length === 0"
-            title="No milestones yet"
-            description="Milestones are awarded as you progress through your internship hours."
+            :title="$t('student.workedHours.milestonesEmptyTitle')"
+            :description="$t('student.workedHours.milestonesEmptyDescription')"
           />
 
           <ul v-else class="milestone-list">
@@ -229,28 +271,39 @@ onMounted(load);
         not the sum of these attendance rows. Saying so would be a claim the data
         does not support.
       -->
-      <BaseSection title="Recent attendance" description="Your most recently recorded days.">
+      <BaseSection
+        :title="$t('student.workedHours.recentTitle')"
+        :description="$t('student.workedHours.recentDescription')"
+      >
         <BaseCard>
           <BaseTable :value="attendance" dataKey="id" paginator :rows="5">
             <template #empty>
-              <BaseEmptyState title="No attendance rows" description="Your check-ins appear here once you scan your card at a terminal." />
+              <BaseEmptyState
+                :title="$t('student.workedHours.recentEmptyTitle')"
+                :description="$t('student.workedHours.recentEmptyDescription')"
+              />
             </template>
 
-            <BaseTableColumn field="date" header="Date" sortable>
+            <BaseTableColumn field="date" :header="$t('common.time.date')" sortable>
               <template #body="slotProps">{{ formatIsoDate(slotProps.data.date) }}</template>
             </BaseTableColumn>
-            <BaseTableColumn field="entry" header="Entry">
+            <BaseTableColumn field="entry" :header="$t('student.workedHours.colEntry')">
               <template #body="slotProps">{{ slotProps.data.entry ?? '—' }}</template>
             </BaseTableColumn>
-            <BaseTableColumn field="exit" header="Exit">
+            <BaseTableColumn field="exit" :header="$t('student.workedHours.colExit')">
               <template #body="slotProps">{{ slotProps.data.exit ?? '—' }}</template>
             </BaseTableColumn>
-            <BaseTableColumn field="hours" header="Hours" sortable>
-              <template #body="slotProps">{{ slotProps.data.hours ?? 0 }}h</template>
-            </BaseTableColumn>
-            <BaseTableColumn field="status" header="Status">
+            <BaseTableColumn field="hours" :header="$t('common.fields.hours')" sortable>
               <template #body="slotProps">
-                <BaseStatusPill :label="slotProps.data.status" :tone="statusTone(slotProps.data.status)" />
+                {{ $t("common.time.hoursShort", { count: slotProps.data.hours ?? 0 }) }}
+              </template>
+            </BaseTableColumn>
+            <BaseTableColumn field="status" :header="$t('common.fields.status')">
+              <template #body="slotProps">
+                <BaseStatusPill
+                  :label="attendanceStatusLabel(slotProps.data.status)"
+                  :tone="statusTone(slotProps.data.status)"
+                />
               </template>
             </BaseTableColumn>
           </BaseTable>

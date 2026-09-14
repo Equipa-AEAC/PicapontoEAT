@@ -14,6 +14,7 @@ import {
 import ProjectActivityFeed from "../../../../components/projects/ProjectActivityFeed.vue";
 import ProjectProgressBar from "../../../../components/projects/ProjectProgressBar.vue";
 import { useProjectsStore } from "../../../../shared/stores";
+import { taskStatusLabel } from "../../../../i18n/vocabulary";
 import { formatRelativeTime } from "../../../../shared/utils/date";
 
 /**
@@ -54,12 +55,16 @@ onMounted(async () => {
 <template>
   <div class="page-stack">
     <BasePageHeader
-      title="Project management"
-      description="What the team is working on, what is late, and who is carrying it."
+      :title="$t('projects.admin.overview.title')"
+      :description="$t('projects.admin.overview.description')"
     >
       <template #actions>
-        <BaseButton label="All projects" severity="secondary" @click="router.push({ name: 'projects' })" />
-        <BaseButton label="All tasks" @click="router.push({ name: 'project-tasks' })" />
+        <BaseButton
+          :label="$t('projects.admin.overview.allProjects')"
+          severity="secondary"
+          @click="router.push({ name: 'projects' })"
+        />
+        <BaseButton :label="$t('projects.admin.overview.allTasks')" @click="router.push({ name: 'project-tasks' })" />
       </template>
     </BasePageHeader>
 
@@ -74,39 +79,51 @@ onMounted(async () => {
       -->
       <div class="metric-grid">
         <article class="base-metric-card">
-          <p class="base-metric-card__label">Active projects</p>
+          <p class="base-metric-card__label">{{ $t("projects.admin.overview.activeProjects") }}</p>
           <p class="base-metric-card__value">{{ overview.activeProjects }}</p>
           <p class="base-metric-card__caption">
-            {{ overview.plannedProjects }} planned · {{ overview.completedProjects }} completed
+            {{
+              $t("projects.admin.overview.plannedAndCompleted", {
+                planned: overview.plannedProjects,
+                completed: overview.completedProjects,
+              })
+            }}
           </p>
         </article>
 
         <article class="base-metric-card">
-          <p class="base-metric-card__label">Open tasks</p>
+          <p class="base-metric-card__label">{{ $t("projects.admin.overview.openTasks") }}</p>
           <p class="base-metric-card__value">{{ overview.openTasks }}</p>
-          <p class="base-metric-card__caption">of {{ totalTasks }} across every project</p>
+          <p class="base-metric-card__caption">
+            {{ $t("projects.admin.overview.ofTotalTasks", { total: totalTasks }) }}
+          </p>
         </article>
 
         <article class="base-metric-card" :class="{ 'base-metric-card--negative': overview.overdueTasks.length > 0 }">
-          <p class="base-metric-card__label">Overdue</p>
+          <p class="base-metric-card__label">{{ $t("projects.admin.overview.overdue") }}</p>
           <p class="base-metric-card__value">{{ overview.overdueTasks.length }}</p>
-          <p class="base-metric-card__caption">{{ overview.dueSoonTasks.length }} more due within a week</p>
+          <p class="base-metric-card__caption">
+            {{ $t("projects.admin.overview.dueSoonCaption", { count: overview.dueSoonTasks.length }) }}
+          </p>
         </article>
 
         <article class="base-metric-card">
-          <p class="base-metric-card__label">Unassigned</p>
+          <p class="base-metric-card__label">{{ $t("projects.admin.overview.unassigned") }}</p>
           <p class="base-metric-card__value">{{ overview.unassignedTasks }}</p>
-          <p class="base-metric-card__caption">open tasks with nobody responsible</p>
+          <p class="base-metric-card__caption">{{ $t("projects.admin.overview.unassignedCaption") }}</p>
         </article>
       </div>
 
       <div class="dashboard-grid">
         <div class="page-stack">
-          <BaseCard title="Needs attention" description="Overdue first, then anything due in the next seven days.">
+          <BaseCard
+            :title="$t('projects.admin.overview.attentionTitle')"
+            :description="$t('projects.admin.overview.attentionDescription')"
+          >
             <BaseEmptyState
               v-if="overview.overdueTasks.length === 0 && overview.dueSoonTasks.length === 0"
-              title="Nothing is late"
-              description="No task is past its due date and nothing falls due in the next week."
+              :title="$t('projects.admin.overview.attentionEmptyTitle')"
+              :description="$t('projects.admin.overview.attentionEmptyDescription')"
             />
 
             <ul v-else class="attention-list">
@@ -119,7 +136,11 @@ onMounted(async () => {
                   <span class="attention-list__title">{{ task.title }}</span>
                   <span class="attention-list__meta type-meta">
                     {{ task.projectName }} ·
-                    {{ task.assignees.length ? task.assignees.map((a) => a.name).join(', ') : 'Unassigned' }}
+                    {{
+                      task.assignees.length
+                        ? task.assignees.map((a) => a.name).join(', ')
+                        : $t('projects.task.nobodyAssigned')
+                    }}
                   </span>
                 </button>
 
@@ -134,11 +155,14 @@ onMounted(async () => {
             </ul>
           </BaseCard>
 
-          <BaseCard title="Assigned to you" description="Open tasks where you are one of the responsible people.">
+          <BaseCard
+            :title="$t('projects.admin.overview.mineTitle')"
+            :description="$t('projects.admin.overview.mineDescription')"
+          >
             <BaseEmptyState
               v-if="projectsStore.myTasks.length === 0"
-              title="Nothing assigned to you"
-              description="Tasks you are put on will appear here with their deadlines."
+              :title="$t('projects.admin.overview.mineEmptyTitle')"
+              :description="$t('projects.admin.overview.mineEmptyDescription')"
             />
 
             <ul v-else class="attention-list">
@@ -154,10 +178,13 @@ onMounted(async () => {
         </div>
 
         <div class="page-stack">
-          <BaseCard title="Work in progress" description="Where every open task currently sits.">
+          <BaseCard
+            :title="$t('projects.admin.overview.progressTitle')"
+            :description="$t('projects.admin.overview.progressDescription')"
+          >
             <ul class="status-bars">
               <li v-for="bucket in overview.statusBreakdown" :key="bucket.status" class="status-bars__row">
-                <span class="status-bars__label type-label">{{ bucket.label }}</span>
+                <span class="status-bars__label type-label">{{ taskStatusLabel(bucket.status) }}</span>
                 <span class="progress-bar status-bars__track">
                   <span
                     class="progress-bar__fill"
@@ -174,11 +201,14 @@ onMounted(async () => {
             </ul>
           </BaseCard>
 
-          <BaseCard title="Team workload" description="Open tasks per person, busiest first.">
+          <BaseCard
+            :title="$t('projects.admin.overview.workloadTitle')"
+            :description="$t('projects.admin.overview.workloadDescription')"
+          >
             <BaseEmptyState
               v-if="activeWorkload.length === 0"
-              title="Nothing assigned yet"
-              description="Assign tasks to members and their load will show here."
+              :title="$t('projects.admin.overview.workloadEmptyTitle')"
+              :description="$t('projects.admin.overview.workloadEmptyDescription')"
             />
 
             <ul v-else class="status-bars">
@@ -196,8 +226,8 @@ onMounted(async () => {
             </ul>
 
             <template #footer>
-              <BaseButton label="Team and assignments" text @click="router.push({ name: 'project-team' })">
-                Team and assignments
+              <BaseButton :label="$t('projects.admin.overview.teamLink')" text @click="router.push({ name: 'project-team' })">
+                {{ $t("projects.admin.overview.teamLink") }}
                 <PhArrowRight weight="bold" />
               </BaseButton>
             </template>
@@ -205,11 +235,14 @@ onMounted(async () => {
         </div>
       </div>
 
-      <BaseCard title="Recently updated" description="The projects that moved most recently.">
+      <BaseCard
+        :title="$t('projects.admin.overview.recentTitle')"
+        :description="$t('projects.admin.overview.recentDescription')"
+      >
         <BaseEmptyState
           v-if="overview.recentlyUpdated.length === 0"
-          title="No projects yet"
-          description="Create the first project to start tracking the team's work."
+          :title="$t('projects.admin.overview.recentEmptyTitle')"
+          :description="$t('projects.admin.overview.recentEmptyDescription')"
         />
 
         <ul v-else class="recent-projects">
@@ -217,14 +250,19 @@ onMounted(async () => {
             <button type="button" class="recent-projects__main" @click="openProject(project.id)">
               <span class="recent-projects__name">{{ project.name }}</span>
               <span class="recent-projects__meta type-meta">
-                {{ project.owner }} · updated {{ formatRelativeTime(project.lastActivityAt) }}
+                {{
+                  $t("projects.admin.overview.recentLine", {
+                    owner: project.owner,
+                    when: formatRelativeTime(project.lastActivityAt),
+                  })
+                }}
               </span>
             </button>
 
             <BaseStatusPill
               v-if="project.isOverdue"
               tone="danger"
-              label="Past deadline"
+              :label="$t('projects.admin.overview.pastDeadline')"
               class="recent-projects__pill"
             />
 
@@ -235,10 +273,17 @@ onMounted(async () => {
         </ul>
       </BaseCard>
 
-      <BaseCard title="Recent activity" description="The last things that happened across every project.">
+      <BaseCard
+        :title="$t('projects.admin.overview.activityTitle')"
+        :description="$t('projects.admin.overview.activityDescription')"
+      >
         <ProjectActivityFeed :events="overview.recentActivity" show-project :project-names="projectNames" />
         <template #footer>
-          <BaseButton label="Full activity log" text @click="router.push({ name: 'project-activity' })" />
+          <BaseButton
+            :label="$t('projects.admin.overview.activityLink')"
+            text
+            @click="router.push({ name: 'project-activity' })"
+          />
         </template>
       </BaseCard>
     </template>

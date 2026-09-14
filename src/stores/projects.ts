@@ -16,10 +16,19 @@ import type {
   TaskStatus,
 } from "../types/projects";
 import { UNASSIGNED_ASSIGNEE } from "../types/projects";
+import type { MemberProjectRights } from "../types/projectPermissions";
 import {
+  NO_PROJECT_RIGHTS,
+  memberCanEditTask,
+  memberCanRemoveTask,
+} from "../types/projectPermissions";
+import {
+  archiveMemberTask,
   archiveProject,
   archiveTask,
   assignTask,
+  getMemberProjectDetail,
+  getMemberProjectWorkspace,
   getProject,
   getProjectBoard,
   getProjectOverview,
@@ -29,12 +38,15 @@ import {
   listProjects,
   listTasks,
   listTasksForParticipant,
+  moveMemberTaskStatus,
   restoreProject,
+  saveMemberTask,
   saveProject,
   saveTask,
   updateTaskStatus,
   type ProjectActor,
 } from "../services/projects.service";
+import { t } from "../i18n";
 import { useAuthStore } from "../modules/authentication/stores/auth";
 import { listAllDailyLogs } from "../services/internshipReports.service";
 import type { TeamJournalEntry } from "../types/internshipReports";
@@ -89,13 +101,39 @@ export const useProjectsStore = defineStore("projects", () => {
   const focusTasks = ref<ProjectTaskSummary[]>([]);
   const unassignedTasks = ref<ProjectTaskSummary[]>([]);
   /**
-   * The signed-in member's own assigned work, for the student workspace.
+   * The signed-in member's own project workspace: the projects they are on and
+   * every task assigned to them, completed ones included.
    *
-   * Separate from `myTasks` because the two resolve identity differently: an
-   * administrator is a *user account*, a student is a *member*, and only the
-   * member id appears on a task's assignee list.
+   * The completed tasks matter: a project view that hides finished work cannot
+   * show what has been done.
    */
-  const memberTasks = ref<ProjectTaskSummary[]>([]);
+  const memberProjects = ref<ProjectSummary[]>([]);
+  const memberProjectTasks = ref<ProjectTaskSummary[]>([]);
+  /**
+   * The one project a student currently has open, and its board.
+   *
+   * Held apart from `selectedProject` / `board`, which the admin workspace owns
+   * and refreshes on its own schedule. A student never loads those slices, and
+   * sharing them would mean one workspace's reload clearing the other's screen.
+   */
+  const memberProject = ref<ProjectSummary | null>(null);
+  const memberBoard = ref<ProjectBoardColumn[]>([]);
+  const memberParticipants = ref<ProjectParticipant[]>([]);
+  const memberActivity = ref<ProjectActivityEvent[]>([]);
+  /**
+   * What the signed-in member may do, per project.
+   *
+   * Held as a map rather than a single value because My tasks lists work from
+   * several projects at once and the answer differs between them — a member can
+   * lead one project and simply take part in another. `memberRights` covers the
+   * workspace lists; `openProjectRights` is the project currently on screen.
+   *
+   * These decide what the interface *offers*. They are computed in the browser
+   * from data the client already holds, so they are not a security boundary —
+   * the service re-checks every write, and the API must too.
+   */
+  const memberRights = ref<Record<string, MemberProjectRights>>({});
+  const openProjectRights = ref<MemberProjectRights>(NO_PROJECT_RIGHTS);
   /** Projects one person is on. Backs the member record's project cross-link. */
   const participantProjects = ref<ProjectSummary[]>([]);
   /**
@@ -145,12 +183,12 @@ export const useProjectsStore = defineStore("projects", () => {
   );
 
   const participantOptions = computed(() => [
-    { label: "Everyone", value: "all" },
+    { label: t("projects.filters.everyone"), value: "all" },
     ...participants.value.map((participant) => ({ label: participant.name, value: participant.id })),
   ]);
 
   const projectOptions = computed(() => [
-    { label: "All projects", value: "all" },
+    { label: t("projects.filters.allProjects"), value: "all" },
     ...allProjects.value.map((project) => ({ label: project.name, value: project.id })),
   ]);
 
@@ -170,7 +208,7 @@ export const useProjectsStore = defineStore("projects", () => {
   }
 
   async function loadParticipants() {
-    await withErrorHandling("Unable to load the team.", async () => {
+    await withErrorHandling(t("projects.errors.loadTeam"), async () => {
       participants.value = await listProjectParticipants();
     });
   }
@@ -178,7 +216,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadProjects() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load projects.", async () => {
+    await withErrorHandling(t("projects.errors.loadProjects"), async () => {
       const [filtered, all] = await Promise.all([
         listProjects(projectFilters.value),
         listProjects({ includeArchived: true }),
@@ -193,7 +231,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadOverview() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load the project overview.", async () => {
+    await withErrorHandling(t("projects.errors.loadOverview"), async () => {
       const [loadedOverview, loadedParticipants] = await Promise.all([getProjectOverview(), listProjectParticipants()]);
       overview.value = loadedOverview;
       participants.value = loadedParticipants;
@@ -206,7 +244,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadProject(projectId: string) {
     loadingDetails.value = true;
 
-    await withErrorHandling("Unable to load the project.", async () => {
+    await withErrorHandling(t("projects.errors.loadProject"), async () => {
       const [project, loadedBoard, loadedActivity, loadedParticipants] = await Promise.all([
         getProject(projectId),
         getProjectBoard(projectId),
@@ -225,7 +263,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadTasks() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load tasks.", async () => {
+    await withErrorHandling(t("projects.errors.loadTasks"), async () => {
       const [loadedTasks, all, loadedParticipants] = await Promise.all([
         listTasks(taskFilters.value),
         listProjects({ includeArchived: true }),
@@ -247,7 +285,7 @@ export const useProjectsStore = defineStore("projects", () => {
       return;
     }
 
-    await withErrorHandling("Unable to load your tasks.", async () => {
+    await withErrorHandling(t("projects.errors.loadMyTasks"), async () => {
       myTasks.value = await listTasksForParticipant(participantId);
     });
   }
@@ -260,7 +298,7 @@ export const useProjectsStore = defineStore("projects", () => {
    * reader having to go to the project workspace and filter by hand.
    */
   async function loadParticipantWork(participantId: string) {
-    await withErrorHandling("Unable to load this member's project work.", async () => {
+    await withErrorHandling(t("projects.errors.loadMemberWork"), async () => {
       participantProjects.value = await listProjects({ participantId });
     });
 
@@ -268,34 +306,165 @@ export const useProjectsStore = defineStore("projects", () => {
   }
 
   async function loadProjectJournal(projectId: string) {
-    await withErrorHandling("Unable to load the journal entries for this project.", async () => {
+    await withErrorHandling(t("projects.errors.loadJournal"), async () => {
       projectJournal.value = await listAllDailyLogs({ projectId });
     });
   }
 
-  /** Work assigned to one member. The only projects query a student may run. */
-  async function loadMemberTasks(memberId: string) {
+  /** The projects one member is on, plus all of their tasks. Student-side only. */
+  async function loadMemberWorkspace(memberId: string) {
     loading.value = true;
 
     try {
-      await withErrorHandling("Unable to load your assigned work.", async () => {
-        memberTasks.value = await listTasksForParticipant(memberId);
+      await withErrorHandling(t("projects.errors.loadMyProjects"), async () => {
+        const workspace = await getMemberProjectWorkspace(memberId);
+        memberProjects.value = workspace.projects;
+        memberProjectTasks.value = workspace.tasks;
+        memberRights.value = workspace.rights;
       });
     } finally {
       loading.value = false;
     }
   }
 
+  /* ------------------------------------------------- Member capabilities */
+
   /**
-   * A member moving their own task along.
+   * What the member may do on one project.
    *
-   * Deliberately not `moveTask`: that refreshes the admin board slices, which a
-   * student never loads. This refreshes only their own list.
+   * Reads the map the workspace query filled in, and falls back to the open
+   * project when the caller is on the board rather than in a list. Returns "no
+   * rights" for anything unknown, which is the safe direction: a control that
+   * fails to appear is a nuisance, one that appears and is then refused is a
+   * bug the member gets blamed for.
    */
-  async function moveMemberTask(taskId: string, status: TaskStatus, memberId: string) {
-    await withErrorHandling("Unable to update the task.", async () => {
-      await updateTaskStatus(taskId, status, actor.value);
-      memberTasks.value = await listTasksForParticipant(memberId);
+  function rightsFor(projectId: string): MemberProjectRights {
+    if (memberProject.value?.id === projectId && openProjectRights.value.canOpen) {
+      return openProjectRights.value;
+    }
+
+    return memberRights.value[projectId] ?? NO_PROJECT_RIGHTS;
+  }
+
+  function memberCanEdit(memberId: string, task: ProjectTaskSummary): boolean {
+    return memberCanEditTask(rightsFor(task.projectId), memberId, task);
+  }
+
+  function memberCanRemove(memberId: string, task: ProjectTaskSummary): boolean {
+    return memberCanRemoveTask(rightsFor(task.projectId), memberId, task);
+  }
+
+  function memberCanAssignOthers(projectId: string): boolean {
+    return rightsFor(projectId).canAssignOthers;
+  }
+
+  /**
+   * Who the trail records for a student's own change.
+   *
+   * `actor` above is the signed-in *account*, which for a student is their user
+   * record. The member id is what a task's assignee list holds, so the two are
+   * passed separately: the member id decides what may be touched, the actor
+   * decides whose name appears on the activity entry.
+   */
+  const memberActor = computed<ProjectActor>(() => ({
+    id: authStore.currentMemberId ?? authStore.currentUser?.id ?? null,
+    name: authStore.currentUser?.fullName ?? "Member",
+  }));
+
+  /** One project a student is on: record, board, people and timeline. */
+  async function loadMemberProject(memberId: string, projectId: string) {
+    loadingDetails.value = true;
+    errorMessage.value = null;
+
+    try {
+      const detail = await getMemberProjectDetail(memberId, projectId);
+      memberProject.value = detail.project;
+      memberBoard.value = detail.board;
+      memberParticipants.value = detail.participants;
+      memberActivity.value = detail.activity;
+      openProjectRights.value = detail.rights;
+      return true;
+    } catch (error) {
+      // A refusal is a real answer here, so it replaces the board rather than
+      // leaving the previous project's cards on screen under a new title.
+      memberProject.value = null;
+      memberBoard.value = [];
+      memberParticipants.value = [];
+      memberActivity.value = [];
+      openProjectRights.value = NO_PROJECT_RIGHTS;
+      errorMessage.value = error instanceof Error ? error.message : t("projects.errors.notOnProject");
+      return false;
+    } finally {
+      loadingDetails.value = false;
+    }
+  }
+
+  /** Everything a student's board view shows, re-read after any change to it. */
+  async function refreshMemberProject(memberId: string, projectId: string) {
+    await Promise.all([loadMemberProject(memberId, projectId), loadMemberWorkspace(memberId)]);
+  }
+
+  /** A student creating or editing a task on a project they are on. */
+  async function persistMemberTask(
+    memberId: string,
+    values: TaskFormValues,
+    taskId?: string,
+  ) {
+    saving.value = true;
+
+    const saved = await withErrorHandling(t("projects.errors.saveTask"), async () => {
+      const task = await saveMemberTask(memberId, values, memberActor.value, taskId);
+      await refreshMemberProject(memberId, values.projectId);
+      return task;
+    });
+
+    saving.value = false;
+    return saved;
+  }
+
+  /** A student dragging a card between columns. */
+  async function moveMemberBoardTask(memberId: string, taskId: string, status: TaskStatus) {
+    return withErrorHandling(t("projects.errors.moveTask"), async () => {
+      const task = await moveMemberTaskStatus(memberId, taskId, status, memberActor.value);
+
+      if (task) {
+        await refreshMemberProject(memberId, task.projectId);
+      }
+
+      return task;
+    });
+  }
+
+  /** A student removing a task. Archived, not deleted — staff can restore it. */
+  async function removeMemberTask(memberId: string, taskId: string, projectId: string) {
+    saving.value = true;
+
+    const removed = await withErrorHandling(t("projects.errors.removeTask"), async () => {
+      await archiveMemberTask(memberId, taskId, memberActor.value);
+      await refreshMemberProject(memberId, projectId);
+      return true;
+    });
+
+    saving.value = false;
+    return removed ?? false;
+  }
+
+  /**
+   * A member changing the status of a task from My tasks.
+   *
+   * Goes through `moveMemberTaskStatus` — the member-scoped entry point — rather
+   * than calling `updateTaskStatus` directly. The direct call was a real hole:
+   * it skipped the project-membership check entirely and recorded the change
+   * under the staff `actor` rather than the member, so a task id was all it took
+   * to move a card on a board the member had never been on.
+   */
+  async function moveMemberProjectTask(taskId: string, status: TaskStatus, memberId: string) {
+    await withErrorHandling(t("projects.errors.taskNotYours"), async () => {
+      await moveMemberTaskStatus(memberId, taskId, status, memberActor.value);
+      const workspace = await getMemberProjectWorkspace(memberId);
+      memberProjects.value = workspace.projects;
+      memberProjectTasks.value = workspace.tasks;
+      memberRights.value = workspace.rights;
     });
   }
 
@@ -311,7 +480,7 @@ export const useProjectsStore = defineStore("projects", () => {
     loadingDetails.value = true;
 
     try {
-      await withErrorHandling("Unable to load that person's work.", async () => {
+      await withErrorHandling(t("projects.errors.loadPersonWork"), async () => {
         focusTasks.value = await listTasksForParticipant(participantId);
       });
     } finally {
@@ -321,7 +490,7 @@ export const useProjectsStore = defineStore("projects", () => {
 
   /** Open work nobody owns — the queue most likely to slip unnoticed. */
   async function loadUnassignedTasks() {
-    await withErrorHandling("Unable to load unassigned work.", async () => {
+    await withErrorHandling(t("projects.errors.loadUnassigned"), async () => {
       unassignedTasks.value = (await listTasks({ assigneeId: UNASSIGNED_ASSIGNEE })).filter(
         (task) => task.status !== "done",
       );
@@ -340,7 +509,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadWorkload() {
     loading.value = true;
 
-    await withErrorHandling("Unable to load the team workload.", async () => {
+    await withErrorHandling(t("projects.errors.loadWorkload"), async () => {
       const [loadedWorkload, loadedParticipants, all] = await Promise.all([
         getProjectWorkload(),
         listProjectParticipants(),
@@ -358,7 +527,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function loadActivity(limit?: number) {
     loading.value = true;
 
-    await withErrorHandling("Unable to load project activity.", async () => {
+    await withErrorHandling(t("projects.errors.loadActivity"), async () => {
       activity.value = await listProjectActivity(undefined, limit);
     });
 
@@ -370,7 +539,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function persistProject(values: ProjectFormValues, projectId?: string) {
     saving.value = true;
 
-    const saved = await withErrorHandling("Unable to save the project.", async () => {
+    const saved = await withErrorHandling(t("projects.errors.saveProject"), async () => {
       const project = await saveProject(values, actor.value, projectId);
       await loadProjects();
 
@@ -386,7 +555,7 @@ export const useProjectsStore = defineStore("projects", () => {
   }
 
   async function archive(projectId: string) {
-    await withErrorHandling("Unable to archive the project.", async () => {
+    await withErrorHandling(t("projects.errors.archiveProject"), async () => {
       await archiveProject(projectId, actor.value);
       await loadProjects();
 
@@ -397,7 +566,7 @@ export const useProjectsStore = defineStore("projects", () => {
   }
 
   async function restore(projectId: string) {
-    await withErrorHandling("Unable to restore the project.", async () => {
+    await withErrorHandling(t("projects.errors.restoreProject"), async () => {
       await restoreProject(projectId, actor.value);
       await loadProjects();
 
@@ -435,7 +604,7 @@ export const useProjectsStore = defineStore("projects", () => {
   async function persistTask(values: TaskFormValues, taskId?: string) {
     saving.value = true;
 
-    const saved = await withErrorHandling("Unable to save the task.", async () => {
+    const saved = await withErrorHandling(t("projects.errors.saveTask"), async () => {
       const task = await saveTask(values, actor.value, taskId);
       await refreshAfterTaskChange(task.projectId);
       return task;
@@ -446,21 +615,21 @@ export const useProjectsStore = defineStore("projects", () => {
   }
 
   async function moveTask(taskId: string, status: TaskStatus, projectId: string) {
-    await withErrorHandling("Unable to move the task.", async () => {
+    await withErrorHandling(t("projects.errors.moveTask"), async () => {
       await updateTaskStatus(taskId, status, actor.value);
       await refreshAfterTaskChange(projectId);
     });
   }
 
   async function setTaskAssignees(taskId: string, assigneeIds: string[], projectId: string) {
-    await withErrorHandling("Unable to change the assignees.", async () => {
+    await withErrorHandling(t("projects.errors.assign"), async () => {
       await assignTask(taskId, assigneeIds, actor.value);
       await refreshAfterTaskChange(projectId);
     });
   }
 
   async function removeTask(taskId: string, projectId: string) {
-    await withErrorHandling("Unable to archive the task.", async () => {
+    await withErrorHandling(t("projects.errors.archiveTask"), async () => {
       await archiveTask(taskId, actor.value);
       await refreshAfterTaskChange(projectId);
     });
@@ -487,8 +656,26 @@ export const useProjectsStore = defineStore("projects", () => {
     focusParticipantId,
     focusTasks,
     unassignedTasks,
-    memberTasks,
     participantProjects,
+    memberProjects,
+    memberProjectTasks,
+    memberProject,
+    memberBoard,
+    memberParticipants,
+    memberActivity,
+    memberRights,
+    openProjectRights,
+    rightsFor,
+    memberCanEdit,
+    memberCanRemove,
+    memberCanAssignOthers,
+    loadMemberWorkspace,
+    loadMemberProject,
+    refreshMemberProject,
+    persistMemberTask,
+    moveMemberBoardTask,
+    removeMemberTask,
+    moveMemberProjectTask,
     projectJournal,
     overview,
     projectFilters,
@@ -510,8 +697,6 @@ export const useProjectsStore = defineStore("projects", () => {
     loadMyTasks,
     loadWorkload,
     focusOnParticipant,
-    loadMemberTasks,
-    moveMemberTask,
     loadParticipantWork,
     loadProjectJournal,
     loadUnassignedTasks,

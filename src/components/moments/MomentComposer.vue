@@ -7,6 +7,7 @@ import { ACCEPTED_IMAGE_TYPES, formatFileSize } from "../../services/uploads.ser
 import { MAX_MOMENT_CAPTION_LENGTH, MOMENT_LIFETIME_HOURS } from "../../types/moments";
 import type { MomentFormValues } from "../../types/moments";
 import type { ProjectSummary } from "../../types/projects";
+import { t } from "../../i18n";
 
 /**
  * Post a moment.
@@ -39,7 +40,7 @@ const processing = ref(false);
 const localError = ref<string | null>(null);
 
 const projectOptions = computed(() => [
-  { label: "Not linked to a project", value: null },
+  { label: t("components.moment.noProject"), value: null },
   ...props.projects
     .filter((project) => project.status !== "archived")
     .map((project) => ({ label: project.name, value: project.id })),
@@ -85,7 +86,7 @@ async function onFileChange(event: Event) {
 
 function submit() {
   if (!preview.value) {
-    localError.value = "Choose a photo first.";
+    localError.value = t("errors.photoFirst");
     return;
   }
 
@@ -101,9 +102,10 @@ function submit() {
 <template>
   <BaseFormDialog
     :visible="visible"
-    title="Post a moment"
-    :subtitle="`Photos stay in the gallery for ${MOMENT_LIFETIME_HOURS} hours, then disappear on their own.`"
-    confirm-label="Post"
+    :title="$t('components.moment.composeTitle')"
+    :subtitle="$t('components.moment.lifetimeSubtitle', { hours: MOMENT_LIFETIME_HOURS })"
+    :confirm-label="$t('components.moment.compose')"
+    :cancel-label="$t('common.actions.cancel')"
     :loading="loading || processing"
     @update:visible="emit('update:visible', $event)"
     @cancel="emit('update:visible', false)"
@@ -122,34 +124,36 @@ function submit() {
 
       <button v-if="!preview" type="button" class="composer__dropzone" :disabled="processing" @click="pickFile">
         <PhImage weight="regular" />
-        <span class="composer__dropzone-label">{{ processing ? 'Processing photo…' : 'Choose a photo' }}</span>
-        <span class="type-meta">PNG, JPG or WebP. It is resized before it is stored.</span>
+        <span class="composer__dropzone-label">{{ processing ? $t('components.moment.processing') : $t('components.moment.choosePhoto') }}</span>
+        <span class="type-meta">{{ $t("components.moment.dropzoneHint") }}</span>
       </button>
 
       <div v-else class="composer__preview">
-        <img :src="preview.imageUrl" alt="Preview of the photo you are about to post" />
+        <img :src="preview.imageUrl" :alt="$t('components.moment.previewAlt')" />
         <div class="composer__preview-bar">
-          <span class="type-meta">Stored size {{ formatFileSize(preview.bytes) }}</span>
+          <span class="type-meta">
+            {{ $t("components.moment.storedSize", { size: formatFileSize(preview.bytes) }) }}
+          </span>
           <BaseButton severity="secondary" size="small" @click="preview = null">
             <PhX weight="bold" />
-            Change
+            {{ $t("components.moment.change") }}
           </BaseButton>
         </div>
       </div>
 
       <label class="composer__field">
-        <span class="type-label">Caption</span>
+        <span class="type-label">{{ $t("components.moment.caption") }}</span>
         <BaseTextarea
           v-model="caption"
           :rows="2"
           :maxlength="MAX_MOMENT_CAPTION_LENGTH"
-          placeholder="Fixing the lab terminals before the open day."
+          :placeholder="$t('components.moment.captionPlaceholder')"
         />
-        <span class="type-meta">{{ remainingCharacters }} characters left</span>
+        <span class="type-meta">{{ $t("common.units.charactersLeft", { count: remainingCharacters }) }}</span>
       </label>
 
       <label class="composer__field">
-        <span class="type-label">Project</span>
+        <span class="type-label">{{ $t("components.moment.project") }}</span>
         <BaseSelect
           :model-value="projectId"
           :options="projectOptions"
@@ -159,7 +163,7 @@ function submit() {
 
       <p class="type-meta composer__quota">
         <PhUploadSimple weight="regular" />
-        You can post {{ remainingQuota }} more {{ remainingQuota === 1 ? 'moment' : 'moments' }} today.
+        {{ $t("components.moment.quotaLeft", { count: remainingQuota }, remainingQuota) }}
       </p>
     </div>
   </BaseFormDialog>

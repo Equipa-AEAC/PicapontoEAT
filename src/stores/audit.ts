@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type { AuditFilters, AuditLogEntry } from "../types/audit";
@@ -30,7 +31,7 @@ export const useAuditStore = defineStore("audit", () => {
     try {
       items.value = await listAuditLogs(filters.value);
     } catch (error) {
-      errorMessage.value = describeError(error, "The audit log could not be loaded.");
+      errorMessage.value = describeError(error, t("errors.loadAudit"));
     } finally {
       loading.value = false;
     }

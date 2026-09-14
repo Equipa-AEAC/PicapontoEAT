@@ -1,5 +1,4 @@
 import type { StudentPortalSummary } from "../types/portal";
-import { INTERNSHIP_STATUS_LABELS } from "../types/internships";
 
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
@@ -30,7 +29,7 @@ export async function getStudentPortalSummary(memberId: string): Promise<Student
 
     return cloneRecord({
       ...mockDatabase.portal,
-      currentInternshipStatus: internship ? INTERNSHIP_STATUS_LABELS[internship.status] : "No placement",
+      currentInternshipStatus: internship ? internship.status : null,
       completedHours,
       remainingHours,
       internshipProgress: requiredHours > 0 ? Math.round((completedHours / requiredHours) * 100) : 0,

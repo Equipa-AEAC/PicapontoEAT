@@ -32,13 +32,14 @@ import TaskBoard from "../../../../components/projects/TaskBoard.vue";
 import TaskFormDialog from "../../../../components/projects/TaskFormDialog.vue";
 import { useProjectsStore } from "../../../../shared/stores";
 import type { ProjectFormValues, ProjectTaskSummary, TaskFormValues, TaskStatus } from "../../../../shared/types";
+import { PROJECT_PRIORITY_TONES, PROJECT_STATUS_TONES } from "../../../../shared/types";
+import { t } from "../../../../i18n";
 import {
-  PROJECT_PRIORITY_LABELS,
-  PROJECT_PRIORITY_TONES,
-  PROJECT_STATUS_LABELS,
-  PROJECT_STATUS_TONES,
-  TASK_STATUS_OPTIONS,
-} from "../../../../shared/types";
+  participantRoleLabel,
+  projectPriorityLabel,
+  projectStatusLabel,
+  taskStatusOptions,
+} from "../../../../i18n/vocabulary";
 import { formatIsoDate, formatRelativeTime } from "../../../../shared/utils/date";
 
 /**
@@ -78,9 +79,14 @@ const archiveTaskTarget = ref<ProjectTaskSummary | null>(null);
 const boardTasks = computed(() => projectsStore.board.flatMap((column) => column.tasks));
 
 const tabs = computed<BaseTabItem[]>(() => [
-  { value: "board", label: "Board", icon: PhKanban, badge: boardTasks.value.length },
-  { value: "list", label: "List", icon: PhListChecks },
-  { value: "activity", label: "Activity", icon: PhPulse, badge: projectsStore.activity.length },
+  { value: "board", label: t("projects.admin.detail.tabBoard"), icon: PhKanban, badge: boardTasks.value.length },
+  { value: "list", label: t("projects.admin.detail.tabList"), icon: PhListChecks },
+  {
+    value: "activity",
+    label: t("projects.admin.detail.tabActivity"),
+    icon: PhPulse,
+    badge: projectsStore.activity.length,
+  },
 ]);
 
 /** List view: same tasks as the board, ordered by deadline rather than by column. */
@@ -147,23 +153,23 @@ onMounted(async () => {
 
     <BaseEmptyState
       v-else-if="!project"
-      title="Project not found"
-      description="It may have been removed, or the link is out of date."
-      action-label="Back to projects"
+      :title="$t('projects.admin.detail.notFoundTitle')"
+      :description="$t('projects.admin.detail.notFoundDescription')"
+      :action-label="$t('projects.admin.detail.backToProjects')"
       @action="router.push({ name: 'projects' })"
     />
 
     <template v-else>
       <BaseButton class="detail-back" severity="secondary" text @click="router.push({ name: 'projects' })">
         <PhArrowLeft weight="bold" />
-        Projects
+        {{ $t("projects.admin.list.title") }}
       </BaseButton>
 
       <BasePageHeader :title="project.name" :description="project.description || undefined">
         <template #actions>
           <BaseButton severity="secondary" @click="showProjectForm = true">
             <PhPencilSimple weight="regular" />
-            Edit
+            {{ $t("common.actions.edit") }}
           </BaseButton>
           <BaseButton
             v-if="project.status !== 'archived'"
@@ -171,15 +177,15 @@ onMounted(async () => {
             @click="archiveProjectConfirm = true"
           >
             <PhArchive weight="regular" />
-            Archive
+            {{ $t("common.actions.archive") }}
           </BaseButton>
           <BaseButton v-else severity="secondary" @click="projectsStore.restore(project.id)">
             <PhArrowCounterClockwise weight="regular" />
-            Restore
+            {{ $t("common.actions.restore") }}
           </BaseButton>
           <BaseButton @click="openCreateTask()">
             <PhPlus weight="bold" />
-            New task
+            {{ $t("projects.admin.detail.newTask") }}
           </BaseButton>
         </template>
       </BasePageHeader>
@@ -193,37 +199,37 @@ onMounted(async () => {
       <BaseCard>
         <div class="project-facts">
           <div class="project-facts__item">
-            <span class="type-label">Status</span>
-            <BaseBadge :label="PROJECT_STATUS_LABELS[project.status]" :tone="PROJECT_STATUS_TONES[project.status]" />
+            <span class="type-label">{{ $t("common.fields.status") }}</span>
+            <BaseBadge :label="projectStatusLabel(project.status)" :tone="PROJECT_STATUS_TONES[project.status]" />
           </div>
 
           <div class="project-facts__item">
-            <span class="type-label">Priority</span>
+            <span class="type-label">{{ $t("common.fields.priority") }}</span>
             <BaseBadge
-              :label="PROJECT_PRIORITY_LABELS[project.priority]"
+              :label="projectPriorityLabel(project.priority)"
               :tone="PROJECT_PRIORITY_TONES[project.priority]"
             />
           </div>
 
           <div class="project-facts__item">
-            <span class="type-label">Responsible</span>
+            <span class="type-label">{{ $t("projects.admin.detail.owner") }}</span>
             <span class="project-facts__value">{{ project.owner }}</span>
           </div>
 
           <div class="project-facts__item">
-            <span class="type-label">Started</span>
+            <span class="type-label">{{ $t("projects.admin.detail.started") }}</span>
             <span class="project-facts__value type-numeric">{{ formatIsoDate(project.startDate) }}</span>
           </div>
 
           <div class="project-facts__item">
-            <span class="type-label">Deadline</span>
+            <span class="type-label">{{ $t("common.time.deadline") }}</span>
             <span class="project-facts__value type-numeric" :class="{ 'project-facts__value--danger': project.isOverdue }">
               {{ formatIsoDate(project.deadline) }}
             </span>
           </div>
 
           <div class="project-facts__item">
-            <span class="type-label">Journal hours</span>
+            <span class="type-label">{{ $t("projects.admin.detail.journalHours") }}</span>
             <!--
               The number used to be a dead end: seeing what was behind it meant
               going to Reports and rebuilding the filter by hand.
@@ -237,18 +243,24 @@ onMounted(async () => {
             >
               {{ project.journalHours }}
               <small class="type-meta">
-                from {{ project.journalEntries }}
-                {{ project.journalEntries === 1 ? 'entry' : 'entries' }} · {{ showJournal ? 'hide' : 'read them' }}
+                {{
+                  $t("projects.admin.detail.journalFrom", {
+                    count: project.journalEntries,
+                    action: showJournal
+                      ? $t("projects.admin.detail.journalHide")
+                      : $t("projects.admin.detail.journalRead"),
+                  }, project.journalEntries)
+                }}
               </small>
             </button>
             <span v-else class="project-facts__value type-numeric">
               0
-              <small class="type-meta">nobody has written about this project</small>
+              <small class="type-meta">{{ $t("projects.admin.detail.journalNobody") }}</small>
             </span>
           </div>
 
           <div class="project-facts__item project-facts__item--wide">
-            <span class="type-label">Progress</span>
+            <span class="type-label">{{ $t("projects.admin.detail.progress") }}</span>
             <ProjectProgressBar :progress="project.progress" />
           </div>
         </div>
@@ -260,9 +272,9 @@ onMounted(async () => {
             <template #board>
               <BaseEmptyState
                 v-if="boardTasks.length === 0"
-                title="No tasks yet"
-                description="Break the project into tasks so progress and deadlines can be tracked."
-                action-label="Add the first task"
+                :title="$t('projects.admin.detail.noTasksTitle')"
+                :description="$t('projects.admin.detail.noTasksDescription')"
+                :action-label="$t('projects.admin.detail.noTasksAction')"
                 @action="openCreateTask()"
               />
               <TaskBoard
@@ -277,9 +289,9 @@ onMounted(async () => {
             <template #list>
               <BaseEmptyState
                 v-if="listTasks.length === 0"
-                title="No tasks yet"
-                description="Break the project into tasks so progress and deadlines can be tracked."
-                action-label="Add the first task"
+                :title="$t('projects.admin.detail.noTasksTitle')"
+                :description="$t('projects.admin.detail.noTasksDescription')"
+                :action-label="$t('projects.admin.detail.noTasksAction')"
                 @action="openCreateTask()"
               />
 
@@ -288,7 +300,11 @@ onMounted(async () => {
                   <div class="task-list__main">
                     <button type="button" class="task-list__title" @click="openEditTask(task)">{{ task.title }}</button>
                     <p class="task-list__meta type-meta">
-                      {{ task.assignees.length ? task.assignees.map((a) => a.name).join(', ') : 'Unassigned' }}
+                      {{
+                        task.assignees.length
+                          ? task.assignees.map((a) => a.name).join(", ")
+                          : $t("projects.admin.detail.unassigned")
+                      }}
                       <template v-if="task.dueLabel">
                         · <span :class="{ 'task-list__overdue': task.isOverdue }">{{ task.dueLabel }}</span>
                       </template>
@@ -299,7 +315,7 @@ onMounted(async () => {
                   <BaseSelect
                     class="task-list__status"
                     :model-value="task.status"
-                    :options="TASK_STATUS_OPTIONS"
+                    :options="taskStatusOptions()"
                     @update:model-value="projectsStore.moveTask(task.id, $event as TaskStatus, projectId)"
                   />
 
@@ -307,8 +323,8 @@ onMounted(async () => {
                     <button
                       type="button"
                       class="icon-actions__button"
-                      aria-label="Edit task"
-                      title="Edit task"
+                      :aria-label="$t('projects.admin.detail.editTask')"
+                      :title="$t('projects.admin.detail.editTask')"
                       @click="openEditTask(task)"
                     >
                       <PhPencilSimple weight="regular" />
@@ -316,8 +332,8 @@ onMounted(async () => {
                     <button
                       type="button"
                       class="icon-actions__button icon-actions__button--danger"
-                      aria-label="Archive task"
-                      title="Archive task"
+                      :aria-label="$t('projects.admin.detail.archiveTask')"
+                      :title="$t('projects.admin.detail.archiveTask')"
                       @click="archiveTaskTarget = task"
                     >
                       <PhTrash weight="regular" />
@@ -330,20 +346,23 @@ onMounted(async () => {
             <template #activity>
               <ProjectActivityFeed
                 :events="projectsStore.activity"
-                empty-title="Nothing has happened yet"
-                empty-description="Creating or moving a task on this project records an entry here."
+                :empty-title="$t('projects.admin.detail.activityEmptyTitle')"
+                :empty-description="$t('projects.admin.detail.activityEmptyDescription')"
               />
             </template>
           </BaseTabs>
         </BaseCard>
 
         <div class="page-stack">
-          <BaseCard title="Team" :description="`${project.participants.length} people on this project`">
+          <BaseCard
+            :title="$t('projects.admin.detail.teamTitle')"
+            :description="$t('projects.admin.detail.teamDescription', { count: project.participants.length })"
+          >
             <BaseEmptyState
               v-if="project.participants.length === 0"
-              title="Nobody assigned"
-              description="Edit the project to put members and staff on it."
-              action-label="Assign people"
+              :title="$t('projects.admin.detail.teamEmptyTitle')"
+              :description="$t('projects.admin.detail.teamEmptyDescription')"
+              :action-label="$t('projects.admin.detail.teamEmptyAction')"
               @action="showProjectForm = true"
             />
 
@@ -351,7 +370,8 @@ onMounted(async () => {
               <li v-for="participant in project.participants" :key="participant.id" class="team-list__row">
                 <span class="team-list__name">{{ participant.name }}</span>
                 <span class="team-list__role type-meta">
-                  {{ participant.role }}<template v-if="participant.isExternal"> · External</template>
+                  {{ participantRoleLabel(participant.role) }}
+                  <template v-if="participant.isExternal"> · {{ $t("projects.admin.detail.external") }}</template>
                 </span>
               </li>
             </ul>
@@ -359,33 +379,35 @@ onMounted(async () => {
 
           <BaseCard
         v-if="showJournal"
-        title="Journal entries"
-        description="What people wrote about their time on this project."
+        :title="$t('projects.admin.detail.journalTitle')"
+        :description="$t('projects.admin.detail.journalDescription')"
       >
         <BaseLoading v-if="projectsStore.loading && projectsStore.projectJournal.length === 0" />
 
         <BaseEmptyState
           v-else-if="projectsStore.projectJournal.length === 0"
-          title="Nothing written yet"
-          description="Journal entries tagged to this project will appear here."
+          :title="$t('projects.admin.detail.journalEmptyTitle')"
+          :description="$t('projects.admin.detail.journalEmptyDescription')"
         />
 
         <ul v-else class="journal-list">
           <li v-for="entry in projectsStore.projectJournal" :key="entry.id" class="journal-list__row">
             <div class="journal-list__head">
               <span class="journal-list__who">{{ entry.memberName }}</span>
-              <span class="type-meta">{{ formatIsoDate(entry.date) }} · {{ entry.hours }}h</span>
+              <span class="type-meta">
+                {{ formatIsoDate(entry.date) }} · {{ $t("common.time.hoursShort", { count: entry.hours }) }}
+              </span>
             </div>
             <p class="journal-list__body">{{ entry.activities }}</p>
             <p v-if="entry.difficulties" class="journal-list__aside type-meta">
-              Difficulties: {{ entry.difficulties }}
+              {{ $t("projects.admin.detail.difficulties", { text: entry.difficulties }) }}
             </p>
           </li>
         </ul>
 
         <template #footer>
           <BaseButton
-            label="Open the full journal"
+            :label="$t('projects.admin.detail.journalLink')"
             severity="secondary"
             text
             @click="router.push({ name: 'reports' })"
@@ -393,14 +415,16 @@ onMounted(async () => {
         </template>
       </BaseCard>
 
-      <BaseCard title="Latest updates">
+      <BaseCard :title="$t('projects.admin.detail.updatesTitle')">
             <ProjectActivityFeed
               :events="projectsStore.activity.slice(0, 5)"
-              empty-title="No updates yet"
-              empty-description="Activity on this project appears here."
+              :empty-title="$t('projects.admin.detail.updatesEmptyTitle')"
+              :empty-description="$t('projects.admin.detail.updatesEmptyDescription')"
             />
             <template #footer>
-              <span class="type-meta">Last change {{ formatRelativeTime(project.lastActivityAt) }}</span>
+              <span class="type-meta">
+                {{ $t("projects.admin.detail.lastChange", { time: formatRelativeTime(project.lastActivityAt) }) }}
+              </span>
             </template>
           </BaseCard>
         </div>
@@ -430,9 +454,14 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="archiveTaskTarget !== null"
-      title="Archive task"
-      :message="`${archiveTaskTarget?.title ?? 'This task'} will be removed from the board. It stays in the project's history.`"
-      confirm-label="Archive"
+      :title="$t('projects.admin.detail.archiveTask')"
+      :message="
+        $t('projects.admin.detail.archiveTaskMessage', {
+          title: archiveTaskTarget?.title ?? $t('projects.task.fallbackTitle'),
+        })
+      "
+      :confirm-label="$t('common.actions.archive')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="archiveTaskTarget = null"
       @confirm="confirmArchiveTask"
       @cancel="archiveTaskTarget = null"
@@ -440,9 +469,10 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="archiveProjectConfirm"
-      title="Archive project"
-      message="This project will be hidden from the default list. Its tasks and activity are kept and it can be restored at any time."
-      confirm-label="Archive"
+      :title="$t('projects.admin.detail.archiveProjectTitle')"
+      :message="$t('projects.admin.detail.archiveProjectMessage')"
+      :confirm-label="$t('common.actions.archive')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="archiveProjectConfirm = false"
       @confirm="confirmArchiveProject"
       @cancel="archiveProjectConfirm = false"

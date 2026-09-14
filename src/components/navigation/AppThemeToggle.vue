@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { PhMoon, PhSun } from "@phosphor-icons/vue";
 
+import { t } from "../../i18n";
 import { useThemeStore } from "../../stores/theme";
 
 /**
@@ -10,7 +11,9 @@ import { useThemeStore } from "../../stores/theme";
  */
 const themeStore = useThemeStore();
 
-const label = computed(() => (themeStore.isDark ? "Switch to light theme" : "Switch to dark theme"));
+const label = computed(() =>
+  themeStore.isDark ? t("shell.topbar.switchToLight") : t("shell.topbar.switchToDark"),
+);
 </script>
 
 <template>

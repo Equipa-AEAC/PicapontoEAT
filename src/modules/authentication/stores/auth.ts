@@ -1,9 +1,12 @@
 import { computed, ref } from "vue";
+
+import { t } from "../../../i18n";
+import { userRoleLabel } from "../../../i18n/vocabulary";
 import { defineStore } from "pinia";
 
 import { loginWithPassword, refreshAuthSession } from "../services/auth.service";
 import type { AuthSession, AuthUser, LoginPayload, StaffRole, UserRole } from "../types/auth";
-import { roleCan, type AdminPermission } from "../../../types/users";
+import { accountCan, effectivePermissions, type AdminPermission } from "../../../types/users";
 
 const AUTH_STORAGE_KEY = "picaponto.auth.session";
 
@@ -13,6 +16,7 @@ interface PersistedAuthState {
   user: AuthUser;
   role: UserRole;
   staffRole: StaffRole | null;
+  staffPermissions: AdminPermission[] | null;
 }
 
 export const useAuthStore = defineStore("auth", () => {
@@ -21,6 +25,8 @@ export const useAuthStore = defineStore("auth", () => {
   const currentUser = ref<AuthUser | null>(null);
   const role = ref<UserRole | null>(null);
   const staffRole = ref<StaffRole | null>(null);
+  /** Account-specific permissions, or null to follow `staffRole`. */
+  const staffPermissions = ref<AdminPermission[] | null>(null);
   const loading = ref(false);
   const rememberMe = ref(false);
 
@@ -50,6 +56,7 @@ export const useAuthStore = defineStore("auth", () => {
     currentUser.value = session.user;
     role.value = session.role;
     staffRole.value = session.staffRole;
+    staffPermissions.value = session.staffPermissions;
     rememberMe.value = shouldPersist;
 
     if (shouldPersist) {
@@ -59,6 +66,7 @@ export const useAuthStore = defineStore("auth", () => {
         user: session.user,
         role: session.role,
         staffRole: session.staffRole,
+        staffPermissions: session.staffPermissions,
       };
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
       return;
@@ -73,6 +81,7 @@ export const useAuthStore = defineStore("auth", () => {
     currentUser.value = null;
     role.value = null;
     staffRole.value = null;
+    staffPermissions.value = null;
     rememberMe.value = false;
     localStorage.removeItem(AUTH_STORAGE_KEY);
   }
@@ -92,6 +101,8 @@ export const useAuthStore = defineStore("auth", () => {
       currentUser.value = { ...parsed.user, memberId: parsed.user?.memberId ?? null };
       role.value = parsed.role;
       staffRole.value = parsed.staffRole ?? null;
+      // Absent from sessions persisted before per-account permissions existed.
+      staffPermissions.value = parsed.staffPermissions ?? null;
       rememberMe.value = true;
     } catch {
       clearSession();
@@ -136,10 +147,20 @@ export const useAuthStore = defineStore("auth", () => {
     return role.value === expectedRole;
   }
 
-  /** Whether the signed-in staff tier is allowed to perform `permission`. */
+  /**
+   * Whether this account is allowed to perform `permission`.
+   *
+   * Reads the account's own list when it has one and falls back to the role's
+   * preset otherwise, through the same function the Users page displays — so
+   * what the interface says somebody can do and what it lets them do are the
+   * same computation.
+   */
   function can(permission: AdminPermission) {
-    return roleCan(staffRole.value, permission);
+    return accountCan(staffRole.value, staffPermissions.value, permission);
   }
+
+  /** The full effective set, for surfaces that list rather than gate. */
+  const permissions = computed(() => effectivePermissions(staffRole.value, staffPermissions.value));
 
   /** Why an action is unavailable, for a disabled control's tooltip. */
   function denialReason(permission: AdminPermission) {
@@ -147,9 +168,13 @@ export const useAuthStore = defineStore("auth", () => {
       return "";
     }
 
-    return staffRole.value
-      ? `Your ${staffRole.value} role does not allow this action.`
-      : "Sign in with a staff account to perform this action.";
+    if (!staffRole.value) {
+      return t("auth.permissions.signInAsStaff");
+    }
+
+    return staffPermissions.value
+      ? t("auth.permissions.accountLacks")
+      : t("auth.permissions.roleDisallows", { role: userRoleLabel(staffRole.value) });
   }
 
   return {
@@ -158,6 +183,8 @@ export const useAuthStore = defineStore("auth", () => {
     currentUser,
     role,
     staffRole,
+    staffPermissions,
+    permissions,
     loading,
     rememberMe,
     isAuthenticated,

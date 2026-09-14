@@ -1,38 +1,60 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
-import { PhCaretLeft, PhCaretRight } from "@phosphor-icons/vue";
+import { useRoute, useRouter } from "vue-router";
+import { PhCalendarPlus, PhNotePencil, PhPencilSimple, PhTrash } from "@phosphor-icons/vue";
 
 import {
+  BaseBadge,
   BaseButton,
   BaseCard,
-  BaseDataCard,
+  BaseConfirmDialog,
   BaseEmptyState,
   BaseErrorState,
   BaseLoading,
   BasePageHeader,
-  BaseSection,
+  BaseStatusPill,
 } from "../../../../shared/components/base";
-import { useAttendanceStore } from "../../../../shared/stores";
-import type { AttendanceStatus } from "../../../../shared/types";
+import CalendarMonthGrid from "../../../../components/calendar/CalendarMonthGrid.vue";
+import type { CalendarDayInfo } from "../../../../components/calendar/CalendarMonthGrid.vue";
+import CalendarEventDialog from "../../../../components/calendar/CalendarEventDialog.vue";
+import {
+  useAttendanceStore,
+  useCalendarEventsStore,
+  useInternshipReportsStore,
+  useProjectsStore,
+} from "../../../../shared/stores";
+import type { AttendanceStatus, CalendarEvent, CalendarEventFormValues } from "../../../../shared/types";
+import { CALENDAR_CATEGORY_TONES } from "../../../../shared/types";
 import { useAuthStore } from "../../../../modules/authentication";
 import { formatIsoDate, todayIsoDate } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import {
+  ATTENDANCE_STATUS_ORDER,
+  attendanceStatusLabel,
+  calendarCategoryLabel,
+  calendarVisibilityLabel,
+  dailyLogStatusLabel,
+} from "../../../../i18n/vocabulary";
 
 /**
- * The member's attendance as a month.
+ * The member's month, and what one day of it actually contained.
  *
- * This page used to render `portalSummary.attendanceCalendar` — seven fixed
- * dates in July with statuses (`absent`, `holiday`) that are not in
- * `AttendanceStatus` at all. It was a third hand-maintained copy of days the
- * attendance collection already holds, so it could not show a real month, and a
- * correction applied to a record never reached it.
+ * The page used to be a month of attendance tiles whose only interaction sent
+ * you to the attendance list — the same list, unfiltered, with the day you
+ * clicked nowhere in sight. Clicking a day now answers the three questions a
+ * calendar is asked: what happened, what is coming, and what can I do about it.
  *
- * It now projects the same rows the attendance page reads, which is what makes
- * a corrected day show as corrected here too.
+ * The day panel is deliberately a panel and not a dialog. A calendar is read by
+ * moving between days, and a modal that has to be dismissed before the next
+ * click turns that into a sequence of interruptions.
  */
+const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 const attendanceStore = useAttendanceStore();
-const router = useRouter();
+const eventsStore = useCalendarEventsStore();
+const projectsStore = useProjectsStore();
+const reportsStore = useInternshipReportsStore();
 
 /**
  * The member whose data this page shows, resolved from the session.
@@ -44,103 +66,238 @@ const router = useRouter();
  */
 const memberId = computed(() => authStore.currentMemberId ?? "");
 
-/** `YYYY-MM` of the month on screen. */
-const viewMonth = ref(todayIsoDate().slice(0, 7));
+const today = todayIsoDate();
 
-/** Monday first, the convention the school's own week uses. */
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/**
+ * Open on the day the caller asked for.
+ *
+ * The dashboard's month grid and every "see it on the calendar" link pass
+ * `?date=`; landing on today instead would drop the one piece of context the
+ * reader clicked to keep.
+ */
+const requestedDate = typeof route.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(route.query.date)
+  ? route.query.date
+  : null;
 
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present: "Present",
-  late: "Late",
-  missing: "Missing",
-  corrected: "Corrected",
+const viewMonth = ref((requestedDate ?? today).slice(0, 7));
+const selectedDate = ref<string | null>(requestedDate ?? today);
+
+const eventDialogVisible = ref(false);
+const editingEvent = ref<CalendarEvent | null>(null);
+const deleteConfirmVisible = ref(false);
+const pendingDeleteId = ref<string | null>(null);
+
+const STATUS_TONES: Record<AttendanceStatus, "success" | "warning" | "danger" | "info"> = {
+  present: "success",
+  late: "warning",
+  missing: "danger",
+  corrected: "info",
 };
 
-const records = computed(() => attendanceStore.items.filter((row) => row.studentId === memberId.value));
+/** The signed-in member, as an event author. */
+const author = computed(() => ({
+  id: memberId.value,
+  name: authStore.currentUser?.fullName ?? "Member",
+}));
 
-/** Months this member actually has records in, newest first. */
-const monthsWithData = computed(() =>
-  [...new Set(records.value.map((row) => row.date.slice(0, 7)))].sort().reverse(),
+const attendanceRows = computed(() =>
+  attendanceStore.items.filter((row) => row.studentId === memberId.value),
 );
 
-const monthRecords = computed(() => records.value.filter((row) => row.date.startsWith(viewMonth.value)));
+const attendanceByDate = computed(() => {
+  const map = new Map<string, (typeof attendanceRows.value)[number]>();
 
-/** `2026-08` keyed by day-of-month, so a cell is one lookup. */
-const byDay = computed(() => {
-  const map = new Map<number, (typeof monthRecords.value)[number]>();
-
-  for (const row of monthRecords.value) {
-    map.set(Number(row.date.slice(8, 10)), row);
+  for (const row of attendanceRows.value) {
+    map.set(row.date, row);
   }
 
   return map;
 });
 
-const monthLabel = computed(() => {
-  const [year, month] = viewMonth.value.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-});
+/** Tasks with a due date, keyed by that date. */
+const tasksByDate = computed(() => {
+  const map = new Map<string, typeof projectsStore.memberProjectTasks>();
 
-/**
- * The grid cells: leading blanks so the 1st lands under its weekday, then the
- * days themselves. Built from a local `Date` rather than parsing the ISO string
- * as UTC, which would shift the whole month by a day in a negative offset.
- */
-const cells = computed(() => {
-  const [year, month] = viewMonth.value.split("-").map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
+  for (const task of projectsStore.memberProjectTasks) {
+    if (!task.dueDate) {
+      continue;
+    }
 
-  // getDay() is Sunday-first; shift so Monday is 0.
-  const leading = (new Date(year, month - 1, 1).getDay() + 6) % 7;
-
-  const blanks = Array.from({ length: leading }, (_, index) => ({ key: `blank-${index}`, day: null }));
-  const days = Array.from({ length: daysInMonth }, (_, index) => ({
-    key: `${viewMonth.value}-${index + 1}`,
-    day: index + 1,
-  }));
-
-  return [...blanks, ...days];
-});
-
-const today = todayIsoDate();
-
-function isoFor(day: number) {
-  return `${viewMonth.value}-${String(day).padStart(2, "0")}`;
-}
-
-function shiftMonth(step: number) {
-  const [year, month] = viewMonth.value.split("-").map(Number);
-  const next = new Date(year, month - 1 + step, 1);
-
-  viewMonth.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function countOf(status: AttendanceStatus) {
-  return monthRecords.value.filter((row) => row.status === status).length;
-}
-
-const monthHours = computed(
-  () => Math.round(monthRecords.value.reduce((total, row) => total + (row.hours ?? 0), 0) * 10) / 10,
-);
-
-/** A day with a record leads to the page that can act on it. */
-function openDay(day: number) {
-  if (!byDay.value.has(day)) {
-    return;
+    const bucket = map.get(task.dueDate) ?? [];
+    bucket.push(task);
+    map.set(task.dueDate, bucket);
   }
 
+  return map;
+});
+
+/** Everything the grid needs, assembled once per month rather than per cell. */
+const dayInfo = computed(() => {
+  const info: Record<string, CalendarDayInfo> = {};
+
+  function ensure(date: string): CalendarDayInfo {
+    info[date] ??= { status: null, statusLabel: "", hours: null, eventCount: 0, taskCount: 0 };
+    return info[date];
+  }
+
+  for (const row of attendanceRows.value) {
+    if (!row.date.startsWith(viewMonth.value)) continue;
+    const day = ensure(row.date);
+    day.status = row.status;
+    day.statusLabel = attendanceStatusLabel(row.status);
+    day.hours = row.hours;
+  }
+
+  for (const event of eventsStore.items) {
+    if (!event.date.startsWith(viewMonth.value)) continue;
+    ensure(event.date).eventCount += 1;
+  }
+
+  for (const [date, tasks] of tasksByDate.value) {
+    if (!date.startsWith(viewMonth.value)) continue;
+    ensure(date).taskCount += tasks.length;
+  }
+
+  return info;
+});
+
+const monthHours = computed(
+  () =>
+    Math.round(
+      attendanceRows.value
+        .filter((row) => row.date.startsWith(viewMonth.value))
+        .reduce((total, row) => total + (row.hours ?? 0), 0) * 10,
+    ) / 10,
+);
+
+const monthSummary = computed(() => {
+  const days = attendanceRows.value.filter((row) => row.date.startsWith(viewMonth.value)).length;
+  const events = eventsStore.items.filter((event) => event.date.startsWith(viewMonth.value)).length;
+
+  return t(
+    "student.calendar.summary",
+    { days, hours: t("common.time.hoursShort", { count: monthHours.value }), events },
+    days,
+  );
+});
+
+/* ------------------------------------------------------------ Selected day */
+
+const selectedAttendance = computed(() =>
+  selectedDate.value ? attendanceByDate.value.get(selectedDate.value) ?? null : null,
+);
+
+const selectedEvents = computed(() =>
+  selectedDate.value ? eventsStore.eventsOn(selectedDate.value) : [],
+);
+
+const selectedTasks = computed(() =>
+  selectedDate.value ? tasksByDate.value.get(selectedDate.value) ?? [] : [],
+);
+
+/** The journal entry written for the selected day, if there is one. */
+const selectedJournalEntry = computed(() =>
+  reportsStore.dailyLogs.find((entry) => entry.date === selectedDate.value) ?? null,
+);
+
+const selectedIsFuture = computed(() => (selectedDate.value ?? "") > today);
+
+/**
+ * Whether the day is worth writing a report about.
+ *
+ * A daily report describes work that happened, so the action is offered for days
+ * that are done and have something recorded against them — not for a future date
+ * and not for a day the member was not here.
+ */
+const canWriteReport = computed(
+  () => !selectedIsFuture.value && (selectedAttendance.value?.hours ?? 0) > 0,
+);
+
+const selectedLabel = computed(() => (selectedDate.value ? formatIsoDate(selectedDate.value) : ""));
+
+/* ------------------------------------------------------------- Interaction */
+
+function selectDay(date: string) {
+  selectedDate.value = date;
+}
+
+function changeMonth(month: string) {
+  viewMonth.value = month;
+}
+
+/**
+ * A deadline on the calendar leads to the board it belongs to.
+ *
+ * The calendar showed task deadlines and stopped there, so the one thing a
+ * reader wants after seeing "this is due today" — the task itself — took a trip
+ * through Projects and a hunt for the card. It now opens that project's board
+ * directly, which is where the task can actually be moved.
+ */
+function openTaskBoard(projectId: string) {
+  void router.push({ name: "student-project-detail", params: { projectId } });
+}
+
+function openDailyLog() {
+  void router.push({ name: "student-daily-log", query: { date: selectedDate.value ?? undefined } });
+}
+
+function openAttendance() {
   void router.push({ name: "student-attendance" });
 }
 
+function openEventDialog(event: CalendarEvent | null = null) {
+  eventsStore.errorMessage = null;
+  editingEvent.value = event;
+  eventDialogVisible.value = true;
+}
+
+async function reloadEvents() {
+  await eventsStore.loadForMember(memberId.value);
+}
+
+async function saveEvent(values: CalendarEventFormValues) {
+  const saved = await eventsStore.save(values, author.value, reloadEvents, editingEvent.value?.id);
+
+  if (saved) {
+    eventDialogVisible.value = false;
+    editingEvent.value = null;
+    // Follow the event: saving a date other than the open one should show it.
+    selectedDate.value = values.date;
+    viewMonth.value = values.date.slice(0, 7);
+  }
+}
+
+function requestDelete(eventId: string) {
+  pendingDeleteId.value = eventId;
+  deleteConfirmVisible.value = true;
+}
+
+async function confirmDelete() {
+  if (pendingDeleteId.value) {
+    await eventsStore.remove(pendingDeleteId.value, author.value, reloadEvents);
+  }
+
+  pendingDeleteId.value = null;
+  deleteConfirmVisible.value = false;
+}
+
+function isMine(event: CalendarEvent) {
+  return event.authorId === memberId.value;
+}
+
+const projectOptions = computed(() =>
+  projectsStore.memberProjects.map((project) => ({ label: project.name, value: project.id })),
+);
+
 async function load() {
   attendanceStore.filters.studentId = memberId.value;
-  await attendanceStore.loadAttendance();
 
-  // Open on the newest month that has anything in it, rather than an empty grid.
-  if (!monthsWithData.value.includes(viewMonth.value) && monthsWithData.value.length > 0) {
-    viewMonth.value = monthsWithData.value[0];
-  }
+  await Promise.all([
+    attendanceStore.loadAttendance(),
+    eventsStore.loadForMember(memberId.value),
+    projectsStore.loadMemberWorkspace(memberId.value),
+    reportsStore.loadJournal(memberId.value),
+  ]);
 }
 
 onMounted(load);
@@ -149,189 +306,340 @@ onMounted(load);
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Calendar"
-      description="Your attendance month by month. The same records the attendance page shows, including corrections."
+      :title="$t('student.calendar.title')"
+      :description="$t('student.calendar.description')"
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="attendanceStore.loading" @click="load" />
-        <BaseButton label="Attendance" severity="secondary" outlined @click="router.push({ name: 'student-attendance' })" />
+        <BaseButton
+          :label="$t('common.actions.refresh')"
+          severity="secondary"
+          outlined
+          :loading="attendanceStore.loading"
+          @click="load"
+        />
+        <BaseButton @click="openEventDialog()">
+          <PhCalendarPlus weight="bold" />
+          {{ $t("student.calendar.addEvent") }}
+        </BaseButton>
       </template>
     </BasePageHeader>
 
-    <BaseErrorState
-      v-if="attendanceStore.errorMessage"
-      :message="attendanceStore.errorMessage"
-      @retry="load"
-    />
+    <BaseErrorState v-if="attendanceStore.errorMessage" :message="attendanceStore.errorMessage" @retry="load" />
+    <p v-if="eventsStore.errorMessage && !eventDialogVisible" class="form-error-banner">{{ eventsStore.errorMessage }}</p>
 
-    <section class="metric-grid">
-      <BaseDataCard title="Present" :value="String(countOf('present'))" :description="`Days marked present in ${monthLabel}`" />
-      <BaseDataCard title="Late" :value="String(countOf('late'))" :description="`Days you arrived late in ${monthLabel}`" />
-      <BaseDataCard title="Corrected" :value="String(countOf('corrected'))" :description="`Days changed after review in ${monthLabel}`" />
-      <BaseDataCard title="Missing" :value="String(countOf('missing'))" :description="`Days with no usable scan in ${monthLabel}`" />
-    </section>
+    <BaseLoading v-if="attendanceStore.loading && attendanceRows.length === 0" />
 
-    <BaseLoading v-if="attendanceStore.loading && records.length === 0" />
-
-    <BaseSection v-else title="Attendance calendar" description="One tile per day. Days you were not scheduled stay blank.">
+    <div v-else class="calendar-layout">
       <BaseCard>
-        <header class="month-bar">
-          <BaseButton severity="secondary" text aria-label="Previous month" @click="shiftMonth(-1)">
-            <PhCaretLeft weight="bold" />
-          </BaseButton>
-          <h3 class="month-bar__label">{{ monthLabel }}</h3>
-          <BaseButton severity="secondary" text aria-label="Next month" @click="shiftMonth(1)">
-            <PhCaretRight weight="bold" />
-          </BaseButton>
-          <span class="month-bar__hours type-meta">{{ monthHours }}h logged</span>
-        </header>
-
-        <BaseEmptyState
-          v-if="monthRecords.length === 0"
-          title="Nothing recorded this month"
-          :description="
-            monthsWithData.length > 0
-              ? 'Use the arrows to move to a month with attendance in it.'
-              : 'Once you start scanning your card, each day appears here with its status.'
-          "
+        <CalendarMonthGrid
+          :month="viewMonth"
+          :selected="selectedDate"
+          :days="dayInfo"
+          :summary="monthSummary"
+          @update:month="changeMonth"
+          @select="selectDay"
         />
 
-        <template v-else>
-          <div class="month-grid" role="grid" :aria-label="`Attendance for ${monthLabel}`">
-            <span v-for="weekday in WEEKDAYS" :key="weekday" class="month-grid__weekday type-label">
-              {{ weekday }}
-            </span>
-
-            <template v-for="cell in cells" :key="cell.key">
-              <span v-if="cell.day === null" class="month-grid__blank" aria-hidden="true" />
-
-              <component
-                :is="byDay.has(cell.day) ? 'button' : 'div'"
-                v-else
-                :type="byDay.has(cell.day) ? 'button' : undefined"
-                class="month-grid__day"
-                :class="[
-                  byDay.get(cell.day) ? `attendance-calendar__day--${byDay.get(cell.day)!.status}` : 'month-grid__day--none',
-                  { 'month-grid__day--today': isoFor(cell.day) === today },
-                ]"
-                :aria-label="
-                  byDay.has(cell.day)
-                    ? `${formatIsoDate(isoFor(cell.day))} — ${STATUS_LABELS[byDay.get(cell.day)!.status]}`
-                    : `${formatIsoDate(isoFor(cell.day))} — no record`
-                "
-                @click="openDay(cell.day)"
-              >
-                <span class="month-grid__number">{{ cell.day }}</span>
-                <span v-if="byDay.get(cell.day)" class="month-grid__status type-meta">
-                  {{ STATUS_LABELS[byDay.get(cell.day)!.status] }}
-                </span>
-                <span v-if="byDay.get(cell.day)?.hours" class="month-grid__hours type-meta">
-                  {{ byDay.get(cell.day)!.hours }}h
-                </span>
-              </component>
-            </template>
-          </div>
-
+        <template #footer>
           <ul class="month-legend">
-            <li v-for="(label, status) in STATUS_LABELS" :key="status" class="month-legend__item">
+            <li v-for="status in ATTENDANCE_STATUS_ORDER" :key="status" class="month-legend__item">
               <span class="month-legend__swatch" :class="`attendance-calendar__day--${status}`" />
-              <span class="type-meta">{{ label }}</span>
+              <span class="type-meta">{{ attendanceStatusLabel(status) }}</span>
+            </li>
+            <li class="month-legend__item">
+              <span class="month-legend__mark month-legend__mark--event">1</span>
+              <span class="type-meta">{{ $t("student.calendar.legendEvents") }}</span>
+            </li>
+            <li class="month-legend__item">
+              <span class="month-legend__mark month-legend__mark--task">1</span>
+              <span class="type-meta">{{ $t("student.calendar.legendTasks") }}</span>
             </li>
           </ul>
         </template>
       </BaseCard>
-    </BaseSection>
+
+      <!-- ------------------------------------------------------- Day panel -->
+      <BaseCard
+        class="day-panel"
+        :title="selectedLabel || $t('student.calendar.pickDay')"
+        :description="
+          selectedDate
+            ? $t('student.calendar.dayDescription')
+            : $t('student.calendar.pickDayDescription')
+        "
+      >
+        <BaseEmptyState
+          v-if="!selectedDate"
+          :title="$t('student.calendar.noDayTitle')"
+          :description="$t('student.calendar.noDayDescription')"
+        />
+
+        <template v-else>
+          <!-- Attendance first: it is the only thing here that counts towards hours. -->
+          <section class="day-block">
+            <p class="type-eyebrow day-block__title">{{ $t("student.calendar.attendance") }}</p>
+
+            <div v-if="selectedAttendance" class="day-attendance">
+              <BaseStatusPill
+                :label="attendanceStatusLabel(selectedAttendance.status)"
+                :tone="STATUS_TONES[selectedAttendance.status]"
+              />
+              <p class="type-numeric day-attendance__times">
+                {{ selectedAttendance.entry ?? '—' }} – {{ selectedAttendance.exit ?? '—' }}
+                <span class="type-meta">
+                  · {{ $t("common.time.hoursShort", { count: selectedAttendance.hours ?? 0 }) }}
+                </span>
+              </p>
+              <p class="type-meta">{{ selectedAttendance.deviceName }}</p>
+              <BaseButton
+                :label="$t('student.calendar.openAttendance')"
+                severity="secondary"
+                text
+                size="small"
+                @click="openAttendance"
+              />
+            </div>
+
+            <p v-else class="type-meta day-block__empty">
+              {{ selectedIsFuture ? $t("student.calendar.futureDay") : $t("student.calendar.noScan") }}
+            </p>
+          </section>
+
+          <!-- The daily report, reachable from the day it describes. -->
+          <section class="day-block">
+            <p class="type-eyebrow day-block__title">{{ $t("student.calendar.dailyReport") }}</p>
+
+            <div v-if="selectedJournalEntry" class="day-report">
+              <BaseBadge
+                :label="dailyLogStatusLabel(selectedJournalEntry.status)"
+                :tone="selectedJournalEntry.status === 'submitted' ? 'success' : 'warning'"
+              />
+              <p class="day-report__text">{{ selectedJournalEntry.activities }}</p>
+              <BaseButton
+                :label="
+                  selectedJournalEntry.status === 'draft'
+                    ? $t('student.calendar.openDraft')
+                    : $t('student.calendar.openInDailyReport')
+                "
+                severity="secondary"
+                text
+                size="small"
+                @click="openDailyLog"
+              />
+            </div>
+
+            <template v-else>
+              <p class="type-meta day-block__empty">
+                {{
+                  canWriteReport
+                    ? $t("student.calendar.noEntry")
+                    : selectedIsFuture
+                      ? $t("student.calendar.entryLater")
+                      : $t("student.calendar.nothingToReport")
+                }}
+              </p>
+              <BaseButton v-if="canWriteReport" severity="secondary" outlined size="small" @click="openDailyLog">
+                <PhNotePencil weight="bold" />
+                {{ $t("student.calendar.writeEntry") }}
+              </BaseButton>
+            </template>
+          </section>
+
+          <!-- Work due on the day, so a deadline is visible where it falls. -->
+          <section v-if="selectedTasks.length" class="day-block">
+            <p class="type-eyebrow day-block__title">{{ $t("student.calendar.dueToday") }}</p>
+            <ul class="day-list">
+              <li v-for="task in selectedTasks" :key="task.id" class="day-list__row">
+                <button type="button" class="day-list__main day-list__link" @click="openTaskBoard(task.projectId)">
+                  <span class="day-list__title">{{ task.title }}</span>
+                  <span class="type-meta">
+                    {{ $t("student.calendar.openBoard", { project: task.projectName }) }}
+                  </span>
+                </button>
+                <BaseBadge
+                  :label="task.isOverdue ? $t('common.time.overdue') : $t('common.time.due')"
+                  :tone="task.isOverdue ? 'danger' : 'warning'"
+                />
+              </li>
+            </ul>
+          </section>
+
+          <section class="day-block">
+            <p class="type-eyebrow day-block__title">{{ $t("student.calendar.events") }}</p>
+
+            <ul v-if="selectedEvents.length" class="day-list">
+              <li v-for="event in selectedEvents" :key="event.id" class="day-list__row">
+                <div class="day-list__main">
+                  <span class="day-list__title">{{ event.title }}</span>
+                  <span class="type-meta">
+                    <template v-if="event.startTime">{{ event.startTime }}<template v-if="event.endTime">–{{ event.endTime }}</template> · </template>
+                    {{ calendarVisibilityLabel(event.visibility) }}
+                    <template v-if="!isMine(event)"> · {{ event.authorName }}</template>
+                  </span>
+                  <span v-if="event.description" class="type-meta day-list__note">{{ event.description }}</span>
+                </div>
+
+                <div class="day-list__actions">
+                  <BaseBadge
+                    :label="calendarCategoryLabel(event.category)"
+                    :tone="CALENDAR_CATEGORY_TONES[event.category]"
+                  />
+                  <!-- Only the author edits. Everyone else is reading somebody's plan. -->
+                  <template v-if="isMine(event)">
+                    <BaseButton severity="secondary" text size="small" :aria-label="$t('student.calendar.editEvent')" @click="openEventDialog(event)">
+                      <PhPencilSimple weight="bold" />
+                    </BaseButton>
+                    <BaseButton severity="danger" text size="small" :aria-label="$t('student.calendar.removeEvent')" @click="requestDelete(event.id)">
+                      <PhTrash weight="bold" />
+                    </BaseButton>
+                  </template>
+                </div>
+              </li>
+            </ul>
+
+            <p v-else class="type-meta day-block__empty">{{ $t("student.calendar.nothingPlanned") }}</p>
+
+            <BaseButton severity="secondary" outlined size="small" @click="openEventDialog()">
+              <PhCalendarPlus weight="bold" />
+              {{ $t("student.calendar.addEventOnDay") }}
+            </BaseButton>
+          </section>
+        </template>
+      </BaseCard>
+    </div>
+
+    <CalendarEventDialog
+      :visible="eventDialogVisible"
+      :event="editingEvent"
+      :default-date="selectedDate ?? today"
+      :project-options="projectOptions"
+      :busy="eventsStore.saving"
+      :error-message="eventsStore.errorMessage"
+      @update:visible="eventDialogVisible = $event"
+      @save="saveEvent"
+      @cancel="eventDialogVisible = false"
+    />
+
+    <BaseConfirmDialog
+      :visible="deleteConfirmVisible"
+      :title="$t('student.calendar.removeEventTitle')"
+      :message="$t('student.calendar.removeEventMessage')"
+      :confirm-label="$t('student.calendar.removeEvent')"
+      :cancel-label="$t('common.actions.cancel')"
+      severity="danger"
+      @update:visible="deleteConfirmVisible = $event"
+      @confirm="confirmDelete"
+      @cancel="deleteConfirmVisible = false"
+    />
   </section>
 </template>
 
 <style scoped>
-.month-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.month-bar__label {
-  margin: 0;
-  min-width: 12ch;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  text-align: center;
-  text-transform: capitalize;
-}
-
-.month-bar__hours {
-  margin-left: auto;
-}
-
-.month-grid {
+/*
+ * Two columns on a desktop: the month keeps its size while the day panel reads
+ * beside it, so selecting a day never pushes the calendar off screen.
+ */
+.calendar-layout {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.month-grid__weekday {
-  padding-bottom: var(--space-1);
-  text-align: center;
+.day-panel {
+  position: sticky;
+  top: var(--space-4);
 }
 
-.month-grid__blank {
-  /* Holds a column so the 1st lands under the right weekday. */
-  min-height: 0;
+.day-block:not(:first-child) {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--border-subtle);
 }
 
-.month-grid__day {
+.day-block__title {
+  margin: 0 0 var(--space-2);
+  color: var(--foreground-secondary);
+}
+
+.day-block__empty {
+  margin: 0 0 var(--space-2);
+}
+
+.day-attendance,
+.day-report {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-height: 72px;
-  padding: var(--space-2);
-  border: var(--border-width) solid var(--border);
-  border-left-width: 3px;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font: inherit;
-  text-align: left;
-  color: var(--foreground);
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
-button.month-grid__day {
+.day-attendance__times,
+.day-report__text {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.day-list {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.day-list__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.day-list__row:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.day-list__main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.day-list__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-button.month-grid__day:hover {
-  border-color: var(--primary);
+.day-list__link:hover .day-list__title {
+  color: var(--primary);
 }
 
-/* A day with no record is a fact, not a failure — it recedes rather than alarms. */
-.month-grid__day--none {
-  border-left-color: var(--border);
-  background: transparent;
-  color: var(--foreground-muted);
-}
-
-.month-grid__day--today {
-  outline: 2px solid var(--primary);
-  outline-offset: 1px;
-}
-
-.month-grid__number {
+.day-list__title {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
 }
 
-.month-grid__status,
-.month-grid__hours {
-  line-height: var(--leading-tight);
+.day-list__note {
+  color: var(--foreground-secondary);
+}
+
+.day-list__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
 }
 
 .month-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
-  margin: var(--space-4) 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -350,14 +658,32 @@ button.month-grid__day:hover {
   border-radius: var(--radius-sm);
 }
 
-@media (max-width: 640px) {
-  .month-grid__day {
-    min-height: 56px;
-    padding: var(--space-1);
+.month-legend__mark {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  text-align: center;
+}
+
+.month-legend__mark--event {
+  background: var(--primary-subtle);
+  color: var(--primary-contrast);
+}
+
+.month-legend__mark--task {
+  background: var(--secondary-subtle);
+  color: var(--foreground-secondary);
+}
+
+@media (max-width: 1080px) {
+  .calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .month-grid__status {
-    display: none;
+  .day-panel {
+    position: static;
   }
 }
 </style>

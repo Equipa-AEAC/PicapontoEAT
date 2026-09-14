@@ -1,107 +1,128 @@
-import { PhCalendar, PhCamera, PhListChecks, PhCertificate, PhClockCounterClockwise, PhFileText, PhGearSix, PhHouse, PhIdentificationCard, PhMegaphone, PhNotePencil, PhTimer } from "@phosphor-icons/vue";
+import { PhCalendar, PhCamera, PhListChecks, PhCertificate, PhClockCounterClockwise, PhFileText, PhFolders, PhGearSix, PhHouse, PhIdentificationCard, PhKanban, PhMegaphone, PhNotePencil, PhTimer } from "@phosphor-icons/vue";
 
 import type { NavigationEntry, NavigationItem } from "../../shared/types";
 import { flattenNavigation } from "../../shared/types";
 
 /**
- * The student sidebar. Flat: the portal has no area big enough to need a group,
- * and inventing one would add a rank the student does not have to reason about.
+ * The student sidebar.
+ *
+ * One group, for the same reason the admin sidebar has one: project management is
+ * the single area with enough surface to need more than a page, and its two
+ * destinations plus the project boards behind them read better as a titled group
+ * than as two more entries competing with Attendance and Certificates.
+ *
+ * Everything else stays flat. A group per page would add a rank the student has
+ * to reason about for no gain.
  */
 export const studentNavigationEntries: NavigationEntry[] = [
   {
     kind: "link",
     name: "student-dashboard",
     path: "/student/dashboard",
-    label: "Dashboard",
-    description: "Personal overview",
+    label: "nav.student-dashboard.label",
+    description: "nav.student-dashboard.description",
     icon: PhHouse,
   },
   {
     kind: "link",
     name: "student-attendance",
     path: "/student/attendance",
-    label: "Attendance",
-    description: "Daily records and status",
+    label: "nav.student-attendance.label",
+    description: "nav.student-attendance.description",
     icon: PhClockCounterClockwise,
   },
   {
     kind: "link",
     name: "student-worked-hours",
     path: "/student/worked-hours",
-    label: "Worked Hours",
-    description: "Internship progress, hours and milestones",
+    label: "nav.student-worked-hours.label",
+    description: "nav.student-worked-hours.description",
     icon: PhTimer,
   },
   {
     kind: "link",
     name: "student-calendar",
     path: "/student/calendar",
-    label: "Calendar",
-    description: "Attendance pattern overview",
+    label: "nav.student-calendar.label",
+    description: "nav.student-calendar.description",
     icon: PhCalendar,
   },
   {
-    kind: "link",
-    name: "student-work",
-    path: "/student/my-work",
-    label: "My Work",
-    description: "Tasks assigned to you",
-    icon: PhListChecks,
+    kind: "group",
+    name: "student-project-management",
+    label: "nav.student-project-management.label",
+    icon: PhKanban,
+    items: [
+      {
+        name: "student-projects",
+        path: "/student/projects",
+        label: "nav.student-projects.label",
+        description: "nav.student-projects.description",
+        icon: PhFolders,
+      },
+      {
+        name: "student-tasks",
+        path: "/student/projects/tasks",
+        label: "nav.student-tasks.label",
+        description: "nav.student-tasks.description",
+        icon: PhListChecks,
+      },
+    ],
   },
   {
     kind: "link",
     name: "student-daily-log",
     path: "/student/daily-log",
-    label: "Daily Report",
-    description: "Register what you did today",
+    label: "nav.student-daily-log.label",
+    description: "nav.student-daily-log.description",
     icon: PhNotePencil,
   },
   {
     kind: "link",
     name: "student-reports",
     path: "/student/reports",
-    label: "Internship Reports",
-    description: "Monthly and final reports",
+    label: "nav.student-reports.label",
+    description: "nav.student-reports.description",
     icon: PhFileText,
   },
   {
     kind: "link",
     name: "student-certificates",
     path: "/student/certificates",
-    label: "Certificates",
-    description: "Completion previews",
+    label: "nav.student-certificates.label",
+    description: "nav.student-certificates.description",
     icon: PhCertificate,
   },
   {
     kind: "link",
     name: "student-moments",
     path: "/student/moments",
-    label: "Team Moments",
-    description: "Today's photos from the team",
+    label: "nav.student-moments.label",
+    description: "nav.student-moments.description",
     icon: PhCamera,
   },
   {
     kind: "link",
     name: "student-announcements",
     path: "/student/announcements",
-    label: "Announcements",
-    description: "Latest updates",
+    label: "nav.student-announcements.label",
+    description: "nav.student-announcements.description",
     icon: PhMegaphone,
   },
   {
     kind: "link",
     name: "student-profile",
     path: "/student/profile",
-    label: "Profile",
-    description: "Personal information",
+    label: "nav.student-profile.label",
+    description: "nav.student-profile.description",
     icon: PhIdentificationCard,
   },
   {
     kind: "link",
     name: "student-settings",
     path: "/student/settings",
-    label: "Settings",
-    description: "Portal preferences",
+    label: "nav.student-settings.label",
+    description: "nav.student-settings.description",
     icon: PhGearSix,
   },
 ];

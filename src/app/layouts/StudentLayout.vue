@@ -6,9 +6,18 @@ import { PhGearSix, PhInfo, PhList, PhSignOut, PhStudent, PhUserCircle } from "@
 import { BaseAvatar, BaseButton, BaseConfirmDialog, BaseDialog, BaseMenu } from "../../shared/components/base";
 import type { BaseMenuItem } from "../../shared/components/base";
 import AppSidebarNav from "../../components/navigation/AppSidebarNav.vue";
+import AppLanguageToggle from "../../components/navigation/AppLanguageToggle.vue";
 import AppThemeToggle from "../../components/navigation/AppThemeToggle.vue";
+import { t } from "../../i18n";
 import { useAuthStore } from "../../modules/authentication";
-import { useAnnouncementsStore, useInternshipsStore, useMomentsStore, useNavigationStore } from "../../shared/stores";
+import {
+  useAnnouncementsStore,
+  useInternshipsStore,
+  useMomentsStore,
+  useNavigationStore,
+  useStudentPreferencesStore,
+} from "../../shared/stores";
+import { applySidebarOrder } from "../../shared/types";
 import { studentNavigationEntries } from "../router/studentNavigation";
 
 const router = useRouter();
@@ -49,24 +58,49 @@ onMounted(refreshBadges);
 watch(() => route.path, refreshBadges);
 
 const navigationStore = useNavigationStore();
+const preferencesStore = useStudentPreferencesStore();
+
+/**
+ * The sidebar in the order this student chose.
+ *
+ * `applySidebarOrder` treats `studentNavigationEntries` as the authority on what
+ * exists and the preference as an opinion about sequence only, so a stored order
+ * can reorder the navigation but can never remove a page from it — including
+ * pages added in a later release, which simply appear at the end.
+ */
+const navigationEntries = computed(() =>
+  applySidebarOrder(studentNavigationEntries, preferencesStore.sidebarOrder),
+);
 const profileMenu = ref();
 const showProfileDialog = ref(false);
 const showLogoutConfirm = ref(false);
 const showAboutDialog = ref(false);
 
 const userRoleLabel = computed(() =>
-  authStore.role === "administrator" ? "Administrator" : authStore.role === "student" ? "Student" : "User",
+  authStore.role === "administrator"
+    ? t("shell.role.administrator")
+    : authStore.role === "student"
+      ? t("shell.role.student")
+      : t("shell.role.user"),
 );
 
-const locationLabel = computed(() => (route.meta.title as string | undefined) ?? "Student portal");
+const locationLabel = computed(() => {
+  const key = route.meta.title as string | undefined;
 
-const profileMenuItems: BaseMenuItem[] = [
-  { label: "My Profile", icon: PhUserCircle, command: () => { showProfileDialog.value = true; } },
-  { label: "Settings", icon: PhGearSix, command: () => router.push({ name: "student-settings" }) },
-  { label: "About", icon: PhInfo, command: () => { showAboutDialog.value = true; } },
+  return key ? t(key) : t("shell.brand.student");
+});
+
+/*
+ * Computed, not a constant: a menu built once at module scope would keep whatever
+ * language happened to be active when the layout was first imported.
+ */
+const profileMenuItems = computed<BaseMenuItem[]>(() => [
+  { label: t("shell.profile.myProfile"), icon: PhUserCircle, command: () => { showProfileDialog.value = true; } },
+  { label: t("shell.profile.settings"), icon: PhGearSix, command: () => router.push({ name: "student-settings" }) },
+  { label: t("shell.profile.about"), icon: PhInfo, command: () => { showAboutDialog.value = true; } },
   { separator: true },
-  { label: "Logout", icon: PhSignOut, command: () => { showLogoutConfirm.value = true; } },
-];
+  { label: t("shell.profile.logout"), icon: PhSignOut, command: () => { showLogoutConfirm.value = true; } },
+]);
 
 async function confirmLogout() {
   await authStore.logout();
@@ -83,14 +117,14 @@ async function confirmLogout() {
           <PhStudent weight="fill" />
         </div>
         <div class="brand-panel__copy">
-          <p class="brand-panel__name">Pica Ponto</p>
-          <p class="brand-panel__tagline">Student portal</p>
+          <p class="brand-panel__name">{{ $t("shell.brand.name") }}</p>
+          <p class="brand-panel__tagline">{{ $t("shell.brand.student") }}</p>
         </div>
       </div>
 
       <AppSidebarNav
-        :entries="studentNavigationEntries"
-        nav-label="Student workspace"
+        :entries="navigationEntries"
+        :nav-label="$t('shell.workspace.studentNav')"
         :collapsed="navigationStore.isSidebarCollapsed"
         :badges="navBadges"
       />
@@ -102,27 +136,30 @@ async function confirmLogout() {
           <button
             class="topbar__toggle"
             type="button"
-            aria-label="Toggle navigation"
+            :aria-label="$t('shell.topbar.toggleNavigation')"
             @click="navigationStore.toggleSidebar"
           >
             <PhList weight="regular" />
           </button>
           <span class="topbar__workspace">
             <span class="topbar__workspace-name">{{ locationLabel }}</span>
-            <span class="topbar__workspace-context">Student workspace</span>
+            <span class="topbar__workspace-context">{{ $t("shell.workspace.student") }}</span>
           </span>
         </div>
 
         <div class="topbar__actions">
+          <AppLanguageToggle />
           <AppThemeToggle />
           <RouterLink v-if="authStore.hasRole('administrator')" to="/admin/dashboard">
-            <BaseButton label="Open admin" severity="secondary" />
+            <BaseButton :label="$t('shell.workspace.openAdmin')" severity="secondary" />
           </RouterLink>
           <BaseButton class="topbar__profile-trigger" severity="secondary" @click="profileMenu.toggle($event)">
             <span class="topbar__profile-trigger-inner">
-              <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="normal" />
+              <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="small" />
               <span class="topbar__profile-copy">
-                <span class="topbar__profile-name">{{ authStore.currentUser?.fullName ?? 'User' }}</span>
+                <span class="topbar__profile-name">
+                  {{ authStore.currentUser?.fullName ?? $t("shell.profile.fallbackName") }}
+                </span>
                 <span class="topbar__profile-role">{{ userRoleLabel }}</span>
               </span>
             </span>
@@ -137,25 +174,28 @@ async function confirmLogout() {
 
       <BaseConfirmDialog
         :visible="showLogoutConfirm"
-        title="Confirm logout"
-        message="This will clear your session and return you to the login screen."
+:title="$t('shell.logout.title')"
+        :message="$t('shell.logout.message')"
+        :confirm-label="$t('shell.logout.confirm')"
+        :cancel-label="$t('common.actions.cancel')"
+        severity="primary"
         :loading="authStore.loading"
         @update:visible="showLogoutConfirm = $event"
         @confirm="confirmLogout"
         @cancel="showLogoutConfirm = false"
       />
 
-      <BaseDialog :visible="showAboutDialog" header="About Pica Ponto" class="app-about-dialog" @update:visible="showAboutDialog = $event">
-        <p>This workspace is the desktop attendance and member management application.</p>
-        <p>Version: development build</p>
+      <BaseDialog :visible="showAboutDialog" :header="$t('shell.about.title')" class="app-about-dialog" @update:visible="showAboutDialog = $event">
+        <p>{{ $t("shell.about.body") }}</p>
+        <p>{{ $t("shell.about.version") }}</p>
       </BaseDialog>
 
-      <BaseDialog :visible="showProfileDialog" header="My Profile" class="app-profile-dialog" @update:visible="showProfileDialog = $event">
+      <BaseDialog :visible="showProfileDialog" :header="$t('shell.profile.myProfile')" class="app-profile-dialog" @update:visible="showProfileDialog = $event">
         <div class="app-profile-dialog__body">
           <BaseAvatar :label="authStore.currentUser?.fullName ?? 'U'" size="xlarge" />
           <div>
-            <p>{{ authStore.currentUser?.fullName ?? 'User' }}</p>
-            <p>{{ authStore.currentUser?.email ?? 'No email available' }}</p>
+            <p>{{ authStore.currentUser?.fullName ?? $t("shell.profile.fallbackName") }}</p>
+            <p>{{ authStore.currentUser?.email ?? $t("shell.profile.noEmail") }}</p>
             <p>{{ userRoleLabel }}</p>
           </div>
         </div>

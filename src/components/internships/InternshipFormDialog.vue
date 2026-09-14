@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
+import { t } from "../../i18n";
 
 import BaseFormDialog from "../base/BaseFormDialog.vue";
 import BaseInputNumber from "../base/BaseInputNumber.vue";
@@ -9,6 +10,7 @@ import BaseTextInput from "../base/BaseTextInput.vue";
 import { INTERNSHIP_HOST_ENTITY } from "../../shared/constants";
 import type { InternshipFormValues } from "../../types/internships";
 import type { MemberSummary } from "../../types/members";
+import { internshipStatusOptions } from "../../i18n/vocabulary";
 
 const props = withDefaults(
   defineProps<{
@@ -35,12 +37,7 @@ const emit = defineEmits<{
 
 const DEFAULT_REQUIRED_HOURS = 240;
 
-const statusOptions = [
-  { label: "Planned", value: "planned" },
-  { label: "Active", value: "active" },
-  { label: "Paused", value: "paused" },
-  { label: "Complete", value: "complete" },
-];
+const statusOptions = computed(() => internshipStatusOptions());
 
 const form = reactive<InternshipFormValues>({
   studentId: "",
@@ -89,22 +86,22 @@ function requireField(field: keyof InternshipFormValues, message: string) {
 
 function validate() {
   const checks = [
-    requireField("studentId", "Select a team member."),
-    requireField("orientador", "The orientador de estágio is required."),
-    requireField("monitor", "The official document set requires a monitor de estágio."),
-    requireField("startDate", "Start date is required."),
-    requireField("endDate", "End date is required."),
+    requireField("studentId", t("errors.selectMember")),
+    requireField("orientador", t("errors.orientadorRequired")),
+    requireField("monitor", t("errors.monitorRequired")),
+    requireField("startDate", t("errors.startDateRequired")),
+    requireField("endDate", t("errors.endDateRequired")),
   ];
 
   if (form.requiredHours <= 0) {
-    errors.requiredHours = "Required hours must be greater than zero.";
+    errors.requiredHours = t("errors.requiredHoursPositive");
     checks.push(false);
   } else {
     delete errors.requiredHours;
   }
 
   if (form.startDate && form.endDate && form.endDate < form.startDate) {
-    errors.endDate = "The end date cannot be before the start date.";
+    errors.endDate = t("errors.endBeforeStart");
     checks.push(false);
   }
 
@@ -131,9 +128,10 @@ watch(
 <template>
   <BaseFormDialog
     :visible="visible"
-    title="Assign internship"
-    :subtitle="`The internship is hosted at ${INTERNSHIP_HOST_ENTITY}, since Equipa Técnica runs inside the school.`"
-    confirm-label="Assign"
+    :title="$t('components.internshipForm.title')"
+    :subtitle="$t('components.internshipForm.subtitle', { host: INTERNSHIP_HOST_ENTITY })"
+    :confirm-label="$t('components.internshipForm.confirm')"
+    :cancel-label="$t('common.actions.cancel')"
     :loading="busy"
     @update:visible="emit('update:visible', $event)"
     @confirm="submit"
@@ -143,52 +141,56 @@ watch(
 
     <div class="settings-grid">
       <label class="settings-grid__wide">
-        <span>Team member *</span>
-        <BaseSelect v-model="form.studentId" :options="memberOptions" placeholder="Select a team member" />
+        <span>{{ $t("components.internshipForm.member") }}</span>
+        <BaseSelect v-model="form.studentId" :options="memberOptions" :placeholder="$t('components.internshipForm.pickMember')" />
         <small v-if="errors.studentId" class="student-form__error">{{ errors.studentId }}</small>
       </label>
 
       <div v-if="selectedMember?.isExternal" class="settings-grid__wide internship-form__origin">
-        <BaseStatusPill label="External intern" tone="warning" />
-        <span>Enrolled at <strong>{{ selectedMember.originSchool }}</strong> — the orientador below belongs to that school.</span>
+        <BaseStatusPill :label="$t('components.internshipForm.external')" tone="warning" />
+        <i18n-t keypath="components.internshipForm.enrolledAtNote" tag="span">
+          <template #school>
+            <strong>{{ selectedMember.originSchool }}</strong>
+          </template>
+        </i18n-t>
       </div>
 
       <label>
-        <span>Required hours *</span>
+        <span>{{ $t("components.internshipForm.requiredHours") }}</span>
         <BaseInputNumber v-model="form.requiredHours" :min="1" />
         <small v-if="errors.requiredHours" class="student-form__error">{{ errors.requiredHours }}</small>
       </label>
       <label>
-        <span>Status *</span>
+        <span>{{ $t("components.internshipForm.status") }}</span>
         <BaseSelect v-model="form.status" :options="statusOptions" />
       </label>
 
       <label>
-        <span>Orientador de Estágio *</span>
-        <BaseTextInput v-model="form.orientador" placeholder="Prof. …" />
-        <small class="student-form__hint">Teacher responsible at the school the intern is enrolled at.</small>
+        <span>{{ $t("components.internshipForm.orientador") }}</span>
+        <BaseTextInput v-model="form.orientador" :placeholder="$t('components.internshipForm.orientadorPlaceholder')" />
+        <small class="student-form__hint">{{ $t("components.internshipForm.orientadorHint") }}</small>
         <small v-if="errors.orientador" class="student-form__error">{{ errors.orientador }}</small>
       </label>
       <label>
-        <span>Monitor de Estágio *</span>
-        <BaseTextInput v-model="form.monitor" placeholder="Eng. …" />
-        <small class="student-form__hint">Equipa Técnica person supervising the intern day to day.</small>
+        <span>{{ $t("components.internshipForm.monitor") }}</span>
+        <BaseTextInput v-model="form.monitor" :placeholder="$t('components.internshipForm.monitorPlaceholder')" />
+        <small class="student-form__hint">{{ $t("components.internshipForm.monitorHint") }}</small>
         <small v-if="errors.monitor" class="student-form__error">{{ errors.monitor }}</small>
       </label>
 
       <label>
-        <span>Start date *</span>
+        <span>{{ $t("components.internshipForm.startDate") }}</span>
         <BaseTextInput v-model="form.startDate" placeholder="YYYY-MM-DD" />
         <small v-if="errors.startDate" class="student-form__error">{{ errors.startDate }}</small>
       </label>
       <label>
-        <span>End date *</span>
+        <span>{{ $t("components.internshipForm.endDate") }}</span>
         <BaseTextInput v-model="form.endDate" placeholder="YYYY-MM-DD" />
         <small v-if="errors.endDate" class="student-form__error">{{ errors.endDate }}</small>
       </label>
 
       <label class="settings-grid__wide">
-        <span>Notes</span>
+        <span>{{ $t("common.fields.notes") }}</span>
         <BaseTextInput v-model="form.notes" />
       </label>
     </div>

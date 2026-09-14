@@ -9,6 +9,7 @@ import {
   BaseToolbar,
 } from "../../../../shared/components/base";
 import ProjectActivityFeed from "../../../../components/projects/ProjectActivityFeed.vue";
+import { t } from "../../../../i18n";
 import { useProjectsStore } from "../../../../shared/stores";
 import type { ProjectActivityKind } from "../../../../shared/types";
 
@@ -25,14 +26,14 @@ const projectFilter = ref<string>("all");
 const kindFilter = ref<ProjectActivityKind | "all">("all");
 
 const kindOptions: Array<{ label: string; value: ProjectActivityKind | "all" }> = [
-  { label: "Everything", value: "all" },
-  { label: "Tasks created", value: "task-created" },
-  { label: "Task status changes", value: "task-status-changed" },
-  { label: "Task edits", value: "task-updated" },
-  { label: "Assignments", value: "task-assigned" },
-  { label: "Projects created", value: "project-created" },
-  { label: "Project edits", value: "project-updated" },
-  { label: "Archived", value: "task-archived" },
+  { label: t("projects.admin.activity.filterEverything"), value: "all" },
+  { label: t("projects.admin.activity.filterTasksCreated"), value: "task-created" },
+  { label: t("projects.admin.activity.filterStatusChanges"), value: "task-status-changed" },
+  { label: t("projects.admin.activity.filterTaskEdits"), value: "task-updated" },
+  { label: t("projects.admin.activity.filterAssignments"), value: "task-assigned" },
+  { label: t("projects.admin.activity.filterProjectsCreated"), value: "project-created" },
+  { label: t("projects.admin.activity.filterProjectEdits"), value: "project-updated" },
+  { label: t("projects.admin.activity.filterArchived"), value: "task-archived" },
 ];
 
 const projectNames = computed(() =>
@@ -56,8 +57,8 @@ onMounted(async () => {
 <template>
   <div class="page-stack">
     <BasePageHeader
-      title="Project activity"
-      description="Everything that has happened across the projects, newest first."
+      :title="$t('projects.admin.activity.title')"
+      :description="$t('projects.admin.activity.description')"
     />
 
     <p v-if="projectsStore.errorMessage" class="form-error-banner">{{ projectsStore.errorMessage }}</p>
@@ -79,7 +80,14 @@ onMounted(async () => {
       </template>
 
       <template #right>
-        <span class="type-meta">{{ filtered.length }} of {{ projectsStore.activity.length }} entries</span>
+        <span class="type-meta">
+          {{
+            $t("projects.activity.entryCount", {
+              shown: filtered.length,
+              total: projectsStore.activity.length,
+            })
+          }}
+        </span>
       </template>
     </BaseToolbar>
 
@@ -90,8 +98,8 @@ onMounted(async () => {
         :events="filtered"
         show-project
         :project-names="projectNames"
-        empty-title="No matching activity"
-        empty-description="Nothing matches the current filters. Widen them to see more."
+        :empty-title="$t('projects.admin.activity.emptyTitle')"
+        :empty-description="$t('projects.admin.activity.emptyDescription')"
       />
     </BaseCard>
   </div>

@@ -1,9 +1,17 @@
 <script setup lang="ts">
+/**
+ * A person, as an image or as their initials.
+ *
+ * `small` exists for the topbar, where the avatar sits inside a control whose
+ * height is set by the button scale. A 40px avatar in a 34px button is what made
+ * the profile picture hang out of its own frame; the fix is an avatar that fits
+ * the control, not a control stretched around the avatar.
+ */
 withDefaults(
   defineProps<{
     image?: string | null;
     label: string;
-    size?: "normal" | "large" | "xlarge";
+    size?: "small" | "normal" | "large" | "xlarge";
   }>(),
   {
     image: undefined,
@@ -35,6 +43,13 @@ withDefaults(
   font-size: var(--text-xs);
 }
 
+.base-avatar--small {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+}
+
 .base-avatar--large {
   width: 56px;
   height: 56px;
@@ -49,8 +64,14 @@ withDefaults(
 }
 
 .base-avatar__image {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /*
+   * The inline baseline gap is why an <img> in an inline-flex box can sit a
+   * pixel proud of its own rounded corner. `display: block` removes it; the
+   * radius is inherited through the parent's `overflow: hidden`.
+   */
 }
 </style>

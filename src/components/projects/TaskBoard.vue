@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { PhPlus } from "@phosphor-icons/vue";
 
 import TaskBoardCard from "./TaskBoardCard.vue";
+import { t } from "../../i18n";
+import { taskStatusLabel } from "../../i18n/vocabulary";
 import type { ProjectBoardColumn, ProjectTaskSummary, TaskStatus } from "../../types/projects";
 
 /**
@@ -12,8 +14,16 @@ import type { ProjectBoardColumn, ProjectTaskSummary, TaskStatus } from "../../t
  * being moved is a task id between five columns, which does not justify a dependency.
  * Every column also has a keyboard-reachable "Add" button, and each card opens with
  * Enter, so the board is fully usable without a mouse.
+ *
+ * `canAdd` and `canMove` come from the viewer's rights on this project. A board
+ * that may not be added to shows no add buttons, and one that may not be moved
+ * is not draggable at all — a card that lifts and then refuses to land is worse
+ * than a card that never lifted.
  */
-defineProps<{ columns: ProjectBoardColumn[] }>();
+withDefaults(defineProps<{ columns: ProjectBoardColumn[]; canAdd?: boolean; canMove?: boolean }>(), {
+  canAdd: true,
+  canMove: true,
+});
 
 const emit = defineEmits<{
   move: [taskId: string, status: TaskStatus];
@@ -56,13 +66,14 @@ function onDrop(status: TaskStatus) {
     >
       <header class="task-board__header">
         <h3 class="task-board__title type-label">
-          {{ column.label }}
+          {{ taskStatusLabel(column.status) }}
           <span class="task-board__count type-numeric">{{ column.tasks.length }}</span>
         </h3>
         <button
+          v-if="canAdd"
           type="button"
           class="task-board__add"
-          :aria-label="`Add a task to ${column.label}`"
+          :aria-label="t('projects.board.addTo', { column: taskStatusLabel(column.status) })"
           @click="emit('add', column.status)"
         >
           <PhPlus weight="bold" />
@@ -74,11 +85,12 @@ function onDrop(status: TaskStatus) {
           v-for="task in column.tasks"
           :key="task.id"
           :task="task"
+          :draggable="canMove"
           @dragstart="onDragStart"
           @open="emit('open', $event)"
         />
 
-        <p v-if="column.tasks.length === 0" class="task-board__empty type-meta">Nothing here.</p>
+        <p v-if="column.tasks.length === 0" class="task-board__empty type-meta">{{ $t("projects.board.empty") }}</p>
       </div>
     </section>
   </div>

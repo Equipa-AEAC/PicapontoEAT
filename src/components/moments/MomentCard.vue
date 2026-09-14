@@ -4,6 +4,7 @@ import { PhClock, PhFlag, PhTrash } from "@phosphor-icons/vue";
 
 import { BaseAvatar, BaseBadge } from "../../shared/components/base";
 import type { TeamMomentSummary } from "../../types/moments";
+import { t } from "../../i18n";
 
 /**
  * One moment in the gallery.
@@ -26,17 +27,17 @@ const postedLabel = computed(() => {
   const minutes = props.moment.minutesSincePosted;
 
   if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t("common.time.minutesAgoShort", { count: minutes });
 
-  return `${Math.floor(minutes / 60)}h ago`;
+  return t("common.time.hoursAgoShort", { count: Math.floor(minutes / 60) });
 });
 
 const expiryLabel = computed(() => {
   const minutes = props.moment.minutesUntilExpiry;
 
-  if (minutes < 60) return `${minutes}m left`;
+  if (minutes < 60) return t("common.time.minutesLeft", { count: minutes });
 
-  return `${Math.floor(minutes / 60)}h left`;
+  return t("common.time.hoursLeft", { count: Math.floor(minutes / 60) });
 });
 
 /** Under an hour left, the card says so more loudly. */
@@ -46,7 +47,7 @@ const expiringSoon = computed(() => props.moment.minutesUntilExpiry < 60);
 <template>
   <figure class="moment-card" :class="{ 'moment-card--hidden': moment.status === 'hidden' }">
     <div class="moment-card__media">
-      <img :src="moment.imageUrl" :alt="moment.caption || `Moment posted by ${moment.authorName}`" loading="lazy" />
+      <img :src="moment.imageUrl" :alt="moment.caption || $t('components.moment.postedByAlt', { name: moment.authorName })" loading="lazy" />
 
       <span class="moment-card__expiry" :class="{ 'moment-card__expiry--soon': expiringSoon }">
         <PhClock weight="fill" />
@@ -70,8 +71,8 @@ const expiringSoon = computed(() => props.moment.minutesUntilExpiry < 60);
             v-if="canReport"
             type="button"
             class="icon-actions__button"
-            aria-label="Report this moment"
-            title="Report this moment"
+            :aria-label="$t('components.moment.report')"
+            :title="$t('components.moment.report')"
             @click="emit('report', moment)"
           >
             <PhFlag weight="regular" />
@@ -80,8 +81,8 @@ const expiringSoon = computed(() => props.moment.minutesUntilExpiry < 60);
             v-if="canRemove"
             type="button"
             class="icon-actions__button icon-actions__button--danger"
-            aria-label="Remove this moment"
-            title="Remove this moment"
+            :aria-label="$t('components.moment.remove')"
+            :title="$t('components.moment.remove')"
             @click="emit('remove', moment)"
           >
             <PhTrash weight="regular" />
@@ -92,8 +93,8 @@ const expiringSoon = computed(() => props.moment.minutesUntilExpiry < 60);
       <p v-if="moment.caption" class="moment-card__caption">{{ moment.caption }}</p>
 
       <div v-if="moment.status !== 'visible'" class="moment-card__flags">
-        <BaseBadge v-if="moment.status === 'reported'" :label="`${moment.reports.length} report(s)`" tone="warning" />
-        <BaseBadge v-if="moment.status === 'hidden'" label="Hidden" tone="danger" />
+        <BaseBadge v-if="moment.status === 'reported'" :label="$t('components.moment.reportCount', { count: moment.reports.length }, moment.reports.length)" tone="warning" />
+        <BaseBadge v-if="moment.status === 'hidden'" :label="$t('components.moment.hidden')" tone="danger" />
       </div>
     </figcaption>
   </figure>

@@ -4,6 +4,7 @@ import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { INTERNSHIP_HOST_ENTITY } from "../shared/constants";
 import { computeParticipationHours } from "./participation.service";
+import { t } from "../i18n";
 
 /**
  * Fill in the hours an internship has actually accrued.
@@ -47,11 +48,11 @@ export async function assignInternship(values: InternshipFormValues): Promise<In
     const member = mockDatabase.members.find((item) => item.id === values.studentId);
 
     if (!member) {
-      throw new Error("Member not found.");
+      throw new Error(t("errors.memberNotFound"));
     }
 
     if (mockDatabase.internships.some((item) => item.studentId === member.id)) {
-      throw new Error("This member already has an internship assigned.");
+      throw new Error(t("errors.internshipAlreadyAssigned"));
     }
 
     const createdInternship: StoredInternship = {
@@ -88,7 +89,7 @@ export async function updateInternshipProgress(studentId: string, values: Intern
     const internship = mockDatabase.internships.find((item) => item.studentId === studentId);
 
     if (!internship) {
-      throw new Error("Internship not found.");
+      throw new Error(t("errors.internshipNotFound"));
     }
 
     /*

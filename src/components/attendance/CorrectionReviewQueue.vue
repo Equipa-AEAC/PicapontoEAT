@@ -17,8 +17,9 @@ import {
 } from "../../shared/components/base";
 import { useAttendanceCorrectionsStore } from "../../shared/stores";
 import type { AttendanceCorrectionRequestSummary, CorrectionRequestStatus } from "../../shared/types";
-import { CORRECTION_KIND_LABELS, CORRECTION_STATUS_LABELS } from "../../shared/types";
 import { formatIsoDate, formatRelativeTime } from "../../shared/utils/date";
+import { correctionKindLabel, correctionStatusLabel } from "../../i18n/vocabulary";
+import { t } from "../../i18n";
 
 /**
  * The reviewer's side of an attendance correction.
@@ -47,11 +48,11 @@ const exitTime = ref("");
 const note = ref("");
 
 const statusOptions = [
-  { label: "Waiting for review", value: "pending" },
-  { label: "Approved", value: "approved" },
-  { label: "Not changed", value: "rejected" },
-  { label: "Withdrawn", value: "withdrawn" },
-  { label: "All requests", value: "all" },
+  { label: correctionStatusLabel("pending"), value: "pending" },
+  { label: correctionStatusLabel("approved"), value: "approved" },
+  { label: correctionStatusLabel("rejected"), value: "rejected" },
+  { label: correctionStatusLabel("withdrawn"), value: "withdrawn" },
+  { label: t("components.correctionQueue.allRequests"), value: "all" },
 ];
 
 const rows = computed(() => store.requests);
@@ -111,8 +112,8 @@ watch(
 
 <template>
   <BaseCard
-    title="Correction requests"
-    description="Days members have reported as wrong. Approving can rewrite the record; the decision is audited either way."
+    :title="$t('components.correctionQueue.title')"
+    :description="$t('components.correctionQueue.description')"
   >
     <div class="queue-filter">
       <BaseSelect
@@ -132,11 +133,11 @@ watch(
 
     <BaseEmptyState
       v-else-if="rows.length === 0"
-      title="Nothing to review"
+      :title="$t('components.correctionQueue.emptyTitle')"
       :description="
         store.filters.status === 'pending'
-          ? 'No member has reported an attendance problem. Requests land here as soon as they do.'
-          : 'No requests match the status you picked.'
+          ? $t('components.correctionQueue.emptyNone')
+          : $t('components.correctionQueue.emptyFiltered')
       "
     />
 
@@ -154,23 +155,42 @@ watch(
             </button>
             · {{ formatIsoDate(request.recordDate) }}
           </span>
-          <span class="review-list__kind type-label">{{ CORRECTION_KIND_LABELS[request.kind] }}</span>
+          <span class="review-list__kind type-label">{{ correctionKindLabel(request.kind) }}</span>
           <p class="review-list__reason">{{ request.reason }}</p>
 
           <span class="review-list__record type-meta">
-            Recorded {{ request.recordEntry ?? '—' }} – {{ request.recordExit ?? '—' }}
-            ({{ request.recordHours ?? 0 }}h) at {{ request.recordDevice ?? 'unknown device' }}
+            {{
+              $t("components.correctionQueue.recordedAs", {
+                entry: request.recordEntry ?? "—",
+                exit: request.recordExit ?? "—",
+                hours: request.recordHours ?? 0,
+                device: request.recordDevice ?? $t("components.correctionQueue.unknownDevice"),
+              })
+            }}
             <template v-if="request.suggestedEntry || request.suggestedExit">
               <PhArrowRight weight="bold" />
-              member says {{ request.suggestedEntry ?? '—' }} – {{ request.suggestedExit ?? '—' }}
+              {{
+                $t("components.correctionQueue.memberSays", {
+                  entry: request.suggestedEntry ?? "—",
+                  exit: request.suggestedExit ?? "—",
+                })
+              }}
             </template>
           </span>
 
           <span class="type-meta">
-            Sent {{ formatRelativeTime(request.createdAt) }}
+            {{ $t("components.correctionQueue.sentAgo", { when: formatRelativeTime(request.createdAt) }) }}
             <template v-if="request.resolvedAt">
-              · closed by {{ request.resolvedBy }} {{ formatRelativeTime(request.resolvedAt) }}
-              <template v-if="request.appliedToRecord"> · record corrected</template>
+              ·
+              {{
+                $t("components.correctionQueue.closedBy", {
+                  name: request.resolvedBy,
+                  when: formatRelativeTime(request.resolvedAt),
+                })
+              }}
+              <template v-if="request.appliedToRecord">
+                · {{ $t("components.correctionQueue.recordCorrected") }}
+              </template>
             </template>
           </span>
 
@@ -178,10 +198,10 @@ watch(
         </div>
 
         <div class="review-list__side">
-          <BaseStatusPill :label="CORRECTION_STATUS_LABELS[request.status]" :tone="statusTone(request.status)" />
+          <BaseStatusPill :label="correctionStatusLabel(request.status)" :tone="statusTone(request.status)" />
           <BaseButton
             v-if="request.status === 'pending'"
-            label="Review"
+            :label="$t('components.correctionQueue.review')"
             severity="secondary"
             size="small"
             @click="open(request)"
@@ -192,8 +212,9 @@ watch(
 
     <BaseFormDialog
       :visible="reviewing !== null"
-      title="Review correction request"
-      confirm-label="Save decision"
+      :title="$t('components.correctionQueue.reviewTitle')"
+      :confirm-label="$t('components.correctionQueue.saveDecision')"
+      :cancel-label="$t('common.actions.cancel')"
       :loading="store.saving"
       :confirm-disabled="!canResolve"
       @update:visible="reviewing = $event ? reviewing : null"
@@ -202,56 +223,65 @@ watch(
     >
       <template v-if="reviewing">
         <div class="review-recap">
-          <p class="review-recap__line">
-            <strong>{{ reviewing.memberName }}</strong> reported
-            <strong>{{ formatIsoDate(reviewing.recordDate) }}</strong>:
-            {{ CORRECTION_KIND_LABELS[reviewing.kind] }}.
-          </p>
+          <i18n-t keypath="components.correctionQueue.reportedLine" tag="p" class="review-recap__line" scope="global">
+            <template #member><strong>{{ reviewing.memberName }}</strong></template>
+            <template #date><strong>{{ formatIsoDate(reviewing.recordDate) }}</strong></template>
+            <template #kind>{{ correctionKindLabel(reviewing.kind) }}</template>
+          </i18n-t>
           <p class="review-recap__quote">“{{ reviewing.reason }}”</p>
           <p class="review-recap__line type-meta">
-            The record currently reads {{ reviewing.recordEntry ?? '—' }} – {{ reviewing.recordExit ?? '—' }}
-            at {{ reviewing.recordDevice ?? 'unknown device' }}.
+            {{
+              $t("components.correctionQueue.currentlyReads", {
+                entry: reviewing.recordEntry ?? "—",
+                exit: reviewing.recordExit ?? "—",
+                device: reviewing.recordDevice ?? $t("components.correctionQueue.unknownDevice"),
+              })
+            }}
           </p>
         </div>
 
         <div class="review-toggle">
           <BaseCheckbox v-model="approve" />
           <span>
-            <strong>Approve this request</strong>
-            <span class="type-meta">Uncheck to close it without agreeing. The member sees your note.</span>
+            <strong>{{ $t("components.correctionQueue.approve") }}</strong>
+            <span class="type-meta">{{ $t("components.correctionQueue.approveHint") }}</span>
           </span>
         </div>
 
         <div class="review-toggle" :class="{ 'review-toggle--disabled': !approve }">
           <BaseCheckbox v-model="applyCorrection" :disabled="!approve" />
           <span>
-            <strong>Also correct the attendance record</strong>
-            <span class="type-meta">Rewrites the times, recalculates the hours and marks the day corrected.</span>
+            <strong>{{ $t("components.correctionQueue.alsoCorrect") }}</strong>
+            <span class="type-meta">{{ $t("components.correctionQueue.alsoCorrectHint") }}</span>
           </span>
         </div>
 
         <div v-if="approve && applyCorrection" class="field-row">
           <label class="field">
-            <span class="field__label type-label">Check-in</span>
+            <span class="field__label type-label">{{ $t("common.fields.checkIn") }}</span>
             <BaseTextInput v-model="entryTime" type="time" />
           </label>
           <label class="field">
-            <span class="field__label type-label">Check-out</span>
+            <span class="field__label type-label">{{ $t("common.fields.checkOut") }}</span>
             <BaseTextInput v-model="exitTime" type="time" />
           </label>
         </div>
 
         <label class="field">
           <span class="field__label type-label">
-            Note for the member{{ approve ? ' (optional)' : ' (required)' }}
+            {{
+              approve
+                ? $t("components.correctionQueue.noteOptional")
+                : $t("components.correctionQueue.noteRequired")
+            }}
           </span>
           <BaseTextarea
             v-model="note"
             :rows="3"
             :placeholder="
               approve
-                ? 'For example: checked the Lab 3 terminal log and corrected the check-out.'
-                : 'Explain why the record is staying as it is.'
+                ? $t('components.correctionQueue.approveNotePlaceholder')
+                : $t('components.correctionQueue.rejectNotePlaceholder')
             "
           />
         </label>

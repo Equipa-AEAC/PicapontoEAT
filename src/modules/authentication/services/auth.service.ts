@@ -1,7 +1,9 @@
 import type { AuthSession, LoginPayload, RefreshSessionPayload, StaffRole, UserRole } from "../types/auth";
+import type { AdminPermission } from "../../../types/users";
 
 import { SEEDED_STUDENT_MEMBER_ID } from "../../../shared/constants";
 import { mockRequest } from "../../../services/mockTransport";
+import { t } from "../../../i18n";
 
 interface MockAccount {
   id: string;
@@ -17,6 +19,8 @@ interface MockAccount {
    * from a fixed table; the real API resolves it from the account record.
    */
   memberId: string | null;
+  /** Account-specific permissions, or null to follow `staffRole`. */
+  permissions: AdminPermission[] | null;
 }
 
 type MockTokenType = "access" | "refresh";
@@ -40,6 +44,7 @@ const mockAccounts: MockAccount[] = [
     role: "administrator",
     staffRole: "administrator",
     memberId: null,
+    permissions: null,
   },
   {
     // Same workspace, narrower permissions — sign in as this account to see the
@@ -51,6 +56,7 @@ const mockAccounts: MockAccount[] = [
     role: "administrator",
     staffRole: "coordinator",
     memberId: null,
+    permissions: null,
   },
   {
     id: "stu-1",
@@ -61,6 +67,7 @@ const mockAccounts: MockAccount[] = [
     staffRole: null,
     // The seeded roster member this account acts as.
     memberId: SEEDED_STUDENT_MEMBER_ID,
+    permissions: null,
   },
 ];
 
@@ -115,6 +122,7 @@ function buildSession(account: MockAccount): AuthSession {
     },
     role: account.role,
     staffRole: account.staffRole,
+    staffPermissions: account.permissions,
   };
 }
 
@@ -124,7 +132,7 @@ export async function loginWithPassword(payload: LoginPayload): Promise<AuthSess
     const account = mockAccounts.find((item) => item.email === normalizedEmail);
 
     if (!account || account.password !== payload.password) {
-      throw new Error("Invalid email or password.");
+      throw new Error(t("errors.invalidCredentials"));
     }
 
     return buildSession(account);
@@ -139,7 +147,7 @@ export async function refreshAuthSession(payload: RefreshSessionPayload): Promis
       : undefined;
 
     if (!account) {
-      throw new Error("Invalid refresh token.");
+      throw new Error(t("errors.invalidRefreshToken"));
     }
 
     return buildSession(account);

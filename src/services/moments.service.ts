@@ -18,6 +18,7 @@ import {
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
 import { ACCEPTED_IMAGE_TYPES } from "./uploads.service";
+import { t } from "../i18n";
 
 /**
  * Team moments.
@@ -119,7 +120,7 @@ async function encodeMomentImage(file: File): Promise<{ dataUrl: string; bytes: 
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("This browser cannot process the selected image.");
+    throw new Error(t("errors.imageUnsupported"));
   }
 
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
@@ -144,7 +145,7 @@ async function encodeMomentImage(file: File): Promise<{ dataUrl: string; bytes: 
 /** Rejects a file before any work is done on it. Returns null when it is fine. */
 export function validateMomentFile(file: File): string | null {
   if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-    return "Use a PNG, JPG or WebP photo.";
+    return t("errors.photoFormat");
   }
 
   return null;
@@ -165,7 +166,7 @@ export async function prepareMomentImage(file: File): Promise<{ imageUrl: string
   const { dataUrl, bytes } = await encodeMomentImage(file);
 
   if (bytes > MAX_MOMENT_BYTES) {
-    throw new Error("That photo is too large to post even after compression. Try a smaller one.");
+    throw new Error(t("errors.photoTooLargeCompressed"));
   }
 
   return { imageUrl: dataUrl, bytes };
@@ -278,11 +279,11 @@ export async function publishMoment(values: MomentFormValues, author: MomentAuth
     const alreadyPosted = unexpired().filter((moment) => moment.authorId === author.id).length;
 
     if (alreadyPosted >= MAX_MOMENTS_PER_MEMBER_PER_DAY) {
-      throw new Error(`You can post ${MAX_MOMENTS_PER_MEMBER_PER_DAY} moments in a 24-hour window.`);
+      throw new Error(t("errors.momentQuotaReached", { count: MAX_MOMENTS_PER_MEMBER_PER_DAY }));
     }
 
     if (values.bytes > MAX_MOMENT_BYTES) {
-      throw new Error("That photo is too large to post.");
+      throw new Error(t("errors.photoTooLarge"));
     }
 
     const createdAt = nowIso();

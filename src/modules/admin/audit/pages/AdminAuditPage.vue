@@ -8,6 +8,8 @@ import { useAuditStore } from "../../../../shared/stores";
 import type { AuditLogEntry } from "../../../../types/audit";
 import { csvFilename, downloadCsv, toCsv } from "../../../../shared/utils/csv";
 import { formatTimestamp } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import { auditActionLabel, auditEntityLabel } from "../../../../i18n/vocabulary";
 
 /**
  * The audit trail.
@@ -23,16 +25,26 @@ const auditStore = useAuditStore();
 const selectedLog = ref<AuditLogEntry | null>(null);
 
 /** Built from the unfiltered log, so narrowing never removes the way back. */
-function optionsFrom(read: (entry: AuditLogEntry) => string, allLabel: string) {
+function optionsFrom(
+  read: (entry: AuditLogEntry) => string,
+  allLabel: string,
+  name: (value: string) => string = (value) => value,
+) {
   return [
     { label: allLabel, value: "all" },
-    ...Array.from(new Set(auditStore.allEntries.map(read))).sort().map((value) => ({ label: value, value })),
+    ...Array.from(new Set(auditStore.allEntries.map(read)))
+      .sort()
+      .map((value) => ({ label: name(value), value })),
   ];
 }
 
-const entityOptions = computed(() => optionsFrom((entry) => entry.entity, "All entities"));
-const actionOptions = computed(() => optionsFrom((entry) => entry.action, "All actions"));
-const userOptions = computed(() => optionsFrom((entry) => entry.userName, "All users"));
+const entityOptions = computed(() =>
+  optionsFrom((entry) => entry.entity, t("admin.audit.allEntities"), auditEntityLabel),
+);
+const actionOptions = computed(() =>
+  optionsFrom((entry) => entry.action, t("admin.audit.allActions"), auditActionLabel),
+);
+const userOptions = computed(() => optionsFrom((entry) => entry.userName, t("admin.audit.allUsers")));
 
 const hasActiveFilters = computed(
   () =>
@@ -108,14 +120,14 @@ onMounted(refresh);
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Audit"
-      description="Review audit-friendly log entries with filters and record drill-down."
+      :title="$t('admin.audit.title')"
+      :description="$t('admin.audit.description')"
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="auditStore.loading" @click="refresh" />
+        <BaseButton :label="$t('common.actions.refresh')" severity="secondary" outlined :loading="auditStore.loading" @click="refresh" />
         <BaseButton :disabled="auditStore.items.length === 0" @click="exportCsv">
           <PhDownloadSimple weight="bold" />
-          Export CSV
+          {{ $t("common.actions.exportCsv") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -132,63 +144,67 @@ onMounted(refresh);
         to be a fraction of. The fourth card used to count whether a row was
         selected, which told a reader nothing they could not see.
       -->
-      <BaseStatsCard label="Entries" :value="String(auditStore.items.length)" caption="Records in the current view" />
-      <BaseStatsCard label="Total records" :value="String(auditStore.allEntries.length)" caption="The whole audit trail" />
-      <BaseStatsCard label="Entities" :value="String(auditStore.entityCount)" caption="Unique entities in the current view" />
-      <BaseStatsCard label="Users" :value="String(actorCount)" caption="Distinct actors in the current view" />
+      <BaseStatsCard :label="$t('admin.audit.metricEntries')" :value="String(auditStore.items.length)" :caption="$t('admin.audit.metricEntriesCaption')" />
+      <BaseStatsCard :label="$t('admin.audit.metricTotal')" :value="String(auditStore.allEntries.length)" :caption="$t('admin.audit.metricTotalCaption')" />
+      <BaseStatsCard :label="$t('admin.audit.metricEntities')" :value="String(auditStore.entityCount)" :caption="$t('admin.audit.metricEntitiesCaption')" />
+      <BaseStatsCard :label="$t('admin.audit.metricUsers')" :value="String(actorCount)" :caption="$t('admin.audit.metricUsersCaption')" />
     </section>
 
     <BaseFilterPanel
-      title="Search and filters"
-      description="Filters apply as you type — no Apply step. The export follows whatever is shown."
+      :title="$t('admin.audit.filtersTitle')"
+      :description="$t('admin.audit.filtersDescription')"
     >
       <div class="filter-strip">
-        <BaseSearchBar v-model="auditStore.filters.query" placeholder="Search audit logs" />
+        <BaseSearchBar v-model="auditStore.filters.query" :placeholder="$t('admin.audit.search')" />
         <BaseSelect v-model="auditStore.filters.entity" :options="entityOptions" />
         <BaseSelect v-model="auditStore.filters.action" :options="actionOptions" />
         <BaseSelect v-model="auditStore.filters.userName" :options="userOptions" />
-        <BaseButton label="Clear filters" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
+        <BaseButton :label="$t('common.actions.clearFilters')" severity="secondary" outlined :disabled="!hasActiveFilters" @click="clearFilters" />
       </div>
     </BaseFilterPanel>
 
     <BaseLoading v-if="auditStore.loading" />
 
-    <BaseSection v-else title="Audit table" description="Searchable and filterable security and operations logs.">
+    <BaseSection v-else :title="$t('admin.audit.tableTitle')" :description="$t('admin.audit.tableDescription')">
       <BaseCard>
         <BaseTable :value="auditStore.items" dataKey="id" paginator :rows="8" @rowClick="openLog">
           <template #empty>
             <BaseEmptyState
-              title="No audit logs"
+              :title="$t('admin.audit.emptyTitle')"
               :description="
                 hasActiveFilters
-                  ? 'No audit record matches the current filters.'
-                  : 'Nothing has been audited yet. Corrections, device changes and member edits appear here.'
+                  ? $t('admin.audit.emptyFiltered')
+                  : $t('admin.audit.emptyNone')
               "
-              :action-label="hasActiveFilters ? 'Clear filters' : undefined"
+              :action-label="hasActiveFilters ? $t('common.actions.clearFilters') : undefined"
               @action="clearFilters"
             />
           </template>
 
-          <BaseTableColumn field="timestamp" header="Timestamp" sortable>
+          <BaseTableColumn field="timestamp" :header="$t('admin.audit.colTimestamp')" sortable>
             <template #body="{ data }">{{ formatTimestamp((data as AuditLogEntry).timestamp) }}</template>
           </BaseTableColumn>
-          <BaseTableColumn field="userName" header="User" sortable />
-          <BaseTableColumn field="action" header="Action" sortable />
-          <BaseTableColumn field="entity" header="Entity" sortable />
-          <BaseTableColumn field="description" header="Description" />
+          <BaseTableColumn field="userName" :header="$t('admin.audit.colUser')" sortable />
+          <BaseTableColumn field="action" :header="$t('admin.audit.colAction')" sortable>
+            <template #body="{ data }">{{ auditActionLabel((data as AuditLogEntry).action) }}</template>
+          </BaseTableColumn>
+          <BaseTableColumn field="entity" :header="$t('admin.audit.colEntity')" sortable>
+            <template #body="{ data }">{{ auditEntityLabel((data as AuditLogEntry).entity) }}</template>
+          </BaseTableColumn>
+          <BaseTableColumn field="description" :header="$t('admin.audit.colDescription')" />
           <BaseTableColumn field="ipAddress" header="IP" />
-          <BaseTableColumn field="deviceName" header="Device" sortable />
+          <BaseTableColumn field="deviceName" :header="$t('admin.audit.colDevice')" sortable />
         </BaseTable>
       </BaseCard>
 
-      <BaseCard v-if="selectedLog" title="Audit details" description="Selected audit row and metadata.">
+      <BaseCard v-if="selectedLog" :title="$t('admin.audit.detailsTitle')" :description="$t('admin.audit.detailsDescription')">
         <div class="module-summary">
-          <BaseStatusPill :label="selectedLog.action" tone="info" />
-          <p><strong>User:</strong> {{ selectedLog.userName }}</p>
-          <p><strong>Entity:</strong> {{ selectedLog.entity }}</p>
-          <p><strong>Description:</strong> {{ selectedLog.description }}</p>
-          <p><strong>IP address:</strong> {{ selectedLog.ipAddress }}</p>
-          <p><strong>Device:</strong> {{ selectedLog.deviceName }}</p>
+          <BaseStatusPill :label="auditActionLabel(selectedLog.action)" tone="info" />
+          <p><strong>{{ $t("admin.audit.userLabel") }}</strong> {{ selectedLog.userName }}</p>
+          <p><strong>{{ $t("admin.audit.entityLabel") }}</strong> {{ auditEntityLabel(selectedLog.entity) }}</p>
+          <p><strong>{{ $t("admin.audit.descriptionLabel") }}</strong> {{ selectedLog.description }}</p>
+          <p><strong>{{ $t("admin.audit.ipLabel") }}</strong> {{ selectedLog.ipAddress }}</p>
+          <p><strong>{{ $t("admin.audit.deviceLabel") }}</strong> {{ selectedLog.deviceName }}</p>
         </div>
       </BaseCard>
     </BaseSection>

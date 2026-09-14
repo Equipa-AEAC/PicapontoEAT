@@ -18,6 +18,7 @@ import { useMomentsStore, useProjectsStore } from "../../../../shared/stores";
 import type { MomentFormValues, TeamMomentSummary } from "../../../../shared/types";
 import { MOMENT_LIFETIME_HOURS } from "../../../../shared/types";
 import { formatFileSize } from "../../../../services/uploads.service";
+import { t } from "../../../../i18n";
 
 /**
  * Team moments, administrator view.
@@ -37,10 +38,10 @@ const removeTarget = ref<TeamMomentSummary | null>(null);
 const summary = computed(() => momentsStore.summary);
 
 const tabs = computed<BaseTabItem[]>(() => [
-  { value: "gallery", label: "Gallery", badge: momentsStore.moments.length },
+  { value: "gallery", label: t("admin.moments.tabGallery"), badge: momentsStore.moments.length },
   {
     value: "moderation",
-    label: "Moderation",
+    label: t("admin.moments.tabModeration"),
     badge: momentsStore.reportedMoments.length || undefined,
   },
 ]);
@@ -70,13 +71,13 @@ onMounted(async () => {
 <template>
   <div class="page-stack">
     <BasePageHeader
-      title="Team moments"
-      :description="`Photos of what the team is doing right now. Each one disappears ${MOMENT_LIFETIME_HOURS} hours after it is posted.`"
+      :title="$t('admin.moments.title')"
+      :description="$t('admin.moments.galleryDescription', { hours: MOMENT_LIFETIME_HOURS })"
     >
       <template #actions>
         <BaseButton :disabled="momentsStore.remainingQuota === 0" @click="showComposer = true">
           <PhCamera weight="regular" />
-          Post a moment
+          {{ $t("admin.moments.post") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -85,27 +86,27 @@ onMounted(async () => {
 
     <div v-if="summary" class="metric-grid">
       <article class="base-metric-card">
-        <p class="base-metric-card__label">Active moments</p>
+        <p class="base-metric-card__label">{{ $t("admin.moments.metricActive") }}</p>
         <p class="base-metric-card__value">{{ summary.activeMoments }}</p>
-        <p class="base-metric-card__caption">visible in the gallery right now</p>
+        <p class="base-metric-card__caption">{{ $t("admin.moments.metricActiveCaption") }}</p>
       </article>
 
       <article class="base-metric-card">
-        <p class="base-metric-card__label">Contributors</p>
+        <p class="base-metric-card__label">{{ $t("admin.moments.metricContributors") }}</p>
         <p class="base-metric-card__value">{{ summary.contributorsToday }}</p>
-        <p class="base-metric-card__caption">people who posted in the last 24 hours</p>
+        <p class="base-metric-card__caption">{{ $t("admin.moments.metricContributorsCaption") }}</p>
       </article>
 
       <article class="base-metric-card" :class="{ 'base-metric-card--negative': summary.reportedMoments > 0 }">
-        <p class="base-metric-card__label">Reported</p>
+        <p class="base-metric-card__label">{{ $t("admin.moments.metricReported") }}</p>
         <p class="base-metric-card__value">{{ summary.reportedMoments }}</p>
-        <p class="base-metric-card__caption">{{ summary.hiddenMoments }} currently hidden</p>
+        <p class="base-metric-card__caption">{{ $t("admin.moments.metricReportedCaption", { count: summary.hiddenMoments }) }}</p>
       </article>
 
       <article class="base-metric-card">
-        <p class="base-metric-card__label">Stored</p>
+        <p class="base-metric-card__label">{{ $t("admin.moments.metricStored") }}</p>
         <p class="base-metric-card__value">{{ formatFileSize(summary.storedBytes) }}</p>
-        <p class="base-metric-card__caption">released automatically as moments expire</p>
+        <p class="base-metric-card__caption">{{ $t("admin.moments.metricStoredCaption") }}</p>
       </article>
     </div>
 
@@ -116,9 +117,9 @@ onMounted(async () => {
         <template #gallery>
           <BaseEmptyState
             v-if="momentsStore.groups.length === 0"
-            title="Nothing posted today"
-            description="When members post photos of what they are working on, they appear here for 24 hours."
-            action-label="Post the first moment"
+            :title="$t('admin.moments.emptyTitle')"
+            :description="$t('admin.moments.emptyDescription')"
+            :action-label="$t('admin.moments.emptyAction')"
             @action="showComposer = true"
           />
 
@@ -128,8 +129,8 @@ onMounted(async () => {
               <header class="moment-group__header">
                 <h3 class="type-card-title">{{ group.authorName }}</h3>
                 <span class="type-meta">
-                  {{ group.moments.length }} {{ group.moments.length === 1 ? 'moment' : 'moments' }}
-                  <template v-if="group.authorIsExternal"> · External</template>
+                  {{ $t("admin.moments.momentCount", { count: group.moments.length }, group.moments.length) }}
+                  <template v-if="group.authorIsExternal"> · {{ $t("admin.moments.external") }}</template>
                 </span>
               </header>
 
@@ -149,8 +150,8 @@ onMounted(async () => {
         <template #moderation>
           <BaseEmptyState
             v-if="momentsStore.moderationQueue.length === 0"
-            title="Nothing to moderate"
-            description="Reported and hidden moments show up here while they are still within their 24 hours."
+            :title="$t('admin.moments.moderationEmptyTitle')"
+            :description="$t('admin.moments.moderationEmptyDescription')"
           />
 
           <div v-else class="moment-grid">
@@ -158,7 +159,7 @@ onMounted(async () => {
               <MomentCard :moment="moment" can-remove @remove="removeTarget = $event" />
 
               <div v-if="moment.reports.length > 0" class="moderation-item__reports">
-                <p class="type-eyebrow">Reports</p>
+                <p class="type-eyebrow">{{ $t("admin.moments.reportsHeading") }}</p>
                 <ul>
                   <li v-for="report in moment.reports" :key="report.id" class="type-meta">
                     <strong>{{ report.reporterName }}</strong> — {{ report.reason }}
@@ -175,11 +176,11 @@ onMounted(async () => {
                   @click="momentsStore.hide(moment.id)"
                 >
                   <PhEyeSlash weight="regular" />
-                  Hide
+                  {{ $t("common.actions.hide") }}
                 </BaseButton>
                 <BaseButton v-else severity="secondary" size="small" @click="momentsStore.restore(moment.id)">
                   <PhEye weight="regular" />
-                  Restore
+                  {{ $t("common.actions.restore") }}
                 </BaseButton>
               </div>
             </div>
@@ -201,9 +202,10 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="removeTarget !== null"
-      title="Remove moment"
-      message="This photo will be removed from the gallery immediately."
-      confirm-label="Remove"
+      :title="$t('admin.moments.removeTitle')"
+      :message="$t('admin.moments.removeMessage')"
+      :confirm-label="$t('common.actions.remove')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="removeTarget = null"
       @confirm="confirmRemove"
       @cancel="removeTarget = null"

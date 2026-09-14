@@ -16,6 +16,8 @@ import {
 import { appendAuditLog } from "./audit.service";
 import { cloneRecord, mockRequest } from "./mockTransport";
 import { mockDatabase } from "./mockDatabase";
+import { t } from "../i18n";
+import { hoursBetween } from "../utils/date";
 
 /*
  * Attendance corrections.
@@ -130,19 +132,19 @@ function validate(values: CorrectionRequestFormValues): string | null {
   const reason = values.reason.trim();
 
   if (reason.length < MIN_CORRECTION_REASON_LENGTH) {
-    return `Please describe what is wrong in at least ${MIN_CORRECTION_REASON_LENGTH} characters, so the reviewer knows what to check.`;
+    return t("errors.correctionReasonTooShort", { count: MIN_CORRECTION_REASON_LENGTH });
   }
 
   if (reason.length > MAX_CORRECTION_REASON_LENGTH) {
-    return `Please keep the description under ${MAX_CORRECTION_REASON_LENGTH} characters.`;
+    return t("errors.correctionReasonTooLong", { count: MAX_CORRECTION_REASON_LENGTH });
   }
 
   if (KINDS_WITH_TIMES.includes(values.kind) && !values.suggestedEntry && !values.suggestedExit) {
-    return "Give at least one of the times you believe are correct.";
+    return t("errors.correctionNeedsATime");
   }
 
   if (values.suggestedEntry && values.suggestedExit && values.suggestedExit <= values.suggestedEntry) {
-    return "The check-out time has to be after the check-in time.";
+    return t("errors.exitBeforeEntry");
   }
 
   return null;
@@ -162,15 +164,15 @@ export async function submitCorrectionRequest(
     const record = attendanceFor(values.attendanceId);
 
     if (!record) {
-      throw new Error("That attendance record no longer exists.");
+      throw new Error(t("errors.attendanceGone"));
     }
 
     if (record.studentId !== actor.id) {
-      throw new Error("You can only ask for corrections to your own attendance.");
+      throw new Error(t("errors.correctionOwnOnly"));
     }
 
     if (hasOpenRequest(mockDatabase.attendanceCorrectionRequests, values.attendanceId)) {
-      throw new Error("There is already a request waiting for review on this record.");
+      throw new Error(t("errors.correctionAlreadyPending"));
     }
 
     const invalid = validate(values);
@@ -220,15 +222,15 @@ export async function withdrawCorrectionRequest(
     const request = mockDatabase.attendanceCorrectionRequests.find((item) => item.id === requestId);
 
     if (!request) {
-      throw new Error("That request no longer exists.");
+      throw new Error(t("errors.requestGone"));
     }
 
     if (request.memberId !== actor.id) {
-      throw new Error("You can only withdraw your own requests.");
+      throw new Error(t("errors.withdrawOwnOnly"));
     }
 
     if (request.status !== "pending") {
-      throw new Error("This request has already been reviewed.");
+      throw new Error(t("errors.requestReviewed"));
     }
 
     request.status = "withdrawn";
@@ -265,15 +267,15 @@ export async function resolveCorrectionRequest(
     const request = mockDatabase.attendanceCorrectionRequests.find((item) => item.id === requestId);
 
     if (!request) {
-      throw new Error("That request no longer exists.");
+      throw new Error(t("errors.requestGone"));
     }
 
     if (request.status !== "pending") {
-      throw new Error("This request has already been reviewed.");
+      throw new Error(t("errors.requestReviewed"));
     }
 
     if (!approve && values.note.trim().length === 0) {
-      throw new Error("Say why the record is not being changed — the member sees this.");
+      throw new Error(t("errors.rejectionNoteRequired"));
     }
 
     const record = attendanceFor(request.attendanceId);
@@ -281,14 +283,14 @@ export async function resolveCorrectionRequest(
 
     if (approve && values.applyCorrection) {
       if (!record) {
-        throw new Error("The attendance record no longer exists, so it cannot be corrected.");
+        throw new Error(t("errors.attendanceGoneForCorrection"));
       }
 
       const entry = values.entryTime || record.entry;
       const exit = values.exitTime || record.exit;
 
       if (entry && exit && exit <= entry) {
-        throw new Error("The check-out time has to be after the check-in time.");
+        throw new Error(t("errors.exitBeforeEntry"));
       }
 
       record.entry = entry;
@@ -318,14 +320,6 @@ export async function resolveCorrectionRequest(
 
     return cloneRecord(toSummary(request));
   });
-}
-
-/** `HH:MM` difference in hours. */
-function hoursBetween(entry: string, exit: string): number {
-  const [entryHour, entryMinute] = entry.split(":").map(Number);
-  const [exitHour, exitMinute] = exit.split(":").map(Number);
-
-  return (exitHour * 60 + exitMinute - (entryHour * 60 + entryMinute)) / 60;
 }
 
 /** Re-export so callers can narrow an updated record without a second import. */

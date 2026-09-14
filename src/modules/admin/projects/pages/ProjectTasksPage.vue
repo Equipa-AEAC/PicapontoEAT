@@ -20,13 +20,9 @@ import {
 import TaskFormDialog from "../../../../components/projects/TaskFormDialog.vue";
 import { useProjectsStore } from "../../../../shared/stores";
 import type { ProjectPriority, ProjectTaskSummary, TaskFormValues, TaskStatus } from "../../../../shared/types";
-import {
-  PROJECT_PRIORITY_LABELS,
-  PROJECT_PRIORITY_OPTIONS,
-  PROJECT_PRIORITY_TONES,
-  TASK_STATUS_OPTIONS,
-  UNASSIGNED_ASSIGNEE,
-} from "../../../../shared/types";
+import { PROJECT_PRIORITY_TONES, UNASSIGNED_ASSIGNEE } from "../../../../shared/types";
+import { t } from "../../../../i18n";
+import { projectPriorityLabel, projectPriorityOptions, taskStatusOptions } from "../../../../i18n/vocabulary";
 import { formatIsoDate } from "../../../../shared/utils/date";
 
 /**
@@ -42,19 +38,25 @@ const showForm = ref(false);
 const editing = ref<ProjectTaskSummary | null>(null);
 const archiveTarget = ref<ProjectTaskSummary | null>(null);
 
-const statusOptions = [{ label: "All statuses", value: "all" }, ...TASK_STATUS_OPTIONS];
-const priorityOptions = [{ label: "All priorities", value: "all" }, ...PROJECT_PRIORITY_OPTIONS];
-const dueOptions = [
-  { label: "Any deadline", value: "all" },
-  { label: "Overdue", value: "overdue" },
-  { label: "Due within a week", value: "soon" },
-  { label: "No deadline", value: "none" },
-];
+const statusOptions = computed(() => [
+  { label: t("projects.filters.allStatuses"), value: "all" },
+  ...taskStatusOptions(),
+]);
+const priorityOptions = computed(() => [
+  { label: t("projects.filters.allPriorities"), value: "all" },
+  ...projectPriorityOptions(),
+]);
+const dueOptions = computed(() => [
+  { label: t("projects.admin.tasks.anyDeadline"), value: "all" },
+  { label: t("common.time.overdue"), value: "overdue" },
+  { label: t("projects.admin.tasks.dueWithinWeek"), value: "soon" },
+  { label: t("projects.admin.tasks.noDeadline"), value: "none" },
+]);
 
 const assigneeOptions = computed(() => [
-  { label: "Anyone", value: "all" },
+  { label: t("projects.admin.tasks.anyone"), value: "all" },
   // Unowned work is the queue most likely to slip, so it is selectable here too.
-  { label: "Nobody assigned", value: UNASSIGNED_ASSIGNEE },
+  { label: t("projects.admin.tasks.nobodyAssigned"), value: UNASSIGNED_ASSIGNEE },
   ...projectsStore.participants.map((participant) => ({ label: participant.name, value: participant.id })),
 ]);
 
@@ -118,11 +120,11 @@ onMounted(() => void projectsStore.loadTasks());
 
 <template>
   <div class="page-stack">
-    <BasePageHeader title="Tasks" description="Every work item across every project, with its owner and deadline.">
+    <BasePageHeader :title="$t('projects.admin.tasks.title')" :description="$t('projects.admin.tasks.description')">
       <template #actions>
         <BaseButton @click="openCreate">
           <PhPlus weight="bold" />
-          New task
+          {{ $t("projects.studentDetail.newTask") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -132,7 +134,7 @@ onMounted(() => void projectsStore.loadTasks());
     <BaseToolbar>
       <template #left>
         <div class="filter-strip">
-          <BaseSearchBar v-model="projectsStore.taskFilters.query" placeholder="Search tasks" />
+          <BaseSearchBar v-model="projectsStore.taskFilters.query" :placeholder="$t('projects.admin.tasks.search')" />
           <BaseSelect
             :model-value="projectsStore.taskFilters.projectId"
             :options="projectsStore.projectOptions"
@@ -164,9 +166,15 @@ onMounted(() => void projectsStore.loadTasks());
       <template #right>
         <span v-if="overdueCount > 0" class="status-pill status-pill--danger">
           <PhWarningCircle weight="fill" />
-          {{ overdueCount }} overdue
+          {{ overdueCount }} {{ $t("common.time.overdue").toLocaleLowerCase() }}
         </span>
-        <BaseButton v-if="projectsStore.hasTaskFilters" label="Clear" severity="secondary" text @click="clearFilters" />
+        <BaseButton
+          v-if="projectsStore.hasTaskFilters"
+          :label="$t('common.actions.clearFilters')"
+          severity="secondary"
+          text
+          @click="clearFilters"
+        />
       </template>
     </BaseToolbar>
 
@@ -175,18 +183,22 @@ onMounted(() => void projectsStore.loadTasks());
     <BaseCard v-else>
       <BaseEmptyState
         v-if="projectsStore.tasks.length === 0"
-        title="No tasks match"
+        :title="$t('projects.admin.tasks.emptyTitle')"
         :description="
           projectsStore.hasTaskFilters
-            ? 'Nothing matches the current filters. Clear them to see every task.'
-            : 'Create a task and assign it to somebody on the team.'
+            ? $t('projects.admin.tasks.emptyFiltered')
+            : $t('projects.admin.tasks.emptyFirst')
         "
-        :action-label="projectsStore.hasTaskFilters ? 'Clear filters' : 'New task'"
+        :action-label="
+          projectsStore.hasTaskFilters
+            ? $t('common.actions.clearFilters')
+            : $t('projects.studentDetail.newTask')
+        "
         @action="projectsStore.hasTaskFilters ? clearFilters() : openCreate()"
       />
 
       <BaseTable v-else :value="projectsStore.tasks" data-key="id" :loading="projectsStore.loading" paginator :rows="15">
-        <BaseTableColumn header="Task" field="title" sortable>
+        <BaseTableColumn :header="$t('projects.admin.tasks.colTask')" field="title" sortable>
           <template #body="{ data }">
             <button type="button" class="task-cell" @click="openEdit(data as ProjectTaskSummary)">
               <span class="task-cell__title">{{ (data as ProjectTaskSummary).title }}</span>
@@ -195,11 +207,11 @@ onMounted(() => void projectsStore.loadTasks());
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Status" width="140px">
+        <BaseTableColumn :header="$t('common.fields.status')" width="140px">
           <template #body="{ data }">
             <BaseSelect
               :model-value="(data as ProjectTaskSummary).status"
-              :options="TASK_STATUS_OPTIONS"
+              :options="taskStatusOptions()"
               @update:model-value="
                 projectsStore.moveTask(
                   (data as ProjectTaskSummary).id,
@@ -211,20 +223,20 @@ onMounted(() => void projectsStore.loadTasks());
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Priority" width="110px">
+        <BaseTableColumn :header="$t('common.fields.priority')" width="110px">
           <template #body="{ data }">
             <BaseBadge
-              :label="PROJECT_PRIORITY_LABELS[(data as ProjectTaskSummary).priority]"
+              :label="projectPriorityLabel((data as ProjectTaskSummary).priority)"
               :tone="PROJECT_PRIORITY_TONES[(data as ProjectTaskSummary).priority]"
             />
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Responsible" width="200px">
+        <BaseTableColumn :header="$t('projects.admin.tasks.colResponsible')" width="200px">
           <template #body="{ data }">
             <span v-if="(data as ProjectTaskSummary).assignees.length === 0" class="task-cell__unassigned">
               <PhWarningCircle weight="regular" />
-              Nobody assigned
+              {{ $t("projects.task.nobodyAssigned") }}
             </span>
             <!--
               Task → member. Only roster members have a record to open; staff
@@ -248,7 +260,7 @@ onMounted(() => void projectsStore.loadTasks());
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Due" field="dueDate" sortable width="150px">
+        <BaseTableColumn :header="$t('projects.admin.tasks.colDue')" field="dueDate" sortable width="150px">
           <template #body="{ data }">
             <span class="cell-stack">
               <span :class="{ 'task-cell__overdue': (data as ProjectTaskSummary).isOverdue }">
@@ -267,8 +279,8 @@ onMounted(() => void projectsStore.loadTasks());
               <button
                 type="button"
                 class="icon-actions__button"
-                aria-label="Open project"
-                title="Open project"
+                :aria-label="$t('projects.admin.tasks.openProject')"
+                :title="$t('projects.admin.tasks.openProject')"
                 @click.stop="
                   router.push({
                     name: 'project-details',
@@ -281,8 +293,8 @@ onMounted(() => void projectsStore.loadTasks());
               <button
                 type="button"
                 class="icon-actions__button icon-actions__button--danger"
-                aria-label="Archive task"
-                title="Archive task"
+                :aria-label="$t('projects.admin.tasks.archiveTask')"
+                :title="$t('projects.admin.tasks.archiveTask')"
                 @click.stop="archiveTarget = data as ProjectTaskSummary"
               >
                 <PhTrash weight="regular" />
@@ -305,9 +317,14 @@ onMounted(() => void projectsStore.loadTasks());
 
     <BaseConfirmDialog
       :visible="archiveTarget !== null"
-      title="Archive task"
-      :message="`${archiveTarget?.title ?? 'This task'} will be removed from the board. It stays in the project's history.`"
-      confirm-label="Archive"
+      :title="$t('projects.admin.detail.archiveTask')"
+      :message="
+        $t('projects.admin.detail.archiveTaskMessage', {
+          title: archiveTarget?.title ?? $t('projects.task.fallbackTitle'),
+        })
+      "
+      :confirm-label="$t('common.actions.archive')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="archiveTarget = null"
       @confirm="confirmArchive"
       @cancel="archiveTarget = null"

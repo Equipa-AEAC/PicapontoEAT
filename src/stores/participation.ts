@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type {
@@ -57,7 +58,7 @@ export const useParticipationStore = defineStore("participation", () => {
       periods.value = loadedPeriods;
       hours.value = loadedHours;
     } catch (error) {
-      errorMessage.value = describeError(error, "This member's participation history could not be loaded.");
+      errorMessage.value = describeError(error, t("errors.loadParticipation"));
     } finally {
       loading.value = false;
     }
@@ -73,7 +74,7 @@ export const useParticipationStore = defineStore("participation", () => {
       await load(memberId);
       return true;
     } catch (error) {
-      errorMessage.value = describeError(error, "That participation period could not be saved.");
+      errorMessage.value = describeError(error, t("errors.savePeriod"));
       return false;
     } finally {
       saving.value = false;
@@ -89,7 +90,7 @@ export const useParticipationStore = defineStore("participation", () => {
       await load(memberId);
       return true;
     } catch (error) {
-      errorMessage.value = describeError(error, "That participation period could not be removed.");
+      errorMessage.value = describeError(error, t("errors.removePeriod"));
       return false;
     } finally {
       saving.value = false;

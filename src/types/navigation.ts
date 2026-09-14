@@ -1,13 +1,23 @@
 import type { Component } from "vue";
 
 /**
- * One destination in a workspace sidebar. `description` is used as the route
- * subtitle, not as a second line in the sidebar — a nav entry shows its label only.
+ * One destination in a workspace sidebar.
+ *
+ * `label` and `description` hold **translation keys**, not text: the sidebar, the
+ * topbar location line, the route metadata and the Settings reordering list all
+ * render the same entry, and a literal here would have to be translated in four
+ * places or in none. The key is derived from `name` (`nav.<name>.label`), so the
+ * navigation definition and the message file cannot drift apart unnoticed.
+ *
+ * `description` is the route subtitle, not a second line in the sidebar — a nav
+ * entry shows its label only.
  */
 export interface NavigationItem {
   name: string;
   path: string;
+  /** i18n key, e.g. `nav.student-dashboard.label`. */
   label: string;
+  /** i18n key, e.g. `nav.student-dashboard.description`. */
   description: string;
   icon: Component;
 }
@@ -21,6 +31,7 @@ export interface NavigationGroup {
   kind: "group";
   /** Stable id, used as the render key and to remember the expanded state. */
   name: string;
+  /** i18n key, e.g. `nav.project-management.label`. */
   label: string;
   icon: Component;
   items: NavigationItem[];

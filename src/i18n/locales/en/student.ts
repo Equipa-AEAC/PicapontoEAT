@@ -1,0 +1,555 @@
+export default {
+  attendance: {
+    title: "Attendance",
+    description:
+      "Every day recorded against your card, and which participation each one counted under. If something is wrong, say so here.",
+    allMonths: "All months",
+    notRecorded: "Not recorded",
+    since: "since {date}",
+    noPeriodYet: "No participation period recorded yet",
+
+    metricParticipation: "Current participation",
+    metricTeamHours: "Technical Team hours",
+    metricTeamHoursCaption: "Volunteer time — counts towards the surplus-hours certificate",
+    metricInternshipHours: "Internship hours",
+    metricInternshipHoursCaption: "Counts towards your FCT requirement",
+    metricWaiting: "Waiting on review",
+    metricWaitingCaption: "Days you reported that nobody has answered yet",
+    metricNothingWaiting: "Nothing you reported is outstanding",
+
+    unclassifiedTitle: "Days nobody has accounted for",
+    unclassifiedDescription:
+      "{count} day is outside every participation period on your record, so {hours} counts towards neither certificate. Ask the coordination team to record the period that covers them. | {count} days are outside every participation period on your record, so {hours} counts towards neither certificate. Ask the coordination team to record the period that covers them.",
+
+    waitingTitle: "Waiting for review",
+    waitingDescription: "You have asked about these days. Nobody has answered yet.",
+    sent: "Sent {time}",
+    withdraw: "Withdraw",
+
+    answeredTitle: "Answered",
+    answeredDescription: "What the coordination team decided about the days you reported.",
+    recordCorrected: "The record was corrected.",
+    noNote: "No note was left.",
+    recordUpdated: "record updated",
+
+    recordTitle: "Your record",
+    recordDescription: "{days} day · {hours} in {scope} | {days} days · {hours} in {scope}",
+    scopeAll: "your whole record",
+    scopeMonth: "the selected month",
+    emptyTitle: "Nothing recorded yet",
+    emptyAll: "Your check-ins appear here once you scan your card at a terminal.",
+    emptyMonth: "No days were recorded in the month you picked.",
+    reported: "Reported",
+    reportProblem: "Report a problem",
+    footerNote: "Reporting a day sends it to the coordination team. Only they can change an attendance record.",
+  },
+
+  workedHours: {
+    chartCompleted: "Completed",
+    chartRemaining: "Remaining",
+    title: "Worked hours",
+    description: "Your internship progress: hours completed, hours left, and the milestones you have reached.",
+    internshipHours: "Internship hours",
+    internshipHoursCaption: "Counted towards your FCT requirement",
+    teamHours: "Technical Team hours",
+    teamHoursCaption: "Volunteer time — does not count towards the internship",
+    stillRequired: "Still required",
+    stillRequiredCaption: "Internship hours left before the placement is complete",
+    progress: "Internship progress",
+    progressCaption: "{done} of {required} required",
+
+    participationTitle: "Your participation",
+    participationDescription:
+      "What you are doing now, and what you did before. Each period keeps the hours you earned during it.",
+    currently: "Currently",
+    since: "since {date}",
+
+    weeklyTitle: "Hours by week",
+    weeklyDescription: "Your last ten recorded weeks, each bar labelled by the Monday it starts on.",
+    weeklyEmptyTitle: "No attendance recorded",
+    weeklyEmptyDescription: "Once you start scanning your card, your weekly load appears here.",
+    weeklySeries: "Hours",
+
+    splitTitle: "Internship progress split",
+    splitDescription: "Internship hours against the requirement. Volunteer hours are not part of this.",
+
+    milestonesTitle: "Milestones",
+    milestonesDescription: "Achievements earned as your placement progresses.",
+    milestonesEmptyTitle: "No milestones yet",
+    milestonesEmptyDescription: "Milestones are awarded as you progress through your internship hours.",
+
+    recentTitle: "Recent attendance",
+    recentDescription: "Your most recently recorded days.",
+    recentEmptyTitle: "No attendance rows",
+    recentEmptyDescription: "Your check-ins appear here once you scan your card at a terminal.",
+    colEntry: "Entry",
+    colExit: "Exit",
+    notRecorded: "Not recorded",
+  },
+
+  calendar: {
+    title: "Calendar",
+    description: "Your month: the days you were recorded, the work due, and what the team has planned.",
+    addEvent: "Add an event",
+    summary: "{days} day · {hours} · {events} event | {days} days · {hours} · {events} events",
+    legendEvents: "Events",
+    legendTasks: "Tasks due",
+
+    pickDay: "Pick a day",
+    dayDescription: "Everything recorded against this day.",
+    pickDayDescription: "Choose a day in the calendar to see what it held.",
+    noDayTitle: "No day selected",
+    noDayDescription:
+      "Click any day in the calendar — including one with nothing on it — to see what was recorded.",
+
+    attendance: "Attendance",
+    openAttendance: "Open attendance record",
+    futureDay: "A day still to come — nothing recorded yet.",
+    noScan: "No scan was recorded on this day.",
+
+    dailyReport: "Daily report",
+    openDraft: "Open the draft",
+    openInDailyReport: "Open in Daily Report",
+    noEntry: "You have not written an entry for this day.",
+    entryLater: "You can write the entry once the day has happened.",
+    nothingToReport: "No hours were recorded, so there is nothing to report for this day.",
+    writeEntry: "Write this day's entry",
+
+    dueToday: "Due today",
+    openBoard: "{project} · open the board",
+
+    events: "Events",
+    editEvent: "Edit event",
+    removeEvent: "Remove event",
+    nothingPlanned: "Nothing planned for this day.",
+    addEventOnDay: "Add an event on this day",
+    removeEventTitle: "Remove event",
+    removeEventMessage: "The event will be removed from your calendar, and from everyone it was shared with.",
+  },
+
+  announcements: {
+    title: "Announcements",
+    description: "Notices for everyone, plus the ones addressed to your participation track.",
+    search: "Search announcements",
+    unreadCount: "{count} unread",
+    unread: "Unread",
+    read: "Read {time}",
+    emptyTitle: "Nothing to read",
+    emptySearch: "No announcement matches what you searched for.",
+    emptyDescription: "Notices from the coordination team will appear here.",
+  },
+
+  profile: {
+    title: "Profile",
+    description: "What the school holds about you, and how to ask for it to be changed.",
+    unavailableTitle: "Profile unavailable",
+    unavailableDescription:
+      "Your profile could not be loaded. Try again, or ask the coordination team to check your record.",
+
+    noPlacement: "No placement",
+    internshipProgress: "Internship progress",
+    progressSplit: "{done} done · {remaining} remaining",
+
+    studentNumber: "Student number",
+    orientador: "Orientador de Estágio",
+    orientadorNote: "At the school you are enrolled at",
+    monitor: "Monitor de Estágio",
+    monitorNote: "At Equipa Técnica",
+
+    waitingTitle: "Waiting for review",
+    waitingDescription:
+      "You have asked for these changes. Your record still shows the old value until somebody approves them.",
+    newPicture: "A new picture",
+    sent: "Sent {time} · {reason}",
+
+    answeredTitle: "Answered",
+    answeredDescription: "What the coordination team decided about the changes you asked for.",
+    recordUpdatedNote: "Your record was updated.",
+    noNote: "No note was left.",
+    recordUpdated: "record updated",
+
+    identityTitle: "Identity",
+    identityDescription:
+      "Held by the school. Your contact details and picture can be changed by request; the academic fields are the school's to correct.",
+    requested: "Requested",
+    requestChange: "Request a change",
+    photoOnFile: "On file",
+    photoMissing: "No picture on file",
+
+    supervisionTitle: "Supervision",
+    supervisionDescription: "The two people who sign off on your internship.",
+
+    shortcutsTitle: "What you can do",
+    shortcutsDescription: "Your record is read-only. These are the pages where you act.",
+    shortcutEntry: "Write today's entry",
+    shortcutEntryHint: "Your daily work journal",
+    shortcutHours: "Check your hours",
+    shortcutHoursHint: "Completed and remaining",
+    shortcutAttendance: "Attendance record",
+    shortcutAttendanceHint: "Day-by-day check-ins",
+    shortcutReports: "Internship reports",
+    shortcutReportsHint: "Monthly and final",
+
+    fieldEmail: "Email address",
+    fieldPhone: "Phone number",
+    fieldPhoto: "Profile picture",
+    hintEmail: "Where the coordination team writes to you.",
+    hintPhone: "Used to reach you about attendance and placement matters.",
+    hintPhoto: "Shown next to your name across the workspace.",
+
+    duplicateRequest: "You already have a {field} request waiting for review.",
+
+    changeStatus: {
+      pending: "Waiting for review",
+      approved: "Approved",
+      rejected: "Rejected",
+      withdrawn: "Withdrawn",
+    },
+  },
+
+  reports: {
+    title: "Internship reports",
+    description: "The monthly balance and the final report, both built from the daily entries you already wrote.",
+    newReport: "New report",
+    tabMonthly: "Monthly reports",
+    tabFinal: "Final report",
+
+    metricEntries: "Journal entries",
+    metricEntriesCaption: "The source material every report is built from",
+    metricHours: "Registered hours",
+    metricHoursCaption: "Sum of every daily entry you wrote",
+    metricDrafts: "Drafts",
+    metricDraftsCaption: "Saved but not submitted — still yours to edit",
+    metricNoDrafts: "Nothing left half-finished",
+    metricReturned: "Returned to you",
+    metricReturnedCaption: "Reviewed and sent back for changes",
+    metricNothingReturned: "Nothing has been sent back",
+
+    balanceTitle: "{month} monthly balance",
+    balanceDescription: "{from} to {to} · {entries} entries · {hours}",
+    editing: "Editing",
+    generatedPreview: "Generated preview",
+    generatedNote: "This is what your daily entries produced, shown as written. Use {edit} if it needs changing before you save it.",
+    activitiesDone: "Activities carried out",
+    activitiesEmptyTitle: "No activities in this period",
+    activitiesEmptyDescription:
+      "No daily entries fall inside the dates you chose. Narrow or widen the period, or write the entries first.",
+    onePerLine: "One activity per line",
+    activitiesPlanned: "Activities planned for the next period",
+    nothingPlanned: "Nothing planned yet — add it with Edit.",
+    difficulties: "Main difficulties felt",
+    discard: "Discard",
+    regenerate: "Regenerate from my entries",
+    saveDraft: "Save draft",
+
+    listTitle: "Your monthly reports",
+    listDescription:
+      "A draft stays yours to edit. Once submitted it is with the coordination team until they answer.",
+    listEmptyTitle: "No monthly reports yet",
+    listEmptyDescription:
+      "A monthly report is the balance of one month's work, built from your daily entries. Create the first one when a month is complete.",
+    colPeriod: "Period",
+    colEntries: "Entries",
+    colSubmitted: "Submitted",
+    continueEditing: "Continue editing",
+    reopenAndRevise: "Reopen and revise",
+    withReviewer: "With the reviewer",
+    approvedBy: "Approved by {name}",
+    theCoordinationTeam: "the coordination team",
+
+    finalTitle: "Final internship report",
+    finalDescription:
+      "Section by section, following the Relatório de Estágio handed in at the end of the placement.",
+    finalReturned: "Returned for revision by {name}: {note}",
+    finalNoNote: "no note was left.",
+    finalApproved: "This report has been approved and is final.",
+    finalLocked: "This report is with the coordination team. It cannot be edited while they are reviewing it.",
+    periodStarts: "Period starts",
+    periodEnds: "Period ends",
+    placementRuns: "Your placement runs {from} to {to} at {host}.",
+    fillFromJournal: "Fill from my journal",
+    submitFinal: "Submit final report",
+
+    submitMonthlyTitle: "Submit monthly report",
+    submitFinalTitle: "Submit final report",
+    submitMessage: "It goes to the coordination team for review. You can only edit it again if they send it back.",
+
+    /* The Portuguese section headings of the official dossier, unchanged in both
+     * languages: they are the names of the sections in the regulated document. */
+    sectionCompany: "Caracterização da empresa",
+    sectionActivities: "Atividades realizadas no estágio",
+    sectionDifficulties: "Dificuldades sentidas na concretização das atividades",
+    sectionLearnings: "Novas aprendizagens",
+    sectionIncidents: "Ocorrências durante o estágio",
+    sectionOther: "Outros",
+  },
+
+  settings: {
+    title: "Settings",
+    description: "How the portal looks and behaves on this device, and the account you are signed in with.",
+
+    appearanceTitle: "Appearance",
+    appearanceDescription: "Applies to this device only, and is remembered the next time you sign in here.",
+    themeGroup: "Colour theme",
+    themeLight: "Light",
+    themeLightHint: "Best in a bright room",
+    themeDark: "Dark",
+    themeDarkHint: "Best in the lab",
+    themeSystem: "Match system",
+    themeSystemHint: "Follows your device",
+
+    languageTitle: "Language",
+    languageDescription:
+      "The language of the whole interface. Stored on this device, so it follows you between sessions here.",
+
+    alertsTitle: "Alerts",
+    alertsDescription:
+      "What the portal flags for you on your dashboard. Nothing here sends email or a message — the portal has no delivery of its own, so these decide what you are shown when you open it.",
+
+    sidebarTitle: "Sidebar order",
+    sidebarDescription: "Put the pages you use most at the top. Pages cannot be removed — this only changes the order.",
+    sidebarDefault: "Currently in the default order.",
+    sidebarCustom: "Your own order is in use.",
+
+    accessTitle: "Access",
+    accessDescription: "Your password is issued by the school and reset in person.",
+    moveUp: "Move {label} up",
+    moveDown: "Move {label} down",
+    resetOrder: "Reset to default",
+    signedInAs: "Signed in as",
+    accessNote:
+      "To reset your password, ask the coordination team — there is no self-service reset.",
+    thisAccount: "this account",
+    storedLocally:
+      "Appearance, language, alerts and sidebar order are remembered by this browser rather than by your account, so signing in on another computer starts from the defaults again.",
+    openProfile: "Open my profile",
+  },
+
+  moments: {
+    galleryDescription:
+      "What the team is working on today. Photos disappear {hours} hours after they are posted.",
+    title: "Team moments",
+    emptyTitle: "Nothing posted yet today",
+    emptyDescription: "Show what you are working on — the workshop, a repair, a project coming together.",
+    emptyAction: "Post the first moment",
+    removeTitle: "Remove your moment",
+    removeMessage: "This photo will be removed from the gallery immediately.",
+    reportTitle: "Report this moment",
+    reportSubtitle: "An administrator will review it. The photo stays visible until they decide.",
+    reportConfirm: "Send report",
+    reportReason: "Reason",
+    reportNote: "Anything else the administrator should know",
+    reportNotePlaceholder: "Optional",
+  },
+
+  alertCategory: {
+    "attendance-corrections": "Attendance corrections",
+    "report-reviews": "Internship report decisions",
+    "certificate-requests": "Certificate requests",
+    "profile-requests": "Profile change requests",
+    announcements: "Announcements",
+    "task-deadlines": "Task deadlines",
+  },
+
+  alertHint: {
+    "attendance-corrections": "When a day you reported is approved or rejected.",
+    "report-reviews": "When a monthly or final report is approved or returned to you.",
+    "certificate-requests": "When a certificate you asked for is approved or rejected.",
+    "profile-requests": "When a change to your email, phone or picture is decided.",
+    announcements: "When the coordination team publishes something addressed to you.",
+    "task-deadlines": "When a task assigned to you is due soon or already late.",
+  },
+
+  dailyLog: {
+    draftCount: "1 draft | {count} drafts",
+    title: "Daily report",
+    description:
+      "Register what you did each day. These entries feed your monthly reports and the final internship report.",
+    newEntry: "New entry",
+    allStatuses: "All statuses",
+    allMonths: "All months",
+    noProject: "No project",
+    search: "Search your entries",
+
+    metricEntries: "Entries",
+    metricEntriesCaption: "Days registered in the journal",
+    metricSubmitted: "Submitted",
+    metricSubmittedCaption: "No longer editable",
+    metricHours: "Registered hours",
+    metricHoursCaption: "Sum of every daily entry",
+    metricLast: "Last entry",
+    metricLastCaption: "Most recent day written",
+
+    journalTitle: "Daily journal",
+    journalDescription: "Drafts can still be edited. Submitting an entry locks it for the orientador.",
+    emptyTitle: "No entries yet",
+    emptyDescription: "Register your first day to start building the journal.",
+
+    colProject: "Project",
+    colActivities: "Activities",
+    colDifficulties: "Difficulties",
+
+    dialogNew: "New daily entry",
+    dialogEdit: "Edit daily entry",
+    dialogSubtitle: "Describe the day the same way you would in the internship dossier.",
+    dialogConfirm: "Save entry",
+    fieldDate: "Date *",
+    fieldHours: "Hours worked *",
+    fieldProject: "Project",
+    projectHint: "Optional, but it lets the club see how much time each project actually took.",
+    fieldActivities: "Activities carried out *",
+    fieldLearnings: "New learnings",
+    fieldDifficulties: "Difficulties felt",
+
+    submitTitle: "Submit entry",
+    submitMessage: "Once submitted the entry can no longer be edited.",
+    deleteTitle: "Delete entry",
+    deleteMessage: "This daily entry will be removed from your journal.",
+  },
+
+  certificates: {
+    reasonNoTeamHours:
+      "You have no hours inside a Technical Team period yet. Volunteer time is what this certificate attests to.",
+    reasonPlacementIncomplete: "Available once the coordination team marks your placement complete.",
+    title: "Certificates",
+    description:
+      "What your participation entitles you to, how to ask for it, and where to download it once it is issued.",
+    metricTeamHours: "Technical Team hours",
+    metricTeamHoursCaption: "Volunteer work — what the surplus-hours certificate attests to",
+    metricInternshipHours: "Internship hours",
+    metricInternshipHoursCaption: "FCT placement time — counted separately",
+    metricAvailable: "Available to download",
+    metricAvailableCaption: "Issued and ready",
+    metricNothingIssued: "Nothing has been issued yet",
+
+    availableTitle: "Available to you",
+    availableDescription:
+      "Based on the participation periods recorded against your attendance. Only certificates your record supports appear here.",
+    surplusDescription: "Awarded for volunteer work as an Equipa Técnica team member.",
+    fctDescription: "The regulated certificate, awarded once your placement is complete.",
+    waitingForReview: "Waiting for review",
+    issued: "Issued",
+    canRequest: "You can request this",
+    notYet: "Not yet",
+    sentOn: "Sent {time}. The coordination team will answer it.",
+    requestUpdated: "Request an updated copy",
+    requestCertificate: "Request certificate",
+    alreadyRequested: "Already requested.",
+
+    issuedTitle: "Your certificates",
+    issuedDescription: "Issued documents, ready to download.",
+    issuedEmptyTitle: "Nothing issued yet",
+    issuedEmptyDescription:
+      "Once the coordination team approves a request, the certificate appears here with the period it covers and a download link.",
+    issuedOn: "{hours} · issued {time}",
+    countersigned: "Countersigned copy attached {time}",
+    signed: "Signed",
+
+    answeredTitle: "Answered requests",
+    answeredDescription: "What the coordination team decided about the certificates you asked for.",
+    noNote: "No note was left.",
+
+    requestTitle: "Request the {kind}",
+    requestSubtitle: "The coordination team reviews the request. Approving it is what generates the document.",
+    requestConfirm: "Send request",
+    requestAttests: "The certificate will attest to {hours} recorded against your {source}.",
+    sourceSurplus: "Technical Team participation",
+    sourceFct: "FCT placement",
+    requestNote: "Anything the reviewer should know (optional)",
+    requestNotePlaceholder: "For example, the deadline you need it by.",
+  },
+
+  dashboard: {
+    fallbackTitle: "Dashboard",
+    loading: "Loading your record.",
+    writeEntry: "Write today's entry",
+    unavailable: "Dashboard unavailable",
+    loadFailed: "Your dashboard could not be loaded.",
+
+    metricInternship: "Internship progress",
+    metricInternshipCaption: "{done} of {required} required",
+    metricTeamHours: "Technical Team hours",
+    metricTeamHoursCaptionTeam: "Volunteer time, towards the surplus-hours certificate",
+    metricTeamHoursCaptionIntern: "Volunteer time — counted separately from the placement",
+    metricDays: "Days recorded",
+    metricDaysCaption: "Days scanned against your card",
+    metricToday: "Today",
+    metricTodayCaption: "Your live attendance state",
+    metricMonth: "This month",
+    metricMonthCaption: "Hours recorded since the 1st",
+
+    attentionTitle: "Needs your attention",
+    attentionDescription: "Decisions, deadlines and drafts waiting on you.",
+    attentionNone: "Nothing is waiting on you right now.",
+    attentionEmptyTitle: "You are up to date",
+    attentionEmptyDescription:
+      "Answered corrections, returned reports, certificate decisions and approaching deadlines all appear here. Choose which of these you want flagged in Settings.",
+
+    monthTitle: "This month",
+    monthDescription: "The days recorded against your card. Click a day to open it on your calendar.",
+    monthRecorded: "{hours} recorded",
+
+    upNextTitle: "Up next",
+    upNextDescription: "Events and deadlines from today onwards.",
+    upNextEmptyTitle: "Nothing scheduled",
+    upNextEmptyDescription:
+      "Team events and task deadlines appear here as they are set. You can add your own from the calendar.",
+    openCalendar: "Open calendar",
+    openTheCalendar: "Open the calendar",
+    event: "Event",
+    due: "Due",
+
+    weeklyTitle: "Hours by week this month",
+    weeklyDescription: "Each bar is one week of the current month, so the shape is the month you actually worked.",
+    weeklyEmptyTitle: "Nothing recorded this month yet",
+    weeklyEmptyDescription: "Once you scan your card, the hours appear here week by week.",
+    weeklySeries: "Hours",
+
+    activityTitle: "Recent activity",
+    activityDescription: "Your latest days and the entries you wrote about them.",
+    activityEmptyTitle: "Nothing recorded yet",
+    activityEmptyDescription: "Your check-ins and daily entries appear here as they happen.",
+    activityAttendance: "Attendance",
+    activityEntries: "Daily entries",
+    fullAttendance: "Full attendance record",
+
+    reportsTitle: "Internship reports",
+    reportsDescription: "Where your monthly balances and the final report stand.",
+    reportEntries: "{count} entry · {hours} | {count} entries · {hours}",
+    finalReport: "Final report",
+    finalReportName: "Relatório de Estágio",
+    reportsEmptyTitle: "No monthly reports yet",
+    reportsEmptyDescription:
+      "Your monthly balance is built from the daily entries you write. Create the first one when a month is complete.",
+    openReports: "Open reports",
+    openInternshipReports: "Open internship reports",
+
+    unclassified:
+      "{days} of your recorded days fall outside every participation period, so {hours} counts towards neither certificate. Ask the coordination team to record the period that covers them.",
+
+    /* Alert rows in "Needs your attention". */
+    alertCorrection: "Attendance correction {status}",
+    alertCorrectionDetail: "{date} — {note}",
+    alertNoNote: "No note was left.",
+    alertOpenAttendance: "Open attendance",
+    alertReportReturned: "{month} monthly report returned",
+    alertReopenAndResubmit: "Reopen it to make the changes and submit again.",
+    alertReportDraft: "{month} monthly report is still a draft",
+    alertReportDraftDetail: "It has not been submitted for review yet.",
+    alertFinishIt: "Finish it",
+    alertFinalReturned: "Final report returned for revision",
+    alertCertificate: "Certificate request {status}",
+    alertCertificateReady: "It is ready to download.",
+    alertOpenCertificates: "Open certificates",
+    alertProfile: "Profile change {status}",
+    alertProfileApplied: "Your record was updated.",
+    alertOpenProfile: "Open profile",
+    alertUnread: "{count} unread announcement | {count} unread announcements",
+    alertUnreadDetail: "Published by the coordination team and addressed to you.",
+    alertReadThem: "Read them",
+    alertOverdue: "{count} task is past the deadline | {count} tasks are past the deadline",
+    alertDueSoon: "{count} task is due soon | {count} tasks are due soon",
+    alertOpenTasks: "Open my tasks",
+    notRecorded: "Not recorded",
+  },
+} as const;

@@ -22,14 +22,14 @@ import ProjectFormDialog from "../../../../components/projects/ProjectFormDialog
 import ProjectProgressBar from "../../../../components/projects/ProjectProgressBar.vue";
 import { useProjectsStore } from "../../../../shared/stores";
 import type { ProjectFormValues, ProjectPriority, ProjectStatus, ProjectSummary } from "../../../../shared/types";
+import { PROJECT_PRIORITY_TONES, PROJECT_STATUS_TONES } from "../../../../shared/types";
+import { t } from "../../../../i18n";
 import {
-  PROJECT_PRIORITY_LABELS,
-  PROJECT_PRIORITY_OPTIONS,
-  PROJECT_PRIORITY_TONES,
-  PROJECT_STATUS_LABELS,
-  PROJECT_STATUS_OPTIONS,
-  PROJECT_STATUS_TONES,
-} from "../../../../shared/types";
+  projectPriorityLabel,
+  projectPriorityOptions,
+  projectStatusLabel,
+  projectStatusOptions,
+} from "../../../../i18n/vocabulary";
 import { formatIsoDate, formatRelativeTime } from "../../../../shared/utils/date";
 
 /**
@@ -45,8 +45,15 @@ const showForm = ref(false);
 const editing = ref<ProjectSummary | null>(null);
 const archiveTarget = ref<ProjectSummary | null>(null);
 
-const statusOptions = [{ label: "All statuses", value: "all" }, ...PROJECT_STATUS_OPTIONS];
-const priorityOptions = [{ label: "All priorities", value: "all" }, ...PROJECT_PRIORITY_OPTIONS];
+/* Computed, not constant: a module constant freezes the labels at import time. */
+const statusOptions = computed(() => [
+  { label: t("projects.filters.allStatuses"), value: "all" },
+  ...projectStatusOptions(),
+]);
+const priorityOptions = computed(() => [
+  { label: t("projects.filters.allPriorities"), value: "all" },
+  ...projectPriorityOptions(),
+]);
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -117,11 +124,11 @@ onMounted(async () => {
 
 <template>
   <div class="page-stack">
-    <BasePageHeader title="Projects" description="Every project the team is running, planned or archived.">
+    <BasePageHeader :title="$t('projects.admin.list.title')" :description="$t('projects.admin.list.description')">
       <template #actions>
         <BaseButton @click="openCreate">
           <PhPlus weight="bold" />
-          New project
+          {{ $t("projects.admin.list.create") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -131,7 +138,10 @@ onMounted(async () => {
     <BaseToolbar>
       <template #left>
         <div class="filter-strip">
-          <BaseSearchBar v-model="projectsStore.projectFilters.query" placeholder="Search projects" />
+          <BaseSearchBar
+            v-model="projectsStore.projectFilters.query"
+            :placeholder="$t('projects.admin.list.search')"
+          />
           <BaseSelect
             :model-value="projectsStore.projectFilters.status"
             :options="statusOptions"
@@ -147,12 +157,21 @@ onMounted(async () => {
             :options="projectsStore.participantOptions"
             @update:model-value="projectsStore.projectFilters.participantId = $event as string"
           />
-          <BaseCheckbox v-model="projectsStore.projectFilters.includeArchived" label="Include archived" />
+          <BaseCheckbox
+            v-model="projectsStore.projectFilters.includeArchived"
+            :label="$t('projects.admin.list.includeArchived')"
+          />
         </div>
       </template>
 
       <template #right>
-        <BaseButton v-if="projectsStore.hasProjectFilters" label="Clear" severity="secondary" text @click="clearFilters" />
+        <BaseButton
+          v-if="projectsStore.hasProjectFilters"
+          :label="$t('common.actions.clearFilters')"
+          severity="secondary"
+          text
+          @click="clearFilters"
+        />
       </template>
     </BaseToolbar>
 
@@ -161,18 +180,22 @@ onMounted(async () => {
     <BaseCard v-else>
       <BaseEmptyState
         v-if="isEmpty"
-        title="No projects match"
+        :title="$t('projects.admin.list.emptyTitle')"
         :description="
           projectsStore.hasProjectFilters
-            ? 'Nothing matches the current filters. Clear them to see every project.'
-            : 'Create the first project to start tracking what the team is building.'
+            ? $t('projects.admin.list.emptyFiltered')
+            : $t('projects.admin.list.emptyFirst')
         "
-        :action-label="projectsStore.hasProjectFilters ? 'Clear filters' : 'New project'"
+        :action-label="
+          projectsStore.hasProjectFilters
+            ? $t('common.actions.clearFilters')
+            : $t('projects.admin.list.create')
+        "
         @action="projectsStore.hasProjectFilters ? clearFilters() : openCreate()"
       />
 
       <BaseTable v-else :value="projectsStore.items" data-key="id" :loading="projectsStore.loading">
-        <BaseTableColumn header="Project" field="name" sortable>
+        <BaseTableColumn :header="$t('projects.admin.list.colProject')" field="name" sortable>
           <template #body="{ data }">
             <button
               type="button"
@@ -185,54 +208,54 @@ onMounted(async () => {
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Status" width="120px">
+        <BaseTableColumn :header="$t('common.fields.status')" width="120px">
           <template #body="{ data }">
             <BaseBadge
-              :label="PROJECT_STATUS_LABELS[(data as ProjectSummary).status]"
+              :label="projectStatusLabel((data as ProjectSummary).status)"
               :tone="statusTone((data as ProjectSummary).status)"
             />
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Priority" width="110px">
+        <BaseTableColumn :header="$t('common.fields.priority')" width="110px">
           <template #body="{ data }">
             <BaseBadge
-              :label="PROJECT_PRIORITY_LABELS[(data as ProjectSummary).priority]"
+              :label="projectPriorityLabel((data as ProjectSummary).priority)"
               :tone="priorityTone((data as ProjectSummary).priority)"
             />
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Progress" width="170px">
+        <BaseTableColumn :header="$t('projects.admin.list.colProgress')" width="170px">
           <template #body="{ data }">
             <ProjectProgressBar :progress="(data as ProjectSummary).progress" />
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Deadline" field="deadline" sortable width="140px">
+        <BaseTableColumn :header="$t('common.time.deadline')" field="deadline" sortable width="140px">
           <template #body="{ data }">
             <span class="cell-stack">
               <span :class="{ 'project-overdue': (data as ProjectSummary).isOverdue }">
                 {{ formatIsoDate((data as ProjectSummary).deadline) }}
               </span>
-              <small v-if="(data as ProjectSummary).isOverdue">Past deadline</small>
+              <small v-if="(data as ProjectSummary).isOverdue">{{ $t("projects.admin.list.pastDeadline") }}</small>
             </span>
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Team" width="80px">
+        <BaseTableColumn :header="$t('projects.admin.list.colTeam')" width="80px">
           <template #body="{ data }">
             <span class="type-numeric">{{ (data as ProjectSummary).participants.length }}</span>
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Hours" width="80px">
+        <BaseTableColumn :header="$t('projects.admin.list.colHours')" width="80px">
           <template #body="{ data }">
             <span class="type-numeric">{{ (data as ProjectSummary).journalHours }}</span>
           </template>
         </BaseTableColumn>
 
-        <BaseTableColumn header="Updated" width="110px">
+        <BaseTableColumn :header="$t('projects.admin.list.colUpdated')" width="110px">
           <template #body="{ data }">
             <span class="type-meta">{{ formatRelativeTime((data as ProjectSummary).lastActivityAt) }}</span>
           </template>
@@ -244,8 +267,8 @@ onMounted(async () => {
               <button
                 type="button"
                 class="icon-actions__button"
-                aria-label="Edit project"
-                title="Edit project"
+                :aria-label="$t('projects.admin.list.editProject')"
+                :title="$t('projects.admin.list.editProject')"
                 @click.stop="openEdit(data as ProjectSummary)"
               >
                 <PhPencilSimple weight="regular" />
@@ -255,8 +278,8 @@ onMounted(async () => {
                 v-if="(data as ProjectSummary).status !== 'archived'"
                 type="button"
                 class="icon-actions__button icon-actions__button--danger"
-                aria-label="Archive project"
-                title="Archive project"
+                :aria-label="$t('projects.admin.list.archiveProject')"
+                :title="$t('projects.admin.list.archiveProject')"
                 @click.stop="archiveTarget = data as ProjectSummary"
               >
                 <PhArchive weight="regular" />
@@ -266,8 +289,8 @@ onMounted(async () => {
                 v-else
                 type="button"
                 class="icon-actions__button"
-                aria-label="Restore project"
-                title="Restore project"
+                :aria-label="$t('projects.admin.list.restoreProject')"
+                :title="$t('projects.admin.list.restoreProject')"
                 @click.stop="projectsStore.restore((data as ProjectSummary).id)"
               >
                 <PhArrowCounterClockwise weight="regular" />
@@ -289,9 +312,10 @@ onMounted(async () => {
 
     <BaseConfirmDialog
       :visible="archiveTarget !== null"
-      title="Archive project"
-      :message="`${archiveTarget?.name ?? 'This project'} will be hidden from the default list. Its tasks and activity are kept and it can be restored at any time.`"
-      confirm-label="Archive"
+      :title="$t('projects.admin.list.archiveTitle')"
+      :message="$t('projects.admin.list.archiveMessage', { name: archiveTarget?.name ?? $t('nav.projects.label') })"
+      :confirm-label="$t('common.actions.archive')"
+      :cancel-label="$t('common.actions.cancel')"
       @update:visible="archiveTarget = null"
       @confirm="confirmArchive"
       @cancel="archiveTarget = null"

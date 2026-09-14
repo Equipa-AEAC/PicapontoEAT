@@ -17,46 +17,20 @@ export type ProjectPriority = "low" | "normal" | "high" | "critical";
 
 export type TaskStatus = "todo" | "in-progress" | "blocked" | "review" | "done";
 
-export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
-  planned: "Planned",
-  active: "Active",
-  paused: "Paused",
-  done: "Completed",
-  archived: "Archived",
-};
+/*
+ * Enumeration *order* lives here; the words do not.
+ *
+ * These used to be `Record<Status, string>` label maps. A module constant is
+ * evaluated once at load, which cannot survive a language change, so the labels
+ * moved to `i18n/vocabulary.ts` as functions and only the ordering — which is a
+ * product decision, not a translation — stayed behind.
+ */
+export const PROJECT_STATUS_ORDER: ProjectStatus[] = ["planned", "active", "paused", "done", "archived"];
 
-export const PROJECT_PRIORITY_LABELS: Record<ProjectPriority, string> = {
-  low: "Low",
-  normal: "Normal",
-  high: "High",
-  critical: "Critical",
-};
-
-export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: "To do",
-  "in-progress": "In progress",
-  blocked: "Blocked",
-  review: "In review",
-  done: "Done",
-};
+export const PROJECT_PRIORITY_ORDER: ProjectPriority[] = ["low", "normal", "high", "critical"];
 
 /** Board column order. Also the order statuses are listed in every select. */
 export const TASK_STATUS_ORDER: TaskStatus[] = ["todo", "in-progress", "blocked", "review", "done"];
-
-export const PROJECT_STATUS_OPTIONS = (Object.keys(PROJECT_STATUS_LABELS) as ProjectStatus[]).map((value) => ({
-  label: PROJECT_STATUS_LABELS[value],
-  value,
-}));
-
-export const PROJECT_PRIORITY_OPTIONS = (Object.keys(PROJECT_PRIORITY_LABELS) as ProjectPriority[]).map((value) => ({
-  label: PROJECT_PRIORITY_LABELS[value],
-  value,
-}));
-
-export const TASK_STATUS_OPTIONS = TASK_STATUS_ORDER.map((value) => ({
-  label: TASK_STATUS_LABELS[value],
-  value,
-}));
 
 /**
  * Somebody who can be put on a project or a task.
@@ -90,6 +64,16 @@ export interface Project {
   deadline: string | null;
   /** Participant ids assigned to the project as a whole. */
   memberIds: string[];
+  /**
+   * Participants trusted to hand work to other people on this project.
+   *
+   * Being on a project lets somebody do the work; it does not let them decide
+   * who else does it. That second capability is granted per project rather than
+   * per person, because a member can reasonably lead one project and simply
+   * take part in another, and a global "can assign" flag could not express that.
+   * The owner always has it and does not need to appear here.
+   */
+  coordinatorIds: string[];
   createdAt: string;
   updatedAt: string | null;
   archivedAt: string | null;
@@ -107,7 +91,16 @@ export interface ProjectTask {
   dueDate: string | null;
   estimatedHours: number | null;
   createdAt: string;
+  /** Display name of whoever created it, as recorded at the time. */
   createdBy: string;
+  /**
+   * Participant id of the creator, or null for tasks that predate the field.
+   *
+   * `createdBy` is a name written into the record and cannot be compared to a
+   * session; this can. It is what lets "a task of mine" mean the one I raised as
+   * well as the one I was given.
+   */
+  createdById: string | null;
   updatedAt: string | null;
   completedAt: string | null;
   archivedAt: string | null;
@@ -138,7 +131,29 @@ export interface ProjectActivityEvent {
   projectId: string;
   taskId: string | null;
   kind: ProjectActivityKind;
+  /**
+   * English text, written when the event happened.
+   *
+   * Kept as the fallback for anything without a `messageKey`, and as what a
+   * future export or backend log would carry. It is never the preferred thing to
+   * render — see `messageKey`.
+   */
   summary: string;
+  /**
+   * Translation key for the same sentence, with `messageParams` filling it in.
+   *
+   * An activity feed is written once and read for the rest of the year, possibly
+   * in a language nobody had chosen when it was written. Recording *what
+   * happened* rather than *how to say it* is the only way the feed can be read
+   * in Portuguese and in English from the same record.
+   */
+  messageKey: string | null;
+  /**
+   * Values for the key. `status`, `fromStatus` and `toStatus` hold raw status
+   * codes and are translated by the renderer; everything else is literal text
+   * (a task title, a list of names) and is interpolated as-is.
+   */
+  messageParams: Record<string, string> | null;
   actorId: string | null;
   actorName: string;
   createdAt: string;
@@ -183,9 +198,12 @@ export interface ProjectTaskSummary extends ProjectTask {
   dueLabel: string | null;
 }
 
+/**
+ * One board column. The column's *name* is not stored: it is the translation of
+ * its status, so a board built before a language change still renders correctly.
+ */
 export interface ProjectBoardColumn {
   status: TaskStatus;
-  label: string;
   tasks: ProjectTaskSummary[];
 }
 
@@ -211,7 +229,8 @@ export interface ProjectOverview {
   overdueTasks: ProjectTaskSummary[];
   dueSoonTasks: ProjectTaskSummary[];
   unassignedTasks: number;
-  statusBreakdown: Array<{ status: TaskStatus; label: string; count: number }>;
+  /* The column name is the translation of the status, not a stored string. */
+  statusBreakdown: Array<{ status: TaskStatus; count: number }>;
   recentActivity: ProjectActivityEvent[];
   recentlyUpdated: ProjectSummary[];
   workload: ProjectWorkloadRow[];
@@ -259,6 +278,7 @@ export interface ProjectFormValues {
   startDate: string | null;
   deadline: string | null;
   memberIds: string[];
+  coordinatorIds: string[];
 }
 
 export interface TaskFormValues {

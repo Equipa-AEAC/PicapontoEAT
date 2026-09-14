@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { t } from "../i18n";
 import { defineStore } from "pinia";
 
 import type { ApplicationSettings } from "../types/settings";
@@ -19,7 +20,7 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       value.value = await getSettings();
     } catch (error) {
-      errorMessage.value = describeError(error, "Settings could not be loaded.");
+      errorMessage.value = describeError(error, t("errors.loadSettings"));
     } finally {
       loading.value = false;
     }
@@ -32,7 +33,7 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       value.value = await saveSettings(nextValue);
     } catch (error) {
-      errorMessage.value = describeError(error, "Settings could not be saved.");
+      errorMessage.value = describeError(error, t("errors.saveSettings"));
       throw error;
     } finally {
       saving.value = false;

@@ -3,6 +3,7 @@ import { PhClockCounterClockwise, PhFingerprint, PhTrendUp, PhUsersThree } from 
 
 import type { DashboardActivity, DashboardMetric } from "../types/dashboard";
 
+import { t } from "../i18n";
 import { formatRelativeTime } from "../utils/date";
 
 import { mockDatabase } from "./mockDatabase";
@@ -19,33 +20,34 @@ export async function getDashboardMetrics(): Promise<DashboardMetric[]> {
 
     return [
       {
-        label: "Today's attendance",
+        labelKey: "admin.metrics.todayAttendance",
         value: String(mockDatabase.attendance.length),
-        caption: "Validated scans and manual records",
+        captionKey: "admin.metrics.todayAttendanceCaption",
         // A badge is only rendered when it says something the data actually supports.
         // There is no week-over-week series to compare against, so this metric carries none.
         // markRaw: these land in a store ref, and Vue warns if a component is made reactive.
         icon: markRaw(PhFingerprint),
       },
       {
-        label: "Currently present",
+        labelKey: "admin.metrics.currentlyPresent",
         value: String(present),
-        caption: "Members checked in right now",
-        trendLabel: `${attendanceRate}% of records`,
+        captionKey: "admin.metrics.currentlyPresentCaption",
+        trendKey: "admin.metrics.percentOfRecords",
+        trendParams: { percent: attendanceRate },
         trendTone: "neutral",
         icon: markRaw(PhUsersThree),
       },
       {
-        label: "Weekly hours",
+        labelKey: "admin.metrics.weeklyHours",
         value: String(Math.round(weeklyHours)),
-        caption: "Attendance hours logged this week",
+        captionKey: "admin.metrics.weeklyHoursCaption",
         icon: markRaw(PhTrendUp),
       },
       {
-        label: "Pending corrections",
+        labelKey: "admin.metrics.pendingCorrections",
         value: String(pendingCorrections),
-        caption: "Attendance records awaiting review",
-        trendLabel: pendingCorrections > 0 ? "Needs attention" : "All clear",
+        captionKey: "admin.metrics.pendingCorrectionsCaption",
+        trendKey: pendingCorrections > 0 ? "admin.metrics.needsAttention" : "admin.metrics.allClear",
         trendTone: pendingCorrections > 0 ? "negative" : "positive",
         icon: markRaw(PhClockCounterClockwise),
       },
@@ -65,23 +67,35 @@ export async function getDashboardMetrics(): Promise<DashboardMetric[]> {
 export async function getDashboardActivity(): Promise<DashboardActivity[]> {
   return mockRequest(() => {
     const memberName = (memberId: string) =>
-      mockDatabase.members.find((member) => member.id === memberId)?.fullName ?? "A member";
+      mockDatabase.members.find((member) => member.id === memberId)?.fullName ?? t("admin.metrics.aMember");
 
     const projectName = (projectId: string | null) =>
-      mockDatabase.projects.find((project) => project.id === projectId)?.name ?? "a project";
+      mockDatabase.projects.find((project) => project.id === projectId)?.name ?? t("admin.metrics.aProject");
 
-    /** "CREATE"/"attendance" is how the log stores it, not how it should read. */
-    const auditTitle = (action: string, entity: string) => {
-      const verb = { CREATE: "added", UPDATE: "updated", DELETE: "removed" }[action] ?? action.toLowerCase();
-      const subject = entity.charAt(0).toUpperCase() + entity.slice(1);
-
-      return `${subject} ${verb}`;
-    };
+    /**
+     * "CREATE"/"attendance" is how the log stores it, not how it should read.
+     *
+     * The *entity* is a database noun, so it is title-cased rather than
+     * translated — there is no vocabulary of entity names, and inventing one for
+     * a strip that shows six rows would be more terminology than it is worth.
+     * The verb around it is translated.
+     */
+    /*
+     * Raw `entity`/`action`, not `auditEntityLabel(entity)` already resolved —
+     * those are vocabulary lookups, and resolving them here bakes in whichever
+     * language happened to be active when the dashboard was last fetched. The
+     * template re-resolves them on every render, the same way `titleKey` itself
+     * is re-resolved rather than being pre-translated into a plain string.
+     */
+    const auditTitle = (action: string, entity: string) => ({
+      titleKey: "admin.metrics.auditRow",
+      titleParams: { entity, action },
+    });
 
     const events: Array<DashboardActivity & { at: string }> = [
       ...mockDatabase.auditLogs.map((entry) => ({
         id: `audit-${entry.id}`,
-        title: auditTitle(entry.action, entry.entity),
+        ...auditTitle(entry.action, entry.entity),
         description: entry.description,
         timestamp: formatRelativeTime(entry.timestamp),
         tone: (entry.action === "DELETE" ? "danger" : "info") as DashboardActivity["tone"],
@@ -89,16 +103,36 @@ export async function getDashboardActivity(): Promise<DashboardActivity[]> {
       })),
       ...mockDatabase.dailyLogs.map((log) => ({
         id: `journal-${log.id}`,
-        title: log.status === "submitted" ? "Daily entry submitted" : "Daily entry drafted",
-        description: `${memberName(log.studentId)} logged ${log.hours}h on ${projectName(log.projectId)}.`,
+        titleKey: log.status === "submitted" ? "admin.metrics.entrySubmitted" : "admin.metrics.entryDrafted",
+        /*
+         * A synthesised sentence, not a recorded one — resolved at render like
+         * everything else here, not flattened into one language at fetch time.
+         */
+        descriptionKey: "admin.metrics.entryDescription",
+        descriptionParams: {
+          name: memberName(log.studentId),
+          hours: t("common.time.hoursShort", { count: log.hours }),
+          project: projectName(log.projectId),
+        },
         timestamp: formatRelativeTime(log.createdAt),
         tone: (log.status === "submitted" ? "success" : "warning") as DashboardActivity["tone"],
         at: log.createdAt,
       })),
       ...mockDatabase.projectActivity.map((event) => ({
         id: `project-${event.id}`,
-        title: projectName(event.projectId),
-        description: `${event.summary} — ${event.actorName}`,
+        titleKey: "admin.metrics.projectTitle",
+        titleParams: { project: projectName(event.projectId) },
+        /*
+         * The event's own message, kept as `messageKey`/`messageParams` rather
+         * than resolved through `formatActivity` here — that call reads the
+         * active locale, so doing it now would freeze the strip's second line
+         * in whichever language was active when the dashboard was fetched. The
+         * template calls `formatActivity` itself on every render instead.
+         */
+        messageKey: event.messageKey,
+        messageParams: event.messageParams,
+        messageSummary: event.summary,
+        actorName: event.actorName,
         timestamp: formatRelativeTime(event.createdAt),
         tone: "info" as DashboardActivity["tone"],
         at: event.createdAt,

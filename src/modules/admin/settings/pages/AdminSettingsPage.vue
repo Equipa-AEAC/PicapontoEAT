@@ -19,8 +19,9 @@ import {
 } from "../../../../shared/components/base";
 import type { BaseTabItem } from "../../../../shared/components/base";
 import { useSettingsStore, useThemeStore } from "../../../../shared/stores";
-import { WEEKDAY_LABELS } from "../../../../types/settings";
 import type { ApplicationSettings } from "../../../../types/settings";
+import { t } from "../../../../i18n";
+import { weekdayLabel } from "../../../../i18n/vocabulary";
 
 const settingsStore = useSettingsStore();
 const themeStore = useThemeStore();
@@ -33,23 +34,30 @@ const passwordForm = reactive({ current: "", next: "", confirm: "" });
 const passwordErrors = reactive<Partial<Record<keyof typeof passwordForm, string>>>({});
 const passwordChanged = ref(false);
 
-const tabs: BaseTabItem[] = [
-  { value: "account", label: "Account & security", icon: PhShieldCheck },
-  { value: "work-hours", label: "Work hours", icon: PhCalendarBlank },
-  { value: "system", label: "System", icon: PhGearSix },
-];
+/* Computed, like every other option list: a constant freezes the language. */
+const tabs = computed<BaseTabItem[]>(() => [
+  { value: "account", label: t("admin.settings.tabAccount"), icon: PhShieldCheck },
+  { value: "work-hours", label: t("admin.settings.tabWorkHours"), icon: PhCalendarBlank },
+  { value: "system", label: t("admin.settings.tabSystem"), icon: PhGearSix },
+]);
 
-const themeOptions = [
-  { label: "Dark", value: "dark" },
-  { label: "Light", value: "light" },
-  { label: "System", value: "system" },
-];
+const themeOptions = computed(() => [
+  { label: t("admin.settings.themeDark"), value: "dark" },
+  { label: t("admin.settings.themeLight"), value: "light" },
+  { label: t("admin.settings.themeSystem"), value: "system" },
+]);
 
-const languageOptions = [
-  { label: "Portuguese (Portugal)", value: "pt-PT" },
-  { label: "Portuguese (Brazil)", value: "pt-BR" },
-  { label: "English (US)", value: "en-US" },
-];
+/*
+ * The *institutional* locale stored in settings, which is a different thing from
+ * the interface language a person picks for themselves — that one is in the
+ * topbar and in each member's own settings. Kept as a stored preference because
+ * it is what a future export or printed document would be produced in.
+ */
+const languageOptions = computed(() => [
+  { label: t("admin.settings.localePtPt"), value: "pt-PT" },
+  { label: t("admin.settings.localePtBr"), value: "pt-BR" },
+  { label: t("admin.settings.localeEnUs"), value: "en-US" },
+]);
 
 const timezoneOptions = [
   { label: "Europe/Lisbon", value: "Europe/Lisbon" },
@@ -57,13 +65,13 @@ const timezoneOptions = [
   { label: "America/New_York", value: "America/New_York" },
 ];
 
-const sessionTimeoutOptions = [
-  { label: "15 minutes", value: 15 },
-  { label: "30 minutes", value: 30 },
-  { label: "1 hour", value: 60 },
-  { label: "4 hours", value: 240 },
-  { label: "Never", value: 0 },
-];
+const sessionTimeoutOptions = computed(() => [
+  { label: t("admin.settings.timeout15"), value: 15 },
+  { label: t("admin.settings.timeout30"), value: 30 },
+  { label: t("admin.settings.timeout60"), value: 60 },
+  { label: t("admin.settings.timeout240"), value: 240 },
+  { label: t("admin.settings.timeoutNever"), value: 0 },
+]);
 
 function createDefaultSettings(): ApplicationSettings {
   return {
@@ -169,21 +177,21 @@ function validatePassword() {
   let valid = true;
 
   if (!passwordForm.current) {
-    passwordErrors.current = "Enter your current password.";
+    passwordErrors.current = t("errors.currentPasswordRequired");
     valid = false;
   } else {
     delete passwordErrors.current;
   }
 
   if (passwordForm.next.length < 8) {
-    passwordErrors.next = "Use at least 8 characters.";
+    passwordErrors.next = t("errors.passwordTooShort");
     valid = false;
   } else {
     delete passwordErrors.next;
   }
 
   if (passwordForm.next !== passwordForm.confirm) {
-    passwordErrors.confirm = "The two passwords do not match.";
+    passwordErrors.confirm = t("errors.passwordsDiffer");
     valid = false;
   } else {
     delete passwordErrors.confirm;
@@ -203,9 +211,9 @@ const passwordStrength = computed(() => {
   const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^\w]/].filter((pattern) => pattern.test(value)).length;
   const score = (value.length >= 12 ? 2 : value.length >= 8 ? 1 : 0) + variety;
 
-  if (score >= 5) return { label: "Strong", tone: "success" as const };
-  if (score >= 3) return { label: "Reasonable", tone: "warning" as const };
-  return { label: "Weak", tone: "danger" as const };
+  if (score >= 5) return { label: t("admin.settings.strengthStrong"), tone: "success" as const };
+  if (score >= 3) return { label: t("admin.settings.strengthReasonable"), tone: "warning" as const };
+  return { label: t("admin.settings.strengthWeak"), tone: "danger" as const };
 });
 
 function changePassword() {
@@ -240,7 +248,7 @@ async function loadSettings() {
     await settingsStore.loadSettings();
     syncForm(settingsStore.value);
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : "Unable to load settings.";
+    loadError.value = error instanceof Error ? error.message : t("admin.settings.loadFailed");
   }
 }
 
@@ -252,13 +260,13 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Settings"
-      description="Your account, how you are notified, when the club operates, and the system configuration behind it."
+      :title="$t('admin.settings.title')"
+      :description="$t('admin.settings.description')"
     >
       <template #actions>
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="settingsStore.loading" @click="loadSettings" />
-        <BaseButton label="Reset" severity="secondary" outlined :disabled="settingsStore.loading || settingsStore.saving" @click="resetSettings" />
-        <BaseButton label="Save changes" :loading="settingsStore.saving" :disabled="settingsStore.loading" @click="saveSettings" />
+        <BaseButton :label="$t('common.actions.refresh')" severity="secondary" outlined :loading="settingsStore.loading" @click="loadSettings" />
+        <BaseButton :label="$t('admin.settings.reset')" severity="secondary" outlined :disabled="settingsStore.loading || settingsStore.saving" @click="resetSettings" />
+        <BaseButton :label="$t('common.actions.saveChanges')" :loading="settingsStore.saving" :disabled="settingsStore.loading" @click="saveSettings" />
       </template>
     </BasePageHeader>
 
@@ -272,77 +280,77 @@ onMounted(async () => {
 
     <BaseEmptyState
       v-else-if="loadError"
-      title="Settings unavailable"
+      :title="$t('admin.settings.unavailable')"
       :description="loadError"
-      action-label="Retry"
+      :action-label="$t('common.actions.retry')"
       @action="loadSettings()"
     />
 
     <BaseTabs v-else v-model="activeTab" :tabs="tabs">
       <!-- ------------------------------------------- Account and security -->
       <template #account>
-        <BaseSection title="Account and security" description="Your password, sessions and the devices allowed to authorise this account.">
+        <BaseSection :title="$t('admin.settings.accountTitle')" :description="$t('admin.settings.accountDescription')">
           <div class="dashboard-grid">
-            <BaseCard title="Change password" description="Used the next time you sign in.">
+            <BaseCard :title="$t('admin.settings.passwordTitle')" :description="$t('admin.settings.passwordDescription')">
               <div class="settings-grid">
                 <label class="settings-grid__wide">
-                  <span>Current password</span>
+                  <span>{{ $t("admin.settings.currentPassword") }}</span>
                   <BaseTextInput v-model="passwordForm.current" type="password" />
                   <small v-if="passwordErrors.current" class="student-form__error">{{ passwordErrors.current }}</small>
                 </label>
                 <label>
-                  <span>New password</span>
+                  <span>{{ $t("admin.settings.newPassword") }}</span>
                   <BaseTextInput v-model="passwordForm.next" type="password" />
                   <small v-if="passwordErrors.next" class="student-form__error">{{ passwordErrors.next }}</small>
                 </label>
                 <label>
-                  <span>Confirm new password</span>
+                  <span>{{ $t("admin.settings.confirmPassword") }}</span>
                   <BaseTextInput v-model="passwordForm.confirm" type="password" />
                   <small v-if="passwordErrors.confirm" class="student-form__error">{{ passwordErrors.confirm }}</small>
                 </label>
               </div>
 
               <div class="settings-actions">
-                <BaseStatusPill v-if="passwordStrength" :label="`Strength: ${passwordStrength.label}`" :tone="passwordStrength.tone" />
-                <BaseStatusPill v-if="passwordChanged" label="Password updated" tone="success" />
-                <BaseButton label="Update password" @click="changePassword" />
+                <BaseStatusPill v-if="passwordStrength" :label="$t('admin.settings.strengthLabel', { level: passwordStrength.label })" :tone="passwordStrength.tone" />
+                <BaseStatusPill v-if="passwordChanged" :label="$t('admin.settings.passwordUpdated')" tone="success" />
+                <BaseButton :label="$t('admin.settings.updatePassword')" @click="changePassword" />
               </div>
             </BaseCard>
 
-            <BaseCard title="Sign-in protection" description="How sessions and unfamiliar devices are handled.">
+            <BaseCard :title="$t('admin.settings.protectionTitle')" :description="$t('admin.settings.protectionDescription')">
               <div class="settings-grid">
                 <label>
-                  <span>Confirm new devices</span>
+                  <span>{{ $t("admin.settings.confirmDevices") }}</span>
                   <BaseToggleSwitch v-model="form.security.confirmNewDevices" />
-                  <small class="student-form__hint">Ask for confirmation the first time this account signs in somewhere new.</small>
+                  <small class="student-form__hint">{{ $t("admin.settings.confirmDevicesHint") }}</small>
                 </label>
                 <label>
-                  <span>Two-factor authentication</span>
+                  <span>{{ $t("admin.settings.twoFactor") }}</span>
                   <BaseToggleSwitch v-model="form.security.twoFactorEnabled" />
-                  <small class="student-form__hint">Require a second factor in addition to the password.</small>
+                  <small class="student-form__hint">{{ $t("admin.settings.twoFactorHint") }}</small>
                 </label>
                 <label class="settings-grid__wide">
-                  <span>Sign out after inactivity</span>
+                  <span>{{ $t("admin.settings.signOutAfter") }}</span>
                   <BaseSelect v-model="form.security.sessionTimeoutMinutes" :options="sessionTimeoutOptions" />
                 </label>
               </div>
             </BaseCard>
           </div>
 
-          <BaseCard title="Trusted devices" description="Devices that may authorise this account without re-confirmation.">
+          <BaseCard :title="$t('admin.settings.trustedTitle')" :description="$t('admin.settings.trustedDescription')">
             <BaseEmptyState
               v-if="form.security.trustedDevices.length === 0"
-              title="No trusted devices"
-              description="Devices appear here after you confirm a sign-in from them."
+              :title="$t('admin.settings.trustedEmptyTitle')"
+              :description="$t('admin.settings.trustedEmptyDescription')"
             />
             <article v-for="device in form.security.trustedDevices" :key="device.id" class="list-row">
               <div>
                 <strong>{{ device.name }}</strong>
-                <p>Last used {{ device.lastUsedAt.slice(0, 10) }}</p>
+                <p>{{ $t("admin.settings.lastUsed", { date: device.lastUsedAt.slice(0, 10) }) }}</p>
               </div>
               <div class="inline-actions">
-                <BaseStatusPill v-if="device.current" label="This device" tone="info" />
-                <BaseButton label="Revoke" text size="small" severity="danger" :disabled="device.current" @click="revokeDevice(device.id)" />
+                <BaseStatusPill v-if="device.current" :label="$t('admin.settings.thisDevice')" tone="info" />
+                <BaseButton :label="$t('admin.settings.revoke')" text size="small" severity="danger" :disabled="device.current" @click="revokeDevice(device.id)" />
               </div>
             </article>
           </BaseCard>
@@ -352,61 +360,66 @@ onMounted(async () => {
       <!-- ----------------------------------------------------- Work hours -->
       <template #work-hours>
         <BaseSection
-          title="Work hours"
-          description="When Equipa Técnica is open. This is what attendance is measured against and what quiet hours follow."
+          :title="$t('admin.settings.hoursTitle')"
+          :description="$t('admin.settings.hoursDescription')"
         >
-          <BaseCard title="Weekly schedule" description="Toggle a day off to mark the club closed.">
+          <BaseCard :title="$t('admin.settings.scheduleTitle')" :description="$t('admin.settings.scheduleDescription')">
             <div class="week-schedule">
               <article v-for="day in form.workHours.schedule" :key="day.weekday" class="week-schedule__row">
                 <div class="week-schedule__day">
                   <BaseToggleSwitch v-model="day.open" />
-                  <span>{{ WEEKDAY_LABELS[day.weekday] }}</span>
+                  <span>{{ weekdayLabel(day.weekday) }}</span>
                 </div>
                 <div class="week-schedule__times">
                   <BaseTextInput v-model="day.start" placeholder="08:30" :disabled="!day.open" />
                   <span class="week-schedule__separator">to</span>
                   <BaseTextInput v-model="day.end" placeholder="17:30" :disabled="!day.open" />
                 </div>
-                <BaseStatusPill v-if="!day.open" label="Closed" tone="warning" />
+                <BaseStatusPill v-if="!day.open" :label="$t('admin.settings.closed')" tone="warning" />
               </article>
             </div>
           </BaseCard>
 
           <div class="dashboard-grid">
-            <BaseCard title="Expected hours" description="Used to flag members who are falling behind.">
+            <BaseCard :title="$t('admin.settings.expectedTitle')" :description="$t('admin.settings.expectedDescription')">
               <div class="settings-grid">
                 <label>
-                  <span>Expected weekly hours</span>
+                  <span>{{ $t("admin.settings.expectedWeekly") }}</span>
                   <BaseInputNumber v-model="form.workHours.expectedWeeklyHours" :min="0" :max="60" />
                 </label>
                 <label>
-                  <span>Scheduled open hours</span>
+                  <span>{{ $t("admin.settings.scheduledOpen") }}</span>
                   <BaseStatusPill
-                    :label="`${scheduledWeeklyHours}h across ${openDays.length} days`"
+                    :label="
+                      $t('admin.settings.weeklySpread', {
+                        hours: scheduledWeeklyHours,
+                        days: openDays.length,
+                      })
+                    "
                     :tone="scheduledWeeklyHours >= form.workHours.expectedWeeklyHours ? 'success' : 'warning'"
                   />
                   <small class="student-form__hint">
-                    The club is open for {{ scheduledWeeklyHours }}h a week, so an expectation above that cannot be met.
+                    {{ $t("admin.settings.openHoursHint", { hours: scheduledWeeklyHours }) }}
                   </small>
                 </label>
               </div>
             </BaseCard>
 
-            <BaseCard title="Closed days" description="Holidays and breaks excluded from attendance expectations.">
+            <BaseCard :title="$t('admin.settings.closedDaysTitle')" :description="$t('admin.settings.closedDaysDescription')">
               <div class="filter-strip">
                 <BaseTextInput v-model="newClosedDate" placeholder="YYYY-MM-DD" />
-                <BaseButton label="Add" severity="secondary" outlined @click="addClosedDate" />
+                <BaseButton :label="$t('common.actions.add')" severity="secondary" outlined @click="addClosedDate" />
               </div>
 
               <BaseEmptyState
                 v-if="form.workHours.closedDates.length === 0"
-                title="No closed days"
-                description="Add the holidays and breaks the club is shut for."
+                :title="$t('admin.settings.closedDaysEmptyTitle')"
+                :description="$t('admin.settings.closedDaysEmptyDescription')"
               />
               <div v-else class="closed-dates">
                 <span v-for="date in form.workHours.closedDates" :key="date" class="closed-dates__chip">
                   {{ date }}
-                  <button type="button" aria-label="Remove closed day" @click="removeClosedDate(date)">
+                  <button type="button" :aria-label="$t('admin.settings.removeClosedDay')" @click="removeClosedDate(date)">
                     <PhTrash weight="bold" />
                   </button>
                 </span>
@@ -418,75 +431,80 @@ onMounted(async () => {
 
       <!-- --------------------------------------------------------- System -->
       <template #system>
-        <BaseSection title="System" description="Workspace-wide configuration. Changes here affect every user.">
+        <BaseSection :title="$t('admin.settings.systemTitle')" :description="$t('admin.settings.systemDescription')">
           <div class="dashboard-grid">
-            <BaseCard title="School identity" description="Branding and localization for the desktop shell.">
+            <BaseCard :title="$t('admin.settings.identityTitle')" :description="$t('admin.settings.identityDescription')">
               <div class="settings-grid">
                 <label>
-                  <span>School name</span>
+                  <span>{{ $t("admin.settings.schoolName") }}</span>
                   <BaseTextInput v-model="form.schoolName" />
                 </label>
                 <label>
-                  <span>Logo URL</span>
+                  <span>{{ $t("admin.settings.logoUrl") }}</span>
                   <BaseTextInput v-model="form.logoUrl" placeholder="https://..." />
                 </label>
                 <label>
-                  <span>Theme</span>
+                  <span>{{ $t("admin.settings.theme") }}</span>
                   <BaseSelect v-model="form.theme" :options="themeOptions" />
                 </label>
                 <label>
-                  <span>Language</span>
+                  <span>{{ $t("common.language.label") }}</span>
                   <BaseSelect v-model="form.language" :options="languageOptions" />
                 </label>
                 <label>
-                  <span>Timezone</span>
+                  <span>{{ $t("admin.settings.timezone") }}</span>
                   <BaseSelect v-model="form.timezone" :options="timezoneOptions" />
                 </label>
                 <label>
-                  <span>Log retention days</span>
+                  <span>{{ $t("admin.settings.logRetention") }}</span>
                   <BaseInputNumber v-model="form.logRetentionDays" :min="30" :max="3650" />
                 </label>
               </div>
             </BaseCard>
 
-            <BaseCard title="Attendance rules" description="Validation windows for scans.">
+            <BaseCard :title="$t('admin.settings.rulesTitle')" :description="$t('admin.settings.rulesDescription')">
               <div class="settings-grid">
                 <label>
-                  <span>Duplicate scan timeout</span>
+                  <span>{{ $t("admin.settings.duplicateTimeout") }}</span>
                   <BaseInputNumber v-model="form.attendance.duplicateScanTimeoutMinutes" :min="1" :max="60" />
                 </label>
                 <label>
-                  <span>Entry tolerance minutes</span>
+                  <span>{{ $t("admin.settings.entryTolerance") }}</span>
                   <BaseInputNumber v-model="form.attendance.entryToleranceMinutes" :min="0" :max="120" />
                 </label>
                 <label>
-                  <span>Exit tolerance minutes</span>
+                  <span>{{ $t("admin.settings.exitTolerance") }}</span>
                   <BaseInputNumber v-model="form.attendance.exitToleranceMinutes" :min="0" :max="120" />
                 </label>
                 <label class="settings-grid__wide">
-                  <span>Working day</span>
-                  <BaseStatusPill :label="`${form.attendance.workingDayStart} – ${form.attendance.workingDayEnd}`" tone="info" />
-                  <small class="student-form__hint">The per-weekday schedule on the Work hours tab is the source of truth.</small>
+                  <span>{{ $t("admin.settings.workingDay") }}</span>
+                  <BaseStatusPill :label="
+                    $t('admin.settings.workingWindow', {
+                      start: form.attendance.workingDayStart,
+                      end: form.attendance.workingDayEnd,
+                    })
+                  " tone="info" />
+                  <small class="student-form__hint">{{ $t("admin.settings.scheduleSourceNote") }}</small>
                 </label>
               </div>
             </BaseCard>
 
-            <BaseCard title="Device integration" description="Tauri, REST and backup configuration.">
+            <BaseCard :title="$t('admin.settings.integrationTitle')" :description="$t('admin.settings.integrationDescription')">
               <div class="settings-grid">
                 <label>
-                  <span>OTA enabled</span>
+                  <span>{{ $t("admin.settings.otaEnabled") }}</span>
                   <BaseToggleSwitch v-model="form.devices.otaEnabled" />
                 </label>
                 <label>
-                  <span>API URL</span>
+                  <span>{{ $t("admin.settings.apiUrl") }}</span>
                   <BaseTextInput v-model="form.devices.apiUrl" />
                 </label>
                 <label>
-                  <span>Backup enabled</span>
+                  <span>{{ $t("admin.settings.backupEnabled") }}</span>
                   <BaseToggleSwitch v-model="form.devices.backupEnabled" />
                 </label>
                 <label>
-                  <span>Backup path</span>
+                  <span>{{ $t("admin.settings.backupPath") }}</span>
                   <BaseTextInput v-model="form.devices.backupPath" />
                 </label>
               </div>

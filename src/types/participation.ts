@@ -1,5 +1,12 @@
 import type { PlacementProgram } from "./placements";
 
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
 /**
  * How a member was participating during a stretch of time.
  *
@@ -17,21 +24,6 @@ import type { PlacementProgram } from "./placements";
  * see `participationKindToProgram`.
  */
 export type ParticipationKind = "team-member" | "internship";
-
-export const PARTICIPATION_KIND_LABELS: Record<ParticipationKind, string> = {
-  "team-member": "Technical Team",
-  internship: "Internship",
-};
-
-/** What each kind's hours are creditable towards. Shown next to the totals. */
-export const PARTICIPATION_KIND_CREDIT: Record<ParticipationKind, string> = {
-  "team-member": "Counts towards the surplus-hours certificate",
-  internship: "Counts towards the FCT internship requirement",
-};
-
-export const PARTICIPATION_KIND_OPTIONS = (
-  Object.keys(PARTICIPATION_KIND_LABELS) as ParticipationKind[]
-).map((value) => ({ label: PARTICIPATION_KIND_LABELS[value], value }));
 
 /** The same distinction `PlacementProgram` draws, under the names it uses. */
 export function participationKindToProgram(kind: ParticipationKind): PlacementProgram {

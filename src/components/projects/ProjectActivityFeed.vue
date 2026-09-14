@@ -14,6 +14,7 @@ import {
 
 import { BaseEmptyState } from "../../shared/components/base";
 import type { ProjectActivityEvent, ProjectActivityKind } from "../../types/projects";
+import { formatActivity } from "../../i18n/vocabulary";
 import { formatRelativeTime } from "../../utils/date";
 
 /**
@@ -35,8 +36,8 @@ const props = withDefaults(
   {
     showProject: false,
     projectNames: () => ({}),
-    emptyTitle: "No activity yet",
-    emptyDescription: "Creating a project or moving a task records an entry here.",
+    emptyTitle: undefined,
+    emptyDescription: undefined,
   },
 );
 
@@ -62,6 +63,11 @@ const rows = computed(() =>
   props.events.map((event) => ({
     ...event,
     projectName: props.projectNames[event.projectId] ?? event.projectId,
+    /*
+     * Rendered from the recorded event, not from the sentence stored with it,
+     * so a timeline written in one language reads correctly in the other.
+     */
+    text: formatActivity(event),
     relative: formatRelativeTime(event.createdAt),
   })),
 );
@@ -69,7 +75,11 @@ const rows = computed(() =>
 
 <template>
   <div class="activity-feed">
-    <BaseEmptyState v-if="rows.length === 0" :title="emptyTitle" :description="emptyDescription" />
+    <BaseEmptyState
+      v-if="rows.length === 0"
+      :title="emptyTitle ?? $t('projects.studentDetail.activityTitle')"
+      :description="emptyDescription ?? $t('projects.activity.empty')"
+    />
 
     <ol v-else class="activity-feed__list">
       <li v-for="event in rows" :key="event.id" class="activity-feed__row">
@@ -78,7 +88,7 @@ const rows = computed(() =>
         </span>
 
         <div class="activity-feed__body">
-          <p class="activity-feed__summary">{{ event.summary }}</p>
+          <p class="activity-feed__summary">{{ event.text }}</p>
           <p class="activity-feed__meta type-meta">
             <PhFolders v-if="showProject" weight="regular" class="activity-feed__meta-icon" />
             <span v-if="showProject">{{ event.projectName }}</span>

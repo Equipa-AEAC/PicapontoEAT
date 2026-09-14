@@ -1,16 +1,12 @@
+/*
+ * The label maps that used to live here now live in `i18n/vocabulary.ts`.
+ *
+ * A `Record<Status, string>` is evaluated once at import, which cannot
+ * survive a language change. The *values* and their order are still a
+ * product decision and stay in this file; how to write them is not.
+ */
+
 export type InternshipStatus = "planned" | "active" | "paused" | "complete";
-
-/** How a placement's state reads to a student, who does not think in enum members. */
-export const INTERNSHIP_STATUS_LABELS: Record<InternshipStatus, string> = {
-  planned: "Planned",
-  active: "In progress",
-  paused: "Paused",
-  complete: "Complete",
-};
-
-export const INTERNSHIP_STATUS_OPTIONS = (
-  Object.keys(INTERNSHIP_STATUS_LABELS) as InternshipStatus[]
-).map((value) => ({ label: INTERNSHIP_STATUS_LABELS[value], value }));
 
 /**
  * An FCT internship carried out inside Equipa Técnica. The club is a school-founded

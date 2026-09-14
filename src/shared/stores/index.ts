@@ -18,4 +18,7 @@ export * from "../../stores/members";
 export * from "../../stores/users";
 export * from "../../modules/authentication/stores/auth";
 export * from "../../stores/attendanceCorrections";
+export * from "../../stores/calendarEvents";
+export * from "../../stores/profileChangeRequests";
+export * from "../../stores/studentPreferences";
 export { useParticipationStore } from "../../stores/participation";

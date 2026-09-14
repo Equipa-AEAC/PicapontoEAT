@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
 
+import BaseDatePicker from "../base/BaseDatePicker.vue";
 import BaseFormDialog from "../base/BaseFormDialog.vue";
 import BaseSelect from "../base/BaseSelect.vue";
 import BaseTextInput from "../base/BaseTextInput.vue";
 import type { ParticipationPeriod, ParticipationPeriodFormValues } from "../../types/participation";
-import { PARTICIPATION_KIND_OPTIONS } from "../../types/participation";
 import type { InternshipSummary } from "../../types/internships";
+import { participationKindOptions } from "../../i18n/vocabulary";
 
 /**
  * Record when a member's participation started and stopped.
@@ -75,9 +76,18 @@ watch(
 <template>
   <BaseFormDialog
     :visible="props.visible"
-    :title="props.period ? 'Edit participation period' : 'Add participation period'"
-    subtitle="Both dates are inclusive and cover whole days. A day belongs entirely to the period containing it."
-    :confirm-label="props.period ? 'Save period' : 'Add period'"
+    :title="
+      props.period
+        ? $t('components.participation.editPeriod')
+        : $t('components.participation.addPeriod')
+    "
+    :subtitle="$t('components.participation.dialogSubtitle')"
+    :confirm-label="
+      props.period
+        ? $t('components.participation.savePeriod')
+        : $t('components.participation.addPeriodShort')
+    "
+    :cancel-label="$t('common.actions.cancel')"
     :confirm-disabled="!canSubmit"
     :loading="props.saving"
     @update:visible="emit('update:visible', $event)"
@@ -86,40 +96,40 @@ watch(
   >
     <div class="settings-grid">
       <label>
-        <span>Participation *</span>
+        <span>{{ $t("components.participation.kind") }}</span>
         <BaseSelect
           :model-value="form.kind"
-          :options="PARTICIPATION_KIND_OPTIONS"
+          :options="participationKindOptions()"
           @update:model-value="form.kind = $event as ParticipationPeriodFormValues['kind']"
         />
       </label>
 
       <label v-if="needsInternship">
-        <span>Internship *</span>
+        <span>{{ $t("components.participation.internship") }}</span>
         <BaseSelect
           :model-value="form.internshipId"
           :options="internshipOptions"
           @update:model-value="form.internshipId = String($event)"
         />
         <small v-if="internshipOptions.length === 0" class="student-form__error">
-          This member has no internship record yet. Assign one before recording an internship period.
+          {{ $t("components.participation.noInternship") }}
         </small>
       </label>
 
       <label>
-        <span>First day *</span>
-        <BaseTextInput v-model="form.startDate" type="date" />
+        <span>{{ $t("components.participation.firstDay") }}</span>
+        <BaseDatePicker v-model="form.startDate" />
       </label>
 
       <label>
-        <span>Last day</span>
-        <BaseTextInput v-model="form.endDate" type="date" />
-        <small class="participation-hint">Leave empty while the participation is still running.</small>
+        <span>{{ $t("components.participation.lastDay") }}</span>
+        <BaseDatePicker v-model="form.endDate" />
+        <small class="participation-hint">{{ $t("components.participation.lastDayHint") }}</small>
       </label>
 
       <label class="settings-grid__wide">
-        <span>Why</span>
-        <BaseTextInput v-model="form.note" placeholder="e.g. FCT placement began" />
+        <span>{{ $t("components.participation.why") }}</span>
+        <BaseTextInput v-model="form.note" :placeholder="$t('components.participation.notePlaceholder')" />
       </label>
 
       <p v-if="props.errorMessage" class="settings-grid__wide form-error-banner">{{ props.errorMessage }}</p>

@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { watch } from "vue";
 import { PhX } from "@phosphor-icons/vue";
+import { t } from "../../i18n";
+
+/*
+ * The root is a `<Teleport>`, so Vue has no single element to fall attributes
+ * through to and drops them with a warning. Every caller that passed a class —
+ * `base-form-dialog`, `base-confirm-dialog`, `app-profile-dialog` — was passing
+ * it into nothing. Attributes are bound to the dialog box explicitly instead.
+ */
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(
   defineProps<{
@@ -54,10 +63,10 @@ watch(
   <Teleport to="body">
     <Transition name="base-dialog-fade">
       <div v-if="visible" class="base-dialog-mask" @mousedown.self="onMaskClick">
-        <div class="base-dialog" role="dialog" aria-modal="true">
+        <div v-bind="$attrs" class="base-dialog" role="dialog" aria-modal="true">
           <header v-if="header || closable" class="base-dialog__header">
             <h3 v-if="header" class="base-dialog__title">{{ header }}</h3>
-            <button v-if="closable" type="button" class="base-dialog__close" aria-label="Close" @click="close">
+            <button v-if="closable" type="button" class="base-dialog__close" :aria-label="t('common.actions.close')" @click="close">
               <PhX weight="bold" />
             </button>
           </header>
@@ -87,10 +96,16 @@ watch(
   background: var(--overlay);
 }
 
+/*
+ * The dialog is the scroll *container*, not the scroller. Scrolling the whole
+ * box took the header and the confirm button with it: on the member form — a
+ * twelve-field grid — "Save" sat below the fold and the reader had to scroll
+ * past every field to find it. The body scrolls; the header and footer stay.
+ */
 .base-dialog {
   width: min(560px, 100%);
   max-height: calc(100vh - 48px);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg);
@@ -100,6 +115,7 @@ watch(
 }
 
 .base-dialog__header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -137,10 +153,15 @@ watch(
 }
 
 .base-dialog__body {
+  /* `min-height: 0` or a flex child refuses to shrink below its content. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-5);
 }
 
 .base-dialog__footer {
+  flex: none;
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);

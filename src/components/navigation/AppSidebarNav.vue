@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import type { NavigationEntry } from "../../types/navigation";
 import { isNavigationGroup } from "../../types/navigation";
+import { t } from "../../i18n";
 
 /**
  * Workspace sidebar navigation.
@@ -12,6 +13,10 @@ import { isNavigationGroup } from "../../types/navigation";
  * whose pages render as indented subsection entries under a non-clickable header.
  * A group is expanded whenever the current route is inside it, so the surrounding
  * pages stay visible while you work in that area.
+ *
+ * Entry labels arrive as translation keys and are resolved here, which is why the
+ * sidebar changes language along with everything else without the navigation
+ * definitions knowing that more than one language exists.
  */
 const props = defineProps<{
   entries: NavigationEntry[];
@@ -46,7 +51,8 @@ function badgeFor(name: string): number | null {
 }
 
 /** The rail hides labels and badges, so the count has to reach the tooltip. */
-function titleFor(label: string, name: string): string {
+function titleFor(labelKey: string, name: string): string {
+  const label = t(labelKey);
   const count = badgeFor(name);
 
   return count === null ? label : `${label} (${count})`;
@@ -66,14 +72,14 @@ function titleFor(label: string, name: string): string {
         <span class="sidebar-nav__icon" aria-hidden="true">
           <component :is="entry.icon" weight="regular" />
         </span>
-        <span class="sidebar-nav__label">{{ entry.label }}</span>
+        <span class="sidebar-nav__label">{{ $t(entry.label) }}</span>
         <span v-if="badgeFor(entry.name) !== null" class="sidebar-nav__badge">{{ badgeFor(entry.name) }}</span>
       </RouterLink>
 
       <div v-else class="sidebar-nav__group" :class="{ 'sidebar-nav__group--active': activeGroups.has(entry.name) }">
         <p class="sidebar-nav__group-label">
           <component :is="entry.icon" weight="regular" aria-hidden="true" />
-          <span>{{ entry.label }}</span>
+          <span>{{ $t(entry.label) }}</span>
         </p>
 
         <RouterLink
@@ -82,12 +88,12 @@ function titleFor(label: string, name: string): string {
           :to="item.path"
           class="sidebar-nav__item sidebar-nav__item--child"
           active-class="sidebar-nav__item--active"
-          :title="collapsed ? `${entry.label} — ${titleFor(item.label, item.name)}` : undefined"
+          :title="collapsed ? `${$t(entry.label)} — ${titleFor(item.label, item.name)}` : undefined"
         >
           <span class="sidebar-nav__icon" aria-hidden="true">
             <component :is="item.icon" weight="regular" />
           </span>
-          <span class="sidebar-nav__label">{{ item.label }}</span>
+          <span class="sidebar-nav__label">{{ $t(item.label) }}</span>
           <span v-if="badgeFor(item.name) !== null" class="sidebar-nav__badge">{{ badgeFor(item.name) }}</span>
         </RouterLink>
       </div>

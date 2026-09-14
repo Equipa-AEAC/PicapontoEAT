@@ -302,9 +302,17 @@
   min-width: 0;
 }
 
+/*
+ * Every control in the topbar is the same height.
+ *
+ * It was three: a 32px toggle, a 32px icon button and a 34px button — close
+ * enough to look like a mistake and far enough apart to stop anything lining up.
+ * `--topbar-control-height` is now the single answer, and the profile trigger
+ * below is bound to it rather than to whatever its contents happen to measure.
+ */
 .topbar__toggle {
-  width: 32px;
-  height: 32px;
+  width: var(--topbar-control-height);
+  height: var(--topbar-control-height);
   flex: none;
   display: grid;
   place-items: center;
@@ -353,9 +361,30 @@
   gap: var(--space-2);
 }
 
+/*
+ * The profile trigger: a control, not a card.
+ *
+ * The avatar used to be 40px tall inside a button whose height was fixed at
+ * 34px, so it overflowed its own border — the picture visibly sat outside the
+ * lining. Three things fix it together, and all three are needed:
+ *
+ *   1. an explicit height on the trigger, tied to the same token as every other
+ *      topbar control, so the button is not sized by its contents;
+ *   2. a `small` avatar (26px) that fits inside that height with room for the
+ *      1px border and the padding;
+ *   3. `overflow: hidden` here, so nothing inside can ever paint past the
+ *      rounded corner again — a guard, not the fix.
+ *
+ * The copy beside it is two lines of tight leading, which measures 24px and
+ * therefore also fits. `min-width: 0` lets a long name ellipsise instead of
+ * pushing the button wider than the topbar.
+ */
 .topbar__profile-trigger {
-  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  height: var(--topbar-control-height);
+  padding: 0 var(--space-3) 0 var(--space-1);
   border-radius: var(--radius-md);
+  overflow: hidden;
+  max-width: 260px;
 }
 
 .topbar__profile-trigger-inner {
@@ -369,8 +398,17 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   min-width: 0;
   line-height: var(--leading-tight);
+}
+
+.topbar__profile-name,
+.topbar__profile-role {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar__profile-name {
@@ -387,8 +425,8 @@
 
 /* Square icon button used for the theme switch and other topbar affordances. */
 .topbar__icon-button {
-  width: 32px;
-  height: 32px;
+  width: var(--topbar-control-height);
+  height: var(--topbar-control-height);
   display: grid;
   place-items: center;
   border: var(--border-width) solid var(--border);
@@ -412,26 +450,43 @@
 
 /* --------------------------------------------------------------- Page frame */
 
+/*
+ * The page frame, and the size every grid inside it measures itself against.
+ *
+ * `container-type: inline-size` is the whole point: the layout below has to
+ * respond to *the space the content actually has*, which is the window minus a
+ * 264px sidebar. The rules used to be viewport media queries, so a 1280px
+ * laptop — the most common size this is used at — dropped the four-across
+ * metric row to two-across even though 1006px was available, and the dashboard
+ * filled with the empty space that was reported.
+ */
 .app-shell__main {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
   max-width: var(--content-max-width);
-  padding: var(--space-6) var(--space-6) var(--space-9);
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  container-type: inline-size;
+  container-name: page;
 }
 
 .page-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--layout-gap-section);
 }
 
+/*
+ * The page header sits closer to its content than the sections do to each
+ * other: the rule under it already separates them, so the old 20px on top of a
+ * 24px stack gap read as a gap twice the size of every other one.
+ */
 .page-header {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-5);
+  gap: var(--space-4);
   align-items: flex-start;
-  padding-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
   border-bottom: var(--border-width) solid var(--border);
 }
 

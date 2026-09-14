@@ -13,20 +13,27 @@ import {
   BaseStatusPill,
 } from "../../../../shared/components/base";
 import { useAnnouncementsStore, useInternshipsStore } from "../../../../shared/stores";
-import { ANNOUNCEMENT_PRIORITY_LABELS } from "../../../../types/announcements";
 import type { AnnouncementPriority, MemberAnnouncement } from "../../../../types/announcements";
-import { PLACEMENT_PROGRAM_LABELS } from "../../../../types/placements";
+
 import type { PlacementProgram } from "../../../../types/placements";
 import { useAuthStore } from "../../../../modules/authentication";
 import { formatIsoDate, formatRelativeTime } from "../../../../shared/utils/date";
+import { announcementPriorityLabel, programLabel } from "../../../../i18n/vocabulary";
 
 /**
  * Notices addressed to this member.
  *
  * These are messages, not records, and they were being rendered as a data table
  * with the message squeezed into a column — which truncated the one part that
- * mattered. This is a reading list: the full text is there, unread notices are
- * marked, and opening one marks it read.
+ * mattered. This is a reading list: the full text is there and unread notices
+ * are marked.
+ *
+ * **Marking read is one notice at a time, and always deliberate.** Expanding or
+ * collapsing used to do it silently, and the only explicit control was a
+ * "Mark all read" button — so a member who opened the page to check one notice
+ * had the rest marked for them, or had to clear the lot. Reading and marking are
+ * now separate: the text opens on click, and "Mark as read" is a button on the
+ * notice it applies to.
  */
 const authStore = useAuthStore();
 const announcementsStore = useAnnouncementsStore();
@@ -74,13 +81,13 @@ function isOpen(announcement: MemberAnnouncement) {
 }
 
 /**
- * Expanding or collapsing a notice both count as having read it.
+ * Expanding and collapsing only change what is on screen.
  *
- * Unread notices start expanded so the text is there without a click, which
- * means "expanded" cannot by itself mean "read" — the member has to act. Either
- * action does it, as does the Mark all read button.
+ * They deliberately do not mark anything: unread notices start expanded so the
+ * text is there without a click, which means "expanded" cannot mean "read", and
+ * a member scrolling past a notice has not read it.
  */
-async function toggle(announcement: MemberAnnouncement) {
+function toggle(announcement: MemberAnnouncement) {
   const next = new Set(openIds.value);
 
   if (next.has(announcement.id)) {
@@ -90,13 +97,11 @@ async function toggle(announcement: MemberAnnouncement) {
   }
 
   openIds.value = next;
-  await announcementsStore.markRead(memberId.value, announcement.id);
 }
 
-async function markAllRead() {
-  for (const announcement of unread.value) {
-    await announcementsStore.markRead(memberId.value, announcement.id);
-  }
+/** One notice, marked because the member said so. */
+async function markRead(announcement: MemberAnnouncement) {
+  await announcementsStore.markRead(memberId.value, announcement.id);
 }
 
 async function refresh() {
@@ -115,18 +120,17 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      title="Announcements"
-      description="Notices for everyone, plus the ones addressed to your participation track."
+      :title="$t('student.announcements.title')"
+      :description="$t('student.announcements.description')"
     >
       <template #actions>
         <BaseButton
-          v-if="unread.length > 0"
-          label="Mark all read"
+          :label="$t('common.actions.refresh')"
           severity="secondary"
           outlined
-          @click="markAllRead"
+          :loading="announcementsStore.loading"
+          @click="refresh()"
         />
-        <BaseButton label="Refresh" severity="secondary" outlined :loading="announcementsStore.loading" @click="refresh()" />
       </template>
     </BasePageHeader>
 
@@ -137,12 +141,12 @@ onMounted(async () => {
     />
 
     <div class="notice-bar">
-      <BaseSearchBar v-model="searchQuery" placeholder="Search announcements" />
+      <BaseSearchBar v-model="searchQuery" :placeholder="$t('student.announcements.search')" />
       <div class="notice-bar__meta">
-        <BaseStatusPill :label="PLACEMENT_PROGRAM_LABELS[memberProgram]" tone="info" />
+        <BaseStatusPill :label="programLabel(memberProgram)" tone="info" />
         <BaseStatusPill
           v-if="unread.length > 0"
-          :label="`${unread.length} unread`"
+          :label="$t('student.announcements.unreadCount', { count: unread.length })"
           tone="warning"
         />
       </div>
@@ -153,11 +157,11 @@ onMounted(async () => {
     <BaseCard v-else>
       <BaseEmptyState
         v-if="announcements.length === 0"
-        title="Nothing to read"
+        :title="$t('student.announcements.emptyTitle')"
         :description="
           searchQuery
-            ? 'No announcement matches what you searched for.'
-            : 'Notices from the coordination team will appear here.'
+            ? $t('student.announcements.emptySearch')
+            : $t('student.announcements.emptyDescription')
         "
       />
 
@@ -175,14 +179,18 @@ onMounted(async () => {
             @click="toggle(announcement)"
           >
             <span class="notice__title-row">
-              <span v-if="announcement.readAt === null" class="notice__dot" aria-label="Unread" />
+              <span
+                v-if="announcement.readAt === null"
+                class="notice__dot"
+                :aria-label="$t('student.announcements.unread')"
+              />
               <span class="notice__title">{{ announcement.title }}</span>
             </span>
 
             <span class="notice__meta type-meta">
               <BaseStatusPill
                 v-if="announcement.priority !== 'normal'"
-                :label="ANNOUNCEMENT_PRIORITY_LABELS[announcement.priority]"
+                :label="announcementPriorityLabel(announcement.priority)"
                 :tone="priorityTones[announcement.priority]"
               />
               <span>{{ formatIsoDate(announcement.publishedAt) }}</span>
@@ -191,16 +199,28 @@ onMounted(async () => {
 
           <div v-if="isOpen(announcement)" class="notice__body">
             <p class="notice__text">{{ announcement.body }}</p>
-            <p class="type-meta notice__footer">
-              <template v-if="announcement.readAt">
-                <PhCheck weight="bold" />
-                Read {{ formatRelativeTime(announcement.readAt) }}
-              </template>
-              <template v-else>
-                <PhEnvelopeSimple weight="regular" />
-                Unread &mdash; collapse this notice, or use “Mark all read”, once you have seen it.
-              </template>
-            </p>
+            <div class="notice__actions">
+              <p class="type-meta notice__footer">
+                <template v-if="announcement.readAt">
+                  <PhCheck weight="bold" />
+                  {{ $t("student.announcements.read", { time: formatRelativeTime(announcement.readAt) }) }}
+                </template>
+                <template v-else>
+                  <PhEnvelopeSimple weight="regular" />
+                  {{ $t("student.announcements.unread") }}
+                </template>
+              </p>
+
+              <!-- One notice, marked because the member pressed this. -->
+              <BaseButton
+                v-if="announcement.readAt === null"
+:label="$t('common.actions.markRead')"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="markRead(announcement)"
+              />
+            </div>
           </div>
         </li>
       </ul>
@@ -302,11 +322,19 @@ onMounted(async () => {
   color: var(--foreground-secondary);
 }
 
+.notice__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
 .notice__footer {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin: var(--space-3) 0 0;
+  margin: 0;
 }
 
 .notice__footer svg {

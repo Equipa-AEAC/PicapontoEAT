@@ -4,6 +4,7 @@ import { PhFilePdf, PhUploadSimple } from "@phosphor-icons/vue";
 
 import BaseButton from "./BaseButton.vue";
 import { ACCEPTED_DOCUMENT_TYPES, formatFileSize, uploadDocument, type UploadedFile } from "../../services/uploads.service";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -19,8 +20,8 @@ const props = withDefaults(
   }>(),
   {
     label: "",
-    hint: "PDF · max 5 MB",
-    uploadLabel: "Upload PDF",
+    hint: undefined,
+    uploadLabel: undefined,
     disabled: false,
     meta: "",
   },
@@ -53,7 +54,7 @@ async function onFileChange(event: Event) {
   try {
     emit("update:modelValue", await uploadDocument(file));
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Unable to upload the document.";
+    errorMessage.value = error instanceof Error ? error.message : t("common.units.files.documentFailed");
   } finally {
     uploading.value = false;
     // Allow re-selecting the same file after a failed attempt.
@@ -92,19 +93,33 @@ function clearFile() {
         <small>{{ formatFileSize(modelValue.size) }}<template v-if="meta"> · {{ meta }}</template></small>
       </div>
       <div class="inline-actions">
-        <BaseButton label="Open" text size="small" @click="openFile" />
-        <BaseButton label="Replace" text size="small" :disabled="disabled" :loading="uploading" @click="pickFile" />
-        <BaseButton label="Remove" text size="small" severity="danger" :disabled="disabled" @click="clearFile" />
+        <BaseButton :label="$t('common.actions.open')" text size="small" @click="openFile" />
+        <BaseButton
+          :label="$t('common.units.files.replace')"
+          text
+          size="small"
+          :disabled="disabled"
+          :loading="uploading"
+          @click="pickFile"
+        />
+        <BaseButton
+          :label="$t('common.actions.remove')"
+          text
+          size="small"
+          severity="danger"
+          :disabled="disabled"
+          @click="clearFile"
+        />
       </div>
     </div>
 
     <div v-else class="base-file-upload__empty">
       <BaseButton severity="secondary" outlined size="small" :disabled="disabled" :loading="uploading" @click="pickFile">
         <PhUploadSimple weight="bold" />
-        <span>{{ uploadLabel }}</span>
+        <span>{{ uploadLabel ?? $t("common.units.files.uploadPdf") }}</span>
       </BaseButton>
       <small v-if="errorMessage" class="base-file-upload__error">{{ errorMessage }}</small>
-      <small v-else class="base-file-upload__hint">{{ hint }}</small>
+      <small v-else class="base-file-upload__hint">{{ hint ?? $t("common.units.files.pdfOnly") }}</small>
     </div>
 
     <small v-if="modelValue && errorMessage" class="base-file-upload__error">{{ errorMessage }}</small>

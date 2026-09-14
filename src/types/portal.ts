@@ -1,3 +1,6 @@
+import type { InternshipStatus } from "./internships";
+import type { AttendanceStatus } from "./attendance";
+
 export interface StudentPortalProfile {
   fullName: string;
   studentNumber: string;
@@ -34,10 +37,24 @@ export interface PortalAnnouncement {
 
 export interface StudentPortalSummary {
   profile: StudentPortalProfile;
-  currentInternshipStatus: string;
+  /**
+   * The placement's status code, or null when there is no placement.
+   *
+   * It used to be a pre-formatted English label built in the service, which put
+   * "In progress" into an otherwise Portuguese card. The view names it.
+   */
+  currentInternshipStatus: InternshipStatus | null;
   completedHours: number;
   remainingHours: number;
-  attendanceToday: string;
+  /**
+   * Today's attendance state, as the status *code* rather than a word.
+   *
+   * It was a pre-formatted English string written into the fixture, which
+   * meant the Portuguese dashboard printed "Present" in the middle of an
+   * otherwise translated card. The view names it through the shared
+   * vocabulary, the same as every other attendance status.
+   */
+  attendanceToday: AttendanceStatus;
   /*
    * There is deliberately no `attendanceCalendar`, `recentAttendance`,
    * `weeklyStatistics` or `monthlyStatistics` here. Days and the totals over

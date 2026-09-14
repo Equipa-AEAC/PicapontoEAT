@@ -2,6 +2,8 @@
 import { computed, ref } from "vue";
 
 import type { ProjectParticipant } from "../../types/projects";
+import { t } from "../../i18n";
+import { participantRoleLabel } from "../../i18n/vocabulary";
 
 /**
  * Multi-select for people, grouped by where they come from.
@@ -18,7 +20,7 @@ const props = withDefaults(
     /** Renders a filter box once the roster is longer than this. */
     searchThreshold?: number;
   }>(),
-  { label: "Assigned people", searchThreshold: 8 },
+  { label: undefined, searchThreshold: 8 },
 );
 
 const emit = defineEmits<{ "update:modelValue": [value: string[]] }>();
@@ -35,13 +37,21 @@ const filtered = computed(() => {
   }
 
   return props.participants.filter((participant) =>
-    `${participant.name} ${participant.role}`.toLowerCase().includes(needle),
+    `${participant.name} ${participantRoleLabel(participant.role)}`.toLowerCase().includes(needle),
   );
 });
 
 const groups = computed(() => [
-  { key: "member", label: "Members", rows: filtered.value.filter((item) => item.source === "member") },
-  { key: "user", label: "Staff", rows: filtered.value.filter((item) => item.source === "user") },
+  {
+    key: "member",
+    label: t("projects.participants.members"),
+    rows: filtered.value.filter((item) => item.source === "member"),
+  },
+  {
+    key: "user",
+    label: t("projects.participants.staff"),
+    rows: filtered.value.filter((item) => item.source === "user"),
+  },
 ]);
 
 function toggle(participantId: string) {
@@ -56,8 +66,10 @@ function toggle(participantId: string) {
 <template>
   <fieldset class="participant-picker">
     <legend class="participant-picker__legend type-label">
-      {{ label }}
-      <span v-if="modelValue.length > 0" class="participant-picker__count">{{ modelValue.length }} selected</span>
+      {{ label ?? $t("projects.participants.legend") }}
+      <span v-if="modelValue.length > 0" class="participant-picker__count">
+        {{ $t("projects.participants.selected", { count: modelValue.length }) }}
+      </span>
     </legend>
 
     <input
@@ -65,8 +77,8 @@ function toggle(participantId: string) {
       v-model="query"
       type="search"
       class="participant-picker__search base-text-input"
-      placeholder="Filter people"
-      aria-label="Filter people"
+      :placeholder="$t('projects.participants.filter')"
+      :aria-label="$t('projects.participants.filter')"
     />
 
     <div class="participant-picker__list">
@@ -86,12 +98,15 @@ function toggle(participantId: string) {
           />
           <span class="participant-picker__name">{{ participant.name }}</span>
           <span class="participant-picker__role type-meta">
-            {{ participant.role }}<template v-if="participant.isExternal"> · External</template>
+            {{ participantRoleLabel(participant.role) }}
+            <template v-if="participant.isExternal"> · {{ $t("projects.participants.external") }}</template>
           </span>
         </label>
       </template>
 
-      <p v-if="filtered.length === 0" class="participant-picker__empty type-meta">Nobody matches that filter.</p>
+      <p v-if="filtered.length === 0" class="participant-picker__empty type-meta">
+        {{ $t("projects.participants.noMatches") }}
+      </p>
     </div>
   </fieldset>
 </template>

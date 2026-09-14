@@ -5,6 +5,7 @@ import { PhUploadSimple } from "@phosphor-icons/vue";
 import BaseAvatar from "./BaseAvatar.vue";
 import BaseButton from "./BaseButton.vue";
 import { ACCEPTED_IMAGE_TYPES, uploadImage } from "../../services/uploads.service";
+import { t } from "../../i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -45,7 +46,7 @@ async function onFileChange(event: Event) {
     const uploaded = await uploadImage(file);
     emit("update:modelValue", uploaded.url);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Unable to upload the image.";
+    errorMessage.value = error instanceof Error ? error.message : t("common.units.files.imageFailed");
   } finally {
     uploading.value = false;
     // Allow re-selecting the same file after a failed attempt.
@@ -75,13 +76,22 @@ function clearImage() {
       <div class="inline-actions">
         <BaseButton severity="secondary" outlined size="small" :loading="uploading" @click="pickFile">
           <PhUploadSimple weight="bold" />
-          <span>{{ props.modelValue ? "Replace photo" : "Upload photo" }}</span>
+          <span>
+            {{ props.modelValue ? $t("common.units.files.replacePhoto") : $t("common.units.files.uploadPhoto") }}
+          </span>
         </BaseButton>
-        <BaseButton v-if="props.modelValue" label="Remove" text size="small" severity="danger" @click="clearImage" />
+        <BaseButton
+          v-if="props.modelValue"
+          :label="$t('common.actions.remove')"
+          text
+          size="small"
+          severity="danger"
+          @click="clearImage"
+        />
       </div>
 
       <small v-if="errorMessage" class="base-image-upload__error">{{ errorMessage }}</small>
-      <small v-else class="base-image-upload__hint">PNG, JPG or WebP · max 2 MB</small>
+      <small v-else class="base-image-upload__hint">{{ $t("common.units.files.hint") }}</small>
     </div>
   </div>
 </template>

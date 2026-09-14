@@ -5,6 +5,7 @@ import { PhDownloadSimple } from "@phosphor-icons/vue";
 
 import BaseButton from "../../../../components/base/BaseButton.vue";
 import BaseCard from "../../../../components/base/BaseCard.vue";
+import BaseDatePicker from "../../../../components/base/BaseDatePicker.vue";
 import BaseEmptyState from "../../../../components/base/BaseEmptyState.vue";
 import BaseErrorState from "../../../../components/base/BaseErrorState.vue";
 import BaseFilterPanel from "../../../../components/base/BaseFilterPanel.vue";
@@ -15,12 +16,16 @@ import BaseSelect from "../../../../components/base/BaseSelect.vue";
 import BaseStatsCard from "../../../../components/base/BaseStatsCard.vue";
 import BaseStatusPill from "../../../../components/base/BaseStatusPill.vue";
 import BaseTable from "../../../../components/base/BaseTable.vue";
-import BaseTextInput from "../../../../components/base/BaseTextInput.vue";
 import TableColumn from "../../../../components/base/TableColumn.vue";
 import { useMembersStore } from "../../../../stores/members";
 import type { MemberAttendanceHistoryItem } from "../../../../shared/types";
 import { csvFilename, downloadCsv, toCsv } from "../../../../shared/utils/csv";
 import { formatIsoDate } from "../../../../shared/utils/date";
+import { t } from "../../../../i18n";
+import {
+  attendanceStatusLabel,
+  attendanceStatusOptions,
+} from "../../../../i18n/vocabulary";
 
 /**
  * One member's attendance, in full.
@@ -43,12 +48,10 @@ const statusFilter = ref<MemberAttendanceHistoryItem["status"] | "all">("all");
 const fromDate = ref("");
 const toDate = ref("");
 
-const statusOptions = [
-  { label: "All statuses", value: "all" },
-  { label: "Present", value: "present" },
-  { label: "Corrected", value: "corrected" },
-  { label: "Missing", value: "missing" },
-];
+const statusOptions = computed(() => [
+  { label: t("common.filters.allStatuses"), value: "all" },
+  ...attendanceStatusOptions().filter((option) => option.value !== "late"),
+]);
 
 const hasFilters = computed(
   () => statusFilter.value !== "all" || fromDate.value !== "" || toDate.value !== "",
@@ -126,19 +129,19 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <BasePageHeader
-      :title="membersStore.selectedMember?.fullName ?? 'Attendance history'"
-      description="Every day recorded against this member, with the corrections that were applied."
+      :title="membersStore.selectedMember?.fullName ?? $t('admin.memberAttendance.back')"
+      :description="$t('admin.memberAttendance.description')"
     >
       <template #actions>
         <BaseButton
-          label="Back to member"
+          :label="$t('admin.memberAttendance.back')"
           severity="secondary"
           outlined
           @click="router.push({ name: 'member-details', params: { memberId } })"
         />
         <BaseButton :disabled="rows.length === 0" @click="exportCsv">
           <PhDownloadSimple weight="bold" />
-          Export CSV
+          {{ $t("common.actions.exportCsv") }}
         </BaseButton>
       </template>
     </BasePageHeader>
@@ -150,32 +153,32 @@ onMounted(async () => {
     />
 
     <section class="metric-grid">
-      <BaseStatsCard label="Days shown" :value="String(rows.length)" caption="Records in the current filter" />
-      <BaseStatsCard label="Hours" :value="`${totalHours}h`" caption="Total across those days" />
-      <BaseStatsCard label="Corrected" :value="String(correctedCount)" caption="Days changed after review" />
-      <BaseStatsCard label="Missing" :value="String(missingCount)" caption="Days with no usable scan" />
+      <BaseStatsCard :label="$t('admin.memberAttendance.metricDays')" :value="String(rows.length)" :caption="$t('admin.memberAttendance.metricDaysCaption')" />
+      <BaseStatsCard :label="$t('common.fields.hours')" :value="`${totalHours}h`" :caption="$t('admin.memberAttendance.metricHoursCaption')" />
+      <BaseStatsCard :label="$t('admin.memberAttendance.metricCorrected')" :value="String(correctedCount)" :caption="$t('admin.memberAttendance.metricCorrectedCaption')" />
+      <BaseStatsCard :label="$t('admin.memberAttendance.metricMissing')" :value="String(missingCount)" :caption="$t('admin.memberAttendance.metricMissingCaption')" />
     </section>
 
-    <BaseFilterPanel title="Filters" description="Narrow by period and status. The export follows whatever is shown.">
+    <BaseFilterPanel :title="$t('admin.memberAttendance.filtersTitle')" :description="$t('admin.memberAttendance.filtersDescription')">
       <div class="filter-strip">
         <label class="date-field">
-          <span class="type-label">From</span>
-          <BaseTextInput v-model="fromDate" type="date" />
+          <span class="type-label">{{ $t("common.time.from") }}</span>
+          <BaseDatePicker v-model="fromDate" />
         </label>
         <label class="date-field">
-          <span class="type-label">To</span>
-          <BaseTextInput v-model="toDate" type="date" />
+          <span class="type-label">{{ $t("common.time.to") }}</span>
+          <BaseDatePicker v-model="toDate" />
         </label>
         <BaseSelect
           :model-value="statusFilter"
           :options="statusOptions"
           @update:model-value="statusFilter = $event as MemberAttendanceHistoryItem['status'] | 'all'"
         />
-        <BaseButton label="Clear" severity="secondary" outlined :disabled="!hasFilters" @click="clearFilters" />
+        <BaseButton :label="$t('common.actions.clearFilters')" severity="secondary" outlined :disabled="!hasFilters" @click="clearFilters" />
       </div>
 
       <p v-if="rangeIsBackwards" class="form-error-banner range-warning">
-        The “to” date is before the “from” date, so nothing can match. Swap them to see results.
+        {{ $t("admin.memberAttendance.invertedRange") }}
       </p>
     </BaseFilterPanel>
 
@@ -185,29 +188,32 @@ onMounted(async () => {
       <BaseCard>
         <BaseEmptyState
           v-if="rows.length === 0"
-          title="No matching days"
+          :title="$t('admin.memberAttendance.emptyTitle')"
           :description="
             hasFilters
-              ? 'No attendance falls inside the period and status you picked.'
-              : 'This member has no recorded attendance yet.'
+              ? $t('admin.memberAttendance.emptyFiltered')
+              : $t('admin.memberAttendance.emptyNone')
           "
-          :action-label="hasFilters ? 'Clear filters' : undefined"
+          :action-label="hasFilters ? $t('common.actions.clearFilters') : undefined"
           @action="clearFilters"
         />
 
         <BaseTable v-else :value="rows" dataKey="id" :rows="15" paginator>
-          <TableColumn field="date" header="Date" sortable>
+          <TableColumn field="date" :header="$t('common.time.date')" sortable>
             <template #body="slotProps">{{ formatIsoDate(slotProps.data.date) }}</template>
           </TableColumn>
-          <TableColumn field="entry" header="Entry" />
-          <TableColumn field="exit" header="Exit" />
-          <TableColumn field="hours" header="Hours" sortable>
+          <TableColumn field="entry" :header="$t('admin.memberAttendance.colEntry')" />
+          <TableColumn field="exit" :header="$t('admin.memberAttendance.colExit')" />
+          <TableColumn field="hours" :header="$t('common.fields.hours')" sortable>
             <template #body="slotProps">{{ slotProps.data.hours }}h</template>
           </TableColumn>
-          <TableColumn field="deviceName" header="Device" sortable />
-          <TableColumn field="status" header="Status" sortable>
+          <TableColumn field="deviceName" :header="$t('admin.memberAttendance.colDevice')" sortable />
+          <TableColumn field="status" :header="$t('common.fields.status')" sortable>
             <template #body="slotProps">
-              <BaseStatusPill :label="slotProps.data.status" :tone="statusTone(slotProps.data.status)" />
+              <BaseStatusPill
+                :label="attendanceStatusLabel(slotProps.data.status)"
+                :tone="statusTone(slotProps.data.status)"
+              />
             </template>
           </TableColumn>
         </BaseTable>
