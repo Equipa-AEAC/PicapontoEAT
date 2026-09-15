@@ -25,6 +25,7 @@ Export/
 *.njsproj
 *.sln
 *.sw?
+.haxelib
 
 # Claude Code scratch worktrees — these are full repo checkouts and must never be committed
 .claude/worktrees/
